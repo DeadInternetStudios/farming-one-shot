@@ -1,0 +1,27 @@
+{
+  "name": "lantern-hollow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A cozy pixel-art farming game for the browser, built with Phaser 4. Every sprite, font, sound and tune is made from code.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "art": "node tools/art/build.mjs",
+    "audio": "node tools/audio/build.mjs",
+    "assets": "npm run art && npm run audio",
+    "sim": "node tools/sim/economy.mjs"
+  },
+  "dependencies": {
+    "phaser": "4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

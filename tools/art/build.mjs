@@ -1,0 +1,224 @@
+// Builds every image the game uses, from code. Run: npm run art
+// Writes public/assets/*.png and *.json, plus src/gen/art.ts (frame lists and tile ids).
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { Img } from './px.mjs';
+import { writePNG } from './png.mjs';
+import { packAtlas } from './atlas.mjs';
+import { R, mix } from './palette.mjs';
+import { buildFont } from './font.mjs';
+import * as TR from './gen/terrain.mjs';
+import * as O from './gen/objects.mjs';
+import * as C from './gen/characters.mjs';
+import * as CR from './gen/crops.mjs';
+import * as B from './gen/buildings.mjs';
+import * as I from './gen/items.mjs';
+import * as U from './gen/ui.mjs';
+import * as FX from './gen/fx.mjs';
+
+const OUT = 'public/assets';
+mkdirSync(OUT, { recursive: true });
+mkdirSync('src/gen', { recursive: true });
+
+const SEASONS = ['spring', 'summer', 'fall', 'winter'];
+const crops = JSON.parse(readFileSync('src/data/crops.json', 'utf8'));
+const manifest = { frames: {}, counts: {} };
+const count = (k, n) => { manifest.counts[k] = n; };
+
+// ---------------------------------------------------------------- tilesets
+const TILE_COLS = 24;
+const plankInterior = (x, y) => {
+  const row = Math.floor(y / 4) % 4, inRow = y % 4;
+  if (inRow === 3) return R.wood[1];
+  if (inRow === 0) return R.wood[4];
+  const off = (row * 5) % 16;
+  if ((x + off) % 16 === 0 && inRow === 1) return R.wood[1];
+  return row % 2 ? R.wood[3] : R.wood[2];
+};
+const plankRim = (e) => (e.d === 0 ? (e.top ? R.wood[5] : R.wood[1]) : undefined);
+const frost = (img, t) => img.mapColors((c) => mix(c, R.snow[3], t));
+
+function blobSet(opts, extra = []) {
+  const set = TR.BLOB_MASKS.map((m) => (m === 255 ? TR.fullTile(opts.fullInterior ?? opts.interior) : TR.blobTile(m, opts)));
+  return { set, extra };
+}
+
+function buildTileset(season) {
+  const ramp = season === 'fall' ? R.grassFall : season === 'summer' ? R.grassSummer : R.grass;
+  const land = (v) => (season === 'winter' ? TR.snowInterior(v) : TR.grassInterior(v, ramp));
+  const tiles = [];
+  const push = (arr) => arr.forEach((t) => tiles.push(t));
+  const landOpts = { interior: land(0), rim: TR.bankRim, rimDepth: 2, outer: TR.bankOuter };
+  push(blobSet(landOpts).set);
+  for (let v = 1; v <= 5; v++) tiles.push(TR.fullTile(land(v)));
+  const tint = (arr) => (season === 'winter' ? arr.map((t) => frost(t.clone(), 0.32)) : arr);
+  push(tint(blobSet({ interior: TR.pathInterior(1), rim: TR.pathRim }).set));
+  push(tint(blobSet({ interior: TR.cobbleInterior(1), rim: TR.cobbleRim }).set));
+  push(tint(blobSet({ interior: TR.soilInterior(false), rim: TR.soilRim(false) }).set));
+  push(tint(blobSet({ interior: TR.soilInterior(true), rim: TR.soilRim(true) }).set));
+  push(blobSet({ interior: TR.sandInterior(0), rim: TR.bankRim, rimDepth: 2, outer: TR.bankOuter }).set);
+  for (let v = 1; v <= 5; v++) tiles.push(TR.fullTile(TR.sandInterior(v)));
+  push(blobSet({ interior: plankInterior, rim: plankRim, outer: (e) => (e.below ? { c: R.ink[1], a: 110 } : null) }).set);
+
+  const rows = Math.ceil(tiles.length / TILE_COLS);
+  const img = new Img(TILE_COLS * 18, rows * 18);
+  tiles.forEach((t, i) => img.blit(t.extrude(1), (i % TILE_COLS) * 18, Math.floor(i / TILE_COLS) * 18));
+  writePNG(`${OUT}/tiles-${season}.png`, img);
+  return tiles.length;
+}
+const tileCount = SEASONS.map(buildTileset)[0];
+const FULL = TR.BLOB_INDEX[255];
+const tileIds = {
+  grass: 0, grassFull: [FULL, 47, 48, 49, 50, 51],
+  path: 52, cobble: 99, soilDry: 146, soilWet: 193,
+  sand: 240, sandFull: [240 + FULL, 287, 288, 289, 290, 291],
+  plank: 292,
+};
+
+// water, six looping frames
+{
+  const frames = TR.waterFrames(6, 64);
+  const items = frames.map((img, i) => ({ name: `water-${i}`, img }));
+  const { atlas, json } = packAtlas(items, { maxW: 256, pad: 0, extrude: 0, imageName: 'water.png' });
+  writePNG(`${OUT}/water.png`, atlas);
+  writeFileSync(`${OUT}/water.json`, JSON.stringify(json));
+}
+
+// ---------------------------------------------------------------- world atlas
+const A = [];
+const add = (name, img) => A.push({ name, img });
+
+for (const s of SEASONS) {
+  for (let v = 0; v < 3; v++) add(`tree/${s}/${v}`, O.tree(s, v * 3 + 1));
+  for (let v = 0; v < 3; v++) add(`bush/${s}/${v}`, O.bush(s, v + 2));
+  add(`stump/${s}`, O.stump(1, s === 'winter'));
+  for (let v = 0; v < 3; v++) add(`weed/${s}/${v}`, O.weed(v + 1, s));
+  for (let f = 0; f < 4; f++) add(`tallgrass/${s}/${f}`, O.tallGrass(f, s));
+}
+count('tree', 3); count('bush', 3); count('weed', 3);
+for (let v = 0; v < 3; v++) add(`rock/small/${v}`, O.rock('small', v + 1));
+for (let v = 0; v < 2; v++) add(`rock/big/${v}`, O.rock('big', v + 2));
+count('rockSmall', 3); count('rockBig', 2);
+const ORES = { copper: R.orange, iron: R.teal, gold: R.yellow, crystal: R.purple };
+for (const [k, c] of Object.entries(ORES)) add(`ore/${k}`, O.ore(c));
+for (const k of ['daisy', 'tulip', 'bell', 'sun', 'lav', 'cosmos']) for (let v = 0; v < 2; v++) add(`flower/${k}/${v}`, O.flowerPatch(k, v + 1));
+for (let m = 0; m < 16; m++) add(`fence/${m}`, O.fence(m));
+for (let v = 0; v < 3; v++) add(`branch/${v}`, O.branch(v + 1));
+add('log/0', O.log(1)); add('log/1', O.log(2));
+
+// crops: stages, regrow, dead
+const cropFrames = {};
+for (const c of crops) {
+  const { stages, regrow, dead } = CR.cropSprites(c);
+  stages.forEach((img, i) => add(`crop/${c.id}/${i}`, img));
+  add(`crop/${c.id}/regrow`, regrow); add(`crop/${c.id}/dead`, dead);
+  cropFrames[c.id] = stages.length;
+}
+
+// buildings
+{
+  const h = B.farmhouse();
+  add('building/farmhouse', h.day); add('building/farmhouse-glow', h.glow);
+  const bin = B.shippingBin();
+  add('building/bin', bin.closed); add('building/bin-open', bin.open);
+  const lp = B.lanternPost();
+  add('prop/lamp', lp.day); add('prop/lamp-glow', lp.glow);
+  add('prop/sign', B.sign());
+}
+
+// items
+{
+  for (const tier of Object.keys(C.TIERS)) for (const t of [...C.TOOLS, 'rod']) {
+    if (t === 'rod' && tier !== 'basic') continue;
+    add(`item/${t}-${tier}`, I.toolIcon(t, tier));
+  }
+  for (const c of crops) {
+    add(`item/seed-${c.id}`, I.seedPacket(R[c.art.fruit] ?? R[c.art.bloom] ?? R[c.art.head] ?? R[c.art.root] ?? R.leaf));
+    add(`item/${c.id}`, I.produce(c));
+  }
+  const bars = { copperBar: R.orange, ironBar: R.teal, goldBar: R.yellow };
+  for (const [k, fn] of Object.entries(I.RES)) {
+    if (k === 'bar' || k === 'fish' || k === 'dish' || k === 'gem') continue;
+    add(`item/${k}`, fn());
+  }
+  for (const [k, ramp] of Object.entries(bars)) add(`item/${k}`, I.RES.bar(ramp)());
+  for (const [k, ramp] of Object.entries({ minnow: R.teal, perch: R.leaf, trout: R.blossom, carp: R.orange, eel: R.ink, koi: R.red })) add(`item/fish-${k}`, I.RES.fish(ramp)());
+  for (const [k, ramp] of Object.entries({ amethyst: R.purple, topaz: R.yellow, aquamarine: R.water, ruby: R.red })) add(`item/gem-${k}`, I.RES.gem(ramp)());
+  for (const [k, ramp] of Object.entries({ soup: R.orange, stew: R.dirt, pie: R.yellow, salad: R.leaf, jam: R.purple, tea: R.leaf })) add(`item/dish-${k}`, I.RES.dish(ramp)());
+}
+
+// ui
+{
+  add('ui/panel', U.panel()); add('ui/panel-dark', U.panelDark());
+  add('ui/slot', U.slot()); add('ui/slot-sel', U.slotSelected());
+  for (const k of ['leaf', 'wood', 'berry', 'sky']) for (const st of ['up', 'hover', 'down']) add(`ui/btn-${k}-${st}`, U.button(k, st));
+  add('ui/btn-disabled', U.disabledButton());
+  add('ui/coin', U.coin()); add('ui/bolt', U.bolt());
+  for (const f of ['full', 'half', 'empty']) add(`ui/heart-${f}`, U.heart(f));
+  add('ui/arrow-down', U.arrowDown()); add('ui/arrow-right', U.arrowRight()); add('ui/check', U.check());
+  for (const s of SEASONS) add(`ui/season-${s}`, U.seasonIcon(s));
+  for (const w of ['sun', 'cloud', 'rain', 'storm', 'snow']) add(`ui/weather-${w}`, U.weatherIcon(w));
+  add('ui/stick-base', U.stickBase()); add('ui/stick-knob', U.stickKnob()); add('ui/action-btn', U.actionButton());
+}
+
+// fx
+{
+  add('fx/glow-128', FX.glow(128)); add('fx/glow-48', FX.glow(48, 1.8));
+  add('fx/shadow-s', FX.shadow(14, 6)); add('fx/shadow-m', FX.shadow(22, 8)); add('fx/shadow-l', FX.shadow(34, 12));
+  for (let i = 0; i < 4; i++) { add(`fx/dust/${i}`, FX.dust(i)); add(`fx/smoke/${i}`, FX.smoke(i)); }
+  for (let i = 0; i < 5; i++) { add(`fx/sparkle/${i}`, FX.sparkle(i)); add(`fx/sparkle-gold/${i}`, FX.sparkle(i, R.yellow)); }
+  add('fx/drop', FX.waterDrop());
+  for (let i = 0; i < 3; i++) { add(`fx/splash/${i}`, FX.splash(i)); add(`fx/ripple/${i}`, FX.ripple(i)); add(`fx/leaf-autumn/${i}`, FX.leaf(i, R.autumn)); add(`fx/leaf-green/${i}`, FX.leaf(i, R.leaf)); }
+  add('fx/petal', FX.petal()); add('fx/snow', FX.snowflake()); add('fx/rain', FX.rainStreak()); add('fx/raindrop', FX.raindrop());
+  add('fx/heart', FX.heartFx()); add('fx/firefly/0', FX.firefly(0)); add('fx/firefly/1', FX.firefly(1));
+  add('fx/note/0', FX.note(0)); add('fx/note/1', FX.note(1)); add('fx/zzz', FX.zzz());
+  add('fx/cursor', FX.cursorTile()); add('fx/exclaim', FX.exclaim());
+}
+
+{
+  const { atlas, json, frames } = packAtlas(A, { maxW: 1024, pad: 2, extrude: 1, imageName: 'atlas.png' });
+  writePNG(`${OUT}/atlas.png`, atlas);
+  writeFileSync(`${OUT}/atlas.json`, JSON.stringify(json));
+  manifest.frames = Object.keys(frames);
+  console.log(`atlas.png ${atlas.w}x${atlas.h}, ${A.length} frames`);
+}
+
+// ---------------------------------------------------------------- characters
+const DIRS = ['down', 'up', 'side'];
+const PLAYER = { skin: R.skin2, hair: R.hairBrown, hairStyle: 'short', shirt: R.teal, pants: R.wood, shoes: R.wood, hat: 'straw' };
+{
+  const items = [];
+  const who = 'player';
+  for (const dir of DIRS) {
+    const poses = dir === 'side' ? C.WALK_SIDE : C.WALK;
+    poses.forEach((p, i) => items.push({ name: `${who}/walk-${dir}-${i}`, img: C.frame(PLAYER, dir, p) }));
+    items.push({ name: `${who}/idle-${dir}-0`, img: C.idleFrame(PLAYER, dir) });
+    for (const tool of C.TOOLS) for (const tier of Object.keys(C.TIERS)) for (let t = 0; t < 4; t++) {
+      items.push({ name: `${who}/${tool}-${tier}-${dir}-${t}`, img: C.toolFrame(PLAYER, dir, t, tool, tier) });
+    }
+  }
+  const { atlas, json, frames } = packAtlas(items, { maxW: 1024, pad: 2, extrude: 1, imageName: 'chars.png' });
+  writePNG(`${OUT}/chars.png`, atlas);
+  writeFileSync(`${OUT}/chars.json`, JSON.stringify(json));
+  console.log(`chars.png ${atlas.w}x${atlas.h}, ${items.length} frames`);
+}
+
+// ---------------------------------------------------------------- fonts
+for (const [name, outline] of [['hollow', null], ['hollow-o', () => R.ink[0]]]) {
+  const { atlas, xml } = buildFont({ outline, name });
+  writePNG(`${OUT}/font-${name}.png`, atlas);
+  writeFileSync(`${OUT}/font-${name}.xml`, xml);
+}
+
+// ---------------------------------------------------------------- manifest for the game
+const ts = `// Generated by tools/art/build.mjs. Do not edit.
+export const TILE_SIZE = 16;
+export const TILESET = { cols: ${TILE_COLS}, margin: 1, spacing: 2, count: ${tileCount} } as const;
+export const TILE_ID = ${JSON.stringify(tileIds)} as const;
+export const BLOB_INDEX: readonly number[] = ${JSON.stringify(TR.BLOB_INDEX)};
+export const CROP_STAGES: Readonly<Record<string, number>> = ${JSON.stringify(cropFrames)};
+export const ART_COUNTS: Readonly<Record<string, number>> = ${JSON.stringify(manifest.counts)};
+export const FRAME_NAMES: readonly string[] = ${JSON.stringify(manifest.frames)};
+export const CHAR_FRAME = { w: ${C.FW}, h: ${C.FH}, originX: 16, originY: 30 } as const;
+`;
+writeFileSync('src/gen/art.ts', ts);
+console.log('wrote src/gen/art.ts');
