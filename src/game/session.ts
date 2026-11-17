@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { newGame } from './state';
 import type { GameState } from './state';
-import { buildMap } from '../world/maps/registry';
+import { buildMap, isDaily } from '../world/maps/registry';
 import type { MapDef } from '../world/mapkit';
 import { locationFromMap } from './state';
 import type { LocationState } from './state';
@@ -52,8 +52,19 @@ class Session {
     return l;
   }
 
+  /** Forget maps and state that change with the day: the mine, and anything built overnight. */
+  newMorning(): void {
+    for (const id of [...this.maps.keys()]) {
+      if (isDaily(id)) {
+        this.maps.delete(id);
+        delete this.state.locations[id];
+      }
+    }
+    this.maps.delete('farm');
+  }
+
   private build(id: string): MapDef {
-    return buildMap(id, this.state.seed);
+    return buildMap(id, this.state);
   }
 }
 

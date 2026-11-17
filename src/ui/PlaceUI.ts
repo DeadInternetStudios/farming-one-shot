@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { itemDef } from '../data/items';
 import { NPC_BY_ID } from '../data/npcs';
+import { MAX_BATCH, SMELTS, batchFor, collectBars, furnaceState, minutesLeft, startSmelt } from '../game/furnace';
 import { canAdd, addItem, countItem, emptySlots } from '../game/inventory';
 import type { Slots } from '../game/inventory';
 import { deliver } from '../game/requests';
@@ -266,5 +267,98 @@ export class ChestScreen extends Screen {
       else if (this.focus === 'chest') { this.focus = 'bag'; this.pack.sel = Math.min(this.pack.cells.length - 1, this.chest.sel % this.chest.cols); }
     } else if (isConfirm(code)) { this.move(this.focus, g.sel); return; }
     this.paint();
+  }
+}
+
+// ------------------------------------------------------------------ the furnace
+
+const clockText = (mins: number): string => {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
+
+/** Feed ore and coal in, come back later for bars. */
+export class FurnaceScreen extends Screen {
+  private pane: ListPane | null = null;
+  private msg: Phaser.GameObjects.BitmapText | null = null;
+
+  constructor(host: Host, private loc: string, private key: string) {
+    super(host);
+  }
+
+  private get thing(): ThingState {
+    const t = session.location(this.loc).things[this.key];
+    if (!t) throw new Error('No furnace at ' + this.key);
+    return t;
+  }
+
+  private entries(): Entry[] {
+    const st = session.state;
+    const t = this.thing;
+    const state = furnaceState(st, t);
+    if (t.job && state !== 'idle') {
+      const d = itemDef(t.job.bar);
+      const left = minutesLeft(st, t);
+      return [{
+        row: { text: `${t.job.n} ${d.name}`, icon: iconFor(st, t.job.bar), right: state === 'ready' ? 'Ready!' : clockText(left) },
+        title: state === 'ready' ? 'All done' : 'Smelting',
+        icon: iconFor(st, t.job.bar),
+        lines: state === 'ready' ? ['The bars are cool enough to hold.'] : [`About ${clockText(left)} to go.`, 'You can walk away. It keeps working.'],
+        actions: state === 'ready' ? [{
+          label: 'Take them', kind: 'leaf', run: () => {
+            const r = collectBars(st, t);
+            session.events.emit('sfx', r.ok ? 'coin' : 'nope');
+            return r.msg;
+          },
+        }] : [],
+      }];
+    }
+    return SMELTS.map((s): Entry => {
+      const n = batchFor(st, s);
+      const ore = countItem(st.player.slots, s.ore);
+      const coal = countItem(st.player.slots, 'coal');
+      return {
+        row: { text: itemDef(s.bar).name, icon: iconFor(st, s.bar), right: n > 0 ? `x${n}` : '', dim: n === 0 },
+        title: itemDef(s.bar).name,
+        icon: iconFor(st, s.bar),
+        lines: [
+          `${s.need} ${itemDef(s.ore).name} and 1 Coal make one bar.`,
+          { t: `${itemDef(s.ore).name}: ${ore}`, tint: ore >= s.need ? COL.leaf : COL.berry },
+          { t: `Coal: ${coal}`, tint: coal >= 1 ? COL.leaf : COL.berry },
+          n > 0 ? `Up to ${MAX_BATCH} at once. ${n} now takes ${clockText(n * s.minutes)}.` : 'Not enough yet.',
+        ],
+        actions: [{
+          label: 'Smelt', kind: 'leaf', run: () => {
+            const r = startSmelt(st, t, s);
+            session.events.emit('sfx', r.ok ? 'craft' : 'nope');
+            if (r.ok) session.events.emit('selected');
+            return r.msg;
+          },
+        }],
+      };
+    });
+  }
+
+  build(): void {
+    const { l, bag } = this;
+    this.dim(0.5);
+    const wide = l.uiW >= 290;
+    const w = Math.min(l.uiW - 8, 340);
+    const h = Math.min(l.uiH - 8, wide ? 190 : 300);
+    const x = Math.floor((l.uiW - w) / 2);
+    const y = Math.floor((l.uiH - h) / 2);
+    bag.panel(x, y, w, h);
+    bag.text(x + 12, y + 10, 'Furnace', {});
+    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const body = this.own(new Bag(this.scene, bag.depth));
+    this.msg = bag.text(x + w / 2, y + h - 12, '', { origin: [0.5, 0] });
+    this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 28, w: w - 20, h: h - 28 - 18 }, wide, () => this.entries()));
+    this.pane.say = (m) => this.msg?.setText(m);
+  }
+
+  override onKey(code: string, ev: KeyboardEvent): void {
+    if (isBack(code)) this.close();
+    else this.pane?.key(code, ev);
   }
 }

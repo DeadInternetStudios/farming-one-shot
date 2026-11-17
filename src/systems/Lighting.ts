@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { daylight, goldenHour } from '../game/clock';
 import type { Season, Weather } from '../game/types';
+import type { MapKind } from '../world/mapkit';
 import type { LightSpot } from '../world/ObjectsView';
 import { DEPTH } from '../world/MapView';
 import type { CameraRig } from './CameraRig';
@@ -31,9 +32,12 @@ export interface SkyState {
 const ROOM_DAY = rgb(0xf6e8d2);
 const ROOM_NIGHT = rgb(0x9a8aa6);
 
-export function skyFor(season: Season, minute: number, weather: Weather, indoors: boolean): SkyState {
+const CAVE = rgb(0x4a5688);
+
+export function skyFor(season: Season, minute: number, weather: Weather, kind: MapKind): SkyState {
   const day = daylight(season, minute);
-  if (indoors) {
+  if (kind === 'cave') return { ambient: pack(CAVE), lamps: 1, day: 0 };
+  if (kind === 'interior') {
     const t = smooth(0.05, 0.9, day);
     return { ambient: pack(mix(ROOM_NIGHT, ROOM_DAY, t)), lamps: 0.55 + (1 - t) * 0.45, day };
   }

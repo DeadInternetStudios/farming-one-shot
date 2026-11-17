@@ -6,13 +6,20 @@ import { tileKey } from '../game/types';
 export const GROUND = { Void: 0, Grass: 1, Sand: 2 } as const;
 export const OVERLAY = { None: 0, Path: 1, Cobble: 2, Plank: 3 } as const;
 
-export type ObjectKind = 'tree' | 'stump' | 'rock' | 'boulder' | 'weed' | 'tallgrass' | 'branch' | 'log' | 'flower' | 'bush';
+export type ObjectKind =
+  | 'tree' | 'stump' | 'rock' | 'boulder' | 'weed' | 'tallgrass' | 'branch' | 'log' | 'flower' | 'bush'
+  | 'mushroom' | 'berries' | 'clay' | 'copper' | 'iron' | 'gold' | 'crystal'
+  | 'chest' | 'furnace' | 'sprinkler';
+
+/** Things the player builds and can pick up again. */
+export const MACHINE_KINDS: ReadonlySet<ObjectKind> = new Set(['chest', 'furnace', 'sprinkler']);
 
 /** Kinds that stop the player. Everything else can be walked through. */
-export const SOLID_OBJECTS: ReadonlySet<ObjectKind> = new Set(['tree', 'stump', 'rock', 'boulder', 'log', 'bush']);
+export const SOLID_OBJECTS: ReadonlySet<ObjectKind> = new Set(['tree', 'stump', 'rock', 'boulder', 'log', 'bush', 'copper', 'iron', 'gold', 'crystal', 'chest', 'furnace', 'sprinkler']);
 
 export const OBJECT_HP: Readonly<Record<ObjectKind, number>> = {
   tree: 5, stump: 3, rock: 2, boulder: 6, weed: 1, tallgrass: 1, branch: 1, log: 6, flower: 1, bush: 1,
+  mushroom: 1, berries: 1, clay: 1, copper: 3, iron: 4, gold: 5, crystal: 4, chest: 1, furnace: 1, sprinkler: 1,
 };
 
 export interface MapObject {

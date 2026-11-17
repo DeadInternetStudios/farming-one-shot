@@ -7,7 +7,7 @@ import { canGift, giveGift, talkTo } from '../game/social';
 import type { Unlock } from '../data/npcs';
 import { Dialogue } from './DialogueUI';
 import { MenuScreen, RecipeScreen, ShrineScreen } from './MenuUI';
-import { BoardScreen, ChestScreen, GiftScreen } from './PlaceUI';
+import { BoardScreen, ChestScreen, FurnaceScreen, GiftScreen } from './PlaceUI';
 import type { Host } from './Screens';
 import { ShopScreen } from './ShopUI';
 
@@ -19,7 +19,8 @@ export type Interact =
   | { kind: 'cook' }
   | { kind: 'board' }
   | { kind: 'menu'; tab?: 'bag' | 'craft' | 'bundles' | 'friends' | 'options' }
-  | { kind: 'chest'; loc: string; key: string };
+  | { kind: 'chest'; loc: string; key: string }
+  | { kind: 'furnace'; loc: string; key: string };
 
 /** Each villager's voice: the pitch of their speech blips. */
 const VOICE: Readonly<Record<string, number>> = { mirren: 1.12, bram: 0.72, ida: 1.0, tam: 0.62, wren: 1.3, olwen: 0.86 };
@@ -87,6 +88,7 @@ export function interact(host: Host, what: Interact, toTitle: () => void): void 
     case 'cook': return host.open(new RecipeScreen(host, 'cook', 'The Stove'));
     case 'board': return host.open(new BoardScreen(host));
     case 'chest': return host.open(new ChestScreen(host, what.loc, what.key));
+    case 'furnace': return host.open(new FurnaceScreen(host, what.loc, what.key));
     case 'menu': return host.open(new MenuScreen(host, toTitle, what.tab));
   }
 }

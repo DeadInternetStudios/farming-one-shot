@@ -30,6 +30,14 @@ const SHADOW: Partial<Record<ObjectKind, { frame: string; alpha: number; dy: num
   boulder: { frame: 'fx/shadow-l', alpha: 0.5, dy: -1 },
   stump: { frame: 'fx/shadow-s', alpha: 0.45, dy: -1 },
   log: { frame: 'fx/shadow-l', alpha: 0.45, dy: -1 },
+  copper: { frame: 'fx/shadow-m', alpha: 0.45, dy: -1 },
+  iron: { frame: 'fx/shadow-m', alpha: 0.45, dy: -1 },
+  gold: { frame: 'fx/shadow-m', alpha: 0.45, dy: -1 },
+  crystal: { frame: 'fx/shadow-m', alpha: 0.45, dy: -1 },
+  chest: { frame: 'fx/shadow-m', alpha: 0.4, dy: -1 },
+  furnace: { frame: 'fx/shadow-m', alpha: 0.45, dy: -1 },
+  sprinkler: { frame: 'fx/shadow-s', alpha: 0.4, dy: -1 },
+  berries: { frame: 'fx/shadow-m', alpha: 0.4, dy: -1 },
 };
 
 /** Everything standing on the ground: trees, rocks, crops, buildings and props, sorted by their feet. */
@@ -131,6 +139,16 @@ export class ObjectsView {
       case 'log': return `log/${o.v % 2}`;
       case 'flower': return `flower/${FLOWER_KINDS[o.v % 6]}/${Math.floor(o.v / 6) % 2}`;
       case 'bush': return `bush/${s}/${o.v % 3}`;
+      case 'mushroom': return `forage/mushroom/${o.v % 2}`;
+      case 'berries': return `forage/berries/${o.v % 2}`;
+      case 'clay': return 'forage/clay';
+      case 'copper': return 'ore/copper';
+      case 'iron': return 'ore/iron';
+      case 'gold': return 'ore/gold';
+      case 'crystal': return 'ore/crystal';
+      case 'chest': return 'obj/chest';
+      case 'furnace': return 'obj/furnace';
+      case 'sprinkler': return 'obj/sprinkler';
     }
   }
 
@@ -202,6 +220,13 @@ export class ObjectsView {
     const s = this.placed.get(key)?.sprite;
     if (!s) return null;
     return this.img(s.x, s.y, s.frame.name).setOrigin(0.5, 1).setDepth(s.depth);
+  }
+
+  /** Furnaces glow while they are working. `busy` says which furnace keys have a job running. */
+  syncMachines(busy: ReadonlySet<string>): void {
+    for (const [key, p] of this.placed) {
+      if (p.kind === 'furnace') p.sprite.setFrame(busy.has(key) ? 'obj/furnace-lit' : 'obj/furnace');
+    }
   }
 
   openBin(open: boolean): void {

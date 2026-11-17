@@ -18,6 +18,7 @@ import * as IN from './gen/interior.mjs';
 import * as V from './gen/village.mjs';
 import * as N from './gen/npcs.mjs';
 import * as MA from './gen/machines.mjs';
+import * as W from './gen/wild.mjs';
 
 const OUT = 'public/assets';
 mkdirSync(OUT, { recursive: true });
@@ -95,6 +96,22 @@ const INTERIOR_IDS = {};
   const img = new Img(TILE_COLS * 18, rows * 18);
   tiles.forEach((t, i) => img.blit(t.extrude(1), (i % TILE_COLS) * 18, Math.floor(i / TILE_COLS) * 18));
   writePNG(`${OUT}/tiles-interior.png`, img);
+}
+
+// cave tileset: floors shaded toward walls (mask bits: 1 wall above, 2 left, 4 right), rock mass, wall faces, ladders
+const CAVE_IDS = {};
+{
+  const tiles = [];
+  const add = (img) => { tiles.push(img); return tiles.length - 1; };
+  CAVE_IDS.floor = [0, 1, 2, 3].map((v) => Array.from({ length: 8 }, (_, m) => add(W.caveFloor(v, m))));
+  CAVE_IDS.mass = [0, 1, 2].map((v) => add(W.caveMass(v)));
+  CAVE_IDS.face = [0, 1, 2].map((v) => add(W.caveFace(v)));
+  CAVE_IDS.hole = add(W.caveHole());
+  CAVE_IDS.up = add(W.caveLadderUp());
+  const rows = Math.ceil(tiles.length / TILE_COLS);
+  const img = new Img(TILE_COLS * 18, rows * 18);
+  tiles.forEach((t, i) => img.blit(t.extrude(1), (i % TILE_COLS) * 18, Math.floor(i / TILE_COLS) * 18));
+  writePNG(`${OUT}/tiles-cave.png`, img);
 }
 
 const FULL = TR.BLOB_INDEX[255];
@@ -197,6 +214,24 @@ for (const c of crops) {
   add('obj/chest', MA.chestWorld(false)); add('obj/chest-open', MA.chestWorld(true));
 }
 
+// the wild: forage, the mine mouth, the lake hut, the coop and the animals
+{
+  add('forage/mushroom/0', W.mushroom(0)); add('forage/mushroom/1', W.mushroom(1));
+  add('forage/berries/0', W.berries(0)); add('forage/berries/1', W.berries(1)); add('forage/clay', W.clay());
+  add('prop/mine-entrance', W.mineEntrance());
+  const shack = W.shack(); add('building/shack', shack.day); add('building/shack-glow', shack.glow);
+  const coop = W.coop(); add('building/coop', coop.day); add('building/coop-glow', coop.glow);
+  add('prop/rowboat', W.rowboat()); add('prop/egg-basket', W.eggBasket());
+  for (const k of ['white', 'brown']) for (const p of ['idle', 'walk0', 'walk1', 'peck0', 'peck1']) add(`critter/hen-${k}-${p}`, W.hen(k, p));
+  add('critter/chick-idle', W.chick('idle')); add('critter/chick-walk', W.chick('walk'));
+  for (const p of ['sit', 'walk0', 'walk1', 'sleep']) add(`critter/cat-${p}`, W.cat(p));
+  add('fx/bobber/0', W.bobber(false)); add('fx/bobber/1', W.bobber(true));
+  add('ui/fish-track', W.fishTrack()); add('ui/fish-zone', W.fishZone()); add('ui/fish-meter', W.fishMeter());
+  add('cave/crystal-purple', W.caveCrystal(R.purple, 1)); add('cave/crystal-purple-glow', W.caveCrystalGlow(R.purple));
+  add('cave/crystal-blue', W.caveCrystal(R.water, 2)); add('cave/crystal-blue-glow', W.caveCrystalGlow(R.water));
+  add('cave/mushroom', W.caveMushroom());
+}
+
 // items
 {
   for (const tier of Object.keys(C.TIERS)) for (const t of [...C.TOOLS, 'rod']) {
@@ -293,6 +328,7 @@ export const TILE_SIZE = 16;
 export const TILESET = { cols: ${TILE_COLS}, margin: 1, spacing: 2, count: ${tileCount} } as const;
 export const TILE_ID = ${JSON.stringify(tileIds)} as const;
 export const INTERIOR_TILE_ID = ${JSON.stringify(INTERIOR_IDS)} as const;
+export const CAVE_TILE_ID = ${JSON.stringify(CAVE_IDS)} as const;
 export const BLOB_INDEX: readonly number[] = ${JSON.stringify(TR.BLOB_INDEX)};
 export const CROP_STAGES: Readonly<Record<string, number>> = ${JSON.stringify(cropFrames)};
 export const ART_COUNTS: Readonly<Record<string, number>> = ${JSON.stringify(manifest.counts)};

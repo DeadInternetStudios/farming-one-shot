@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { itemDef } from '../data/items';
-import { facingTile, interactTile, isSolidTile, isWater, useSeed, useTool } from '../game/actions';
+import { facingTile, interactTile, isSolidTile, isWater, placeMachine, useSeed, useTool } from '../game/actions';
 import type { Ctx, Outcome } from '../game/actions';
 import { DAY_END, minutesPerSecond, seasonOf } from '../game/clock';
 import { sleepThrough } from '../game/day';
@@ -10,6 +10,7 @@ import { rngFor } from '../game/rng';
 import { saveGame } from '../game/save';
 import { session } from '../game/session';
 import { litCount } from '../game/bundles';
+import { furnaceState } from '../game/furnace';
 import { addItem } from '../game/inventory';
 import type { Dir, ToolId, Weather } from '../game/types';
 import { tileKey } from '../game/types';
@@ -23,6 +24,7 @@ import { Fx } from '../systems/Fx';
 import { Lighting, skyFor } from '../systems/Lighting';
 import { MapView } from '../world/MapView';
 import { ObjectsView } from '../world/ObjectsView';
+import type { LightSpot } from '../world/ObjectsView';
 import type { Hotspot, MapDef, Warp } from '../world/mapkit';
 import { hasMap } from '../world/maps/registry';
 
@@ -40,6 +42,7 @@ export class WorldScene extends Phaser.Scene {
   private objects!: ObjectsView;
   private npcs!: Npcs;
   private lastTenth = 0;
+  private lastMachineSync = 0;
   private player!: Player;
   private rig!: CameraRig;
   private lighting!: Lighting;
@@ -211,12 +214,22 @@ export class WorldScene extends Phaser.Scene {
 
     this.updateCursor(time);
     this.objects.update(time);
+    if (time - this.lastMachineSync > 700) {
+      this.lastMachineSync = time;
+      this.syncMachines();
+    }
     this.rig.update(dt, this.player.x, this.player.y - 8);
-    const sky = skyFor(seasonOf(st.day), st.minute, st.weather, this.def.indoors);
-    this.lighting.update(sky, time, this.objects.glows);
+    const sky = skyFor(seasonOf(st.day), st.minute, st.weather, this.def.kind);
+    this.lighting.update(sky, time, this.objects.glows, this.torch());
     const dark = 1 - Math.min(1, sky.day * 1.3);
     for (const f of this.objects.nightFrames) f.setAlpha(dark);
     this.chimneySmoke(dt, sky.day);
+  }
+
+  /** In the mine you carry a little light of your own. */
+  private torch(): LightSpot[] {
+    if (this.def.kind !== 'cave') return [];
+    return [{ x: this.player.x, y: this.player.y - 10, r: 92, color: 0xffd9a3, flicker: true }];
   }
 
   private say(msg: string): void {
@@ -289,18 +302,30 @@ export class WorldScene extends Phaser.Scene {
     const door = this.warpAt(t.x, t.y);
     if (door) return this.travel(door);
 
+    const key = tileKey(t.x, t.y);
+    const held = st.player.slots[st.player.selected];
+    const def = held ? itemDef(held.id) : null;
+    const standing = session.location(this.def.id).objects[key];
+    if (standing?.k === 'chest' || standing?.k === 'furnace') {
+      const breaker = held && (held.id === 'axe' || held.id === 'pick');
+      if (!breaker) {
+        session.events.emit('interact', { kind: standing.k, loc: this.def.id, key });
+        return;
+      }
+    }
+
     const hand = interactTile(ctx, t.x, t.y);
     if (hand) return this.resolve(hand, null);
 
-    const held = st.player.slots[st.player.selected];
-    if (!held) return;
-    const def = itemDef(held.id);
+    if (!held || !def) return;
     if (def.kind === 'tool') {
       const tool = held.id as ToolId;
       const out = useTool(ctx, tool, t.x, t.y, this.player.facing);
       this.resolve(out, tool);
     } else if (def.kind === 'seed') {
       this.resolve(useSeed(ctx, held.id, st.player.selected, t.x, t.y), null);
+    } else if (def.kind === 'machine') {
+      this.resolve(placeMachine(ctx, held.id, st.player.selected, t.x, t.y), null);
     } else {
       this.say(`${def.name}. Press F to eat it, or ship it from the bin.`);
     }
@@ -356,6 +381,13 @@ export class WorldScene extends Phaser.Scene {
   private talk(id: string): void {
     this.npcs.face(id, OPPOSITE[this.player.facing]);
     session.events.emit('interact', { kind: 'talk', id });
+  }
+
+  private syncMachines(): void {
+    const busy = new Set<string>();
+    const l = session.location(this.def.id);
+    for (const [key, t] of Object.entries(l.things)) if (t.kind === 'furnace' && furnaceState(session.state, t) === 'working') busy.add(key);
+    this.objects.syncMachines(busy);
   }
 
   private lightShrine(): void {
@@ -441,7 +473,8 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.fadeOut(900, 12, 9, 20);
     cam.once('camerafadeoutcomplete', () => {
-      const summary = sleepThrough(session.state, session.map('farm'), passedOut);
+      const summary = sleepThrough(session.state, (id) => session.map(id), passedOut);
+      session.newMorning();
       this.afterSleep(summary);
     });
   }

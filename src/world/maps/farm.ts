@@ -1,8 +1,9 @@
 import { GROUND, MapBuilder, OVERLAY } from '../mapkit';
+import type { GameState } from '../../game/state';
 import type { MapDef } from '../mapkit';
 
 /** Lantern Hollow Farm. 56 x 40 tiles. The house sits top left, the pond bottom right. */
-export function farmMap(seed: number): MapDef {
+export function farmMap(seed: number, _state?: GameState): MapDef {
   const m = new MapBuilder('farm', 'Lantern Hollow Farm', 56, 40, seed);
   m.fill(m.ground, GROUND.Grass);
 
