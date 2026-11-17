@@ -1,4 +1,5 @@
 import { cropOfSeed, itemDef } from '../data/items';
+import { decorAt, decorIndexOf, decorItemId } from '../features/garden/catalog';
 import type { MapDef, ObjectKind } from '../world/mapkit';
 import { MACHINE_KINDS, SOLID_OBJECTS, OBJECT_HP } from '../world/mapkit';
 import {
@@ -110,7 +111,10 @@ function pickUpMachine(ctx: Ctx, key: string, tx: number, ty: number, o: ObjectS
   if (o.k === 'chest' && thing?.items?.some((s) => s)) return fail('Empty the chest first.', tx, ty);
   if (o.k === 'furnace' && thing?.job) return fail('The furnace is still busy.', tx, ty);
   const fx: FxEvent[] = [];
-  if (!give(ctx, o.k, 1, fx, tx, ty)) return fail('Your bag is full.', tx, ty);
+  const decor = o.k === 'decor' ? decorAt(o.v) : undefined;
+  // a garden piece comes back as the thing you bought; one that is not in the catalogue any more just goes
+  const item = o.k === 'decor' ? (decor ? decorItemId(decor) : null) : o.k;
+  if (item && !give(ctx, item, 1, fx, tx, ty)) return fail('Your bag is full.', tx, ty);
   delete l.objects[key];
   delete l.things[key];
   return done({ sfx: 'pickup', fx, changed: [key], swing: false });
@@ -122,9 +126,14 @@ export function placeMachine(ctx: Ctx, id: string, slotIndex: number, tx: number
   const key = tileKey(tx, ty);
   const i = ty * ctx.map.w + tx;
   if (!ctx.map.tillable[i] || l.objects[key] || l.soil[key] || ctx.map.solid[i]) return fail("There isn't room to put that down here.", tx, ty);
-  const kind = id as 'chest' | 'furnace' | 'sprinkler';
-  l.objects[key] = { k: kind, v: 0, hp: 1 };
-  l.things[key] = kind === 'chest' ? { kind, items: emptySlots(24) } : { kind };
+  const piece = decorIndexOf(id);
+  if (piece >= 0) {
+    l.objects[key] = { k: 'decor', v: piece, hp: 1 };
+  } else {
+    const kind = id as 'chest' | 'furnace' | 'sprinkler';
+    l.objects[key] = { k: kind, v: 0, hp: 1 };
+    l.things[key] = kind === 'chest' ? { kind, items: emptySlots(24) } : { kind };
+  }
   takeFromSlot(ctx.state.player.slots, slotIndex, 1);
   return done({ sfx: 'place', fx: [{ t: 'dust', x: tx, y: ty }], changed: [key], swing: false });
 }
@@ -304,10 +313,3 @@ export function describeSelected(state: GameState): string {
   const s = state.player.slots[state.player.selected];
   return s ? itemDef(s.id).name : '';
 }
-
-export const OBJECT_NAMES: Readonly<Record<ObjectKind, string>> = {
-  tree: 'Tree', stump: 'Stump', rock: 'Rock', boulder: 'Boulder', weed: 'Weeds', tallgrass: 'Tall grass',
-  branch: 'Branch', log: 'Large log', flower: 'Wildflowers', bush: 'Bush',
-  mushroom: 'Mushroom', berries: 'Berry bush', clay: 'Clay', copper: 'Copper ore', iron: 'Iron ore', gold: 'Gold ore', crystal: 'Crystal',
-  chest: 'Chest', furnace: 'Furnace', sprinkler: 'Sprinkler',
-};

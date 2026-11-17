@@ -1,4 +1,5 @@
 import { BUNDLES } from '../data/bundles';
+import { DECOR, GARDEN_ON } from '../features/garden/catalog';
 import { allLit, isComplete } from './bundles';
 import { dayOfSeason, seasonOf } from './clock';
 import { FESTIVALS, FESTIVAL_NAMES, festivalToday } from '../data/festivals';
@@ -65,6 +66,11 @@ export function nextGoal(st: GameState): Goal | null {
   if (!hasMet(st, 'tam') && countItem(st.player.slots, 'rod') === 0 && st.stats.caught === 0) return gift('tam', 'Find Old Tam at the lake');
   if (st.deepest === 0 && st.day >= 3) return gift('wood', 'Explore the woods north of the farm');
   if (!planted && st.day > 1) return gift('replant', `Plant ${season === 'winter' ? 'something for spring' : 'a new crop'}`);
+
+  // once there is gold to spare, point at the garden: lanterns and the rest are what the money is for
+  const cheapest = Math.min(...DECOR.map((d) => d.price));
+  const decorated = Object.values(st.locations.farm?.objects ?? {}).some((o) => o.k === 'decor');
+  if (GARDEN_ON && !decorated && st.day >= 4 && st.player.gold >= cheapest * 2) return gift('garden', 'Light up the farm: lanterns are sold at the store');
 
   const open = BUNDLES.filter((b) => !isComplete(st, b));
   const seasonal = open.find((b) => b.id === season) ?? open[0];

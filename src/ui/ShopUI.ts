@@ -1,6 +1,7 @@
 import { cropOfSeed, itemDef } from '../data/items';
 import { CAFE_STOCK, SHOPS, SMITHY_STOCK, TOOL_UPGRADES, storeStock } from '../data/shops';
 import { seasonOf } from '../game/clock';
+import { GARDEN_ON, GARDEN_STOCK, decorIndexOf } from '../features/garden/catalog';
 import { plantAdvice } from '../game/farming';
 import { countItem } from '../game/inventory';
 import { session } from '../game/session';
@@ -63,7 +64,7 @@ export class ShopScreen extends Screen {
         if (!it) return null;
         const d = itemDef(it);
         const crop = cropOfSeed(it);
-        const when = crop ? [plantAdvice(crop.id, st.day)] : [];
+        const when = crop ? [plantAdvice(crop.id, st.day)] : decorIndexOf(it) >= 0 ? ['Set it down on open ground at home. Pick it up with the axe or the pickaxe.'] : [];
         return { icon: iconFor(st, it), title: d.name, lines: [d.blurb, ...when, `Costs ${buyPrice(it)}g.`, `You have ${countItem(st.player.slots, it)}.`] };
       },
       actions: (i) => {
@@ -131,7 +132,8 @@ export class ShopScreen extends Screen {
           }];
         },
       };
-      return [stockTab('Buy', () => storeStock(seasonOf(st.day), st.flags)), upTab, sellTab];
+      const garden = GARDEN_ON ? [stockTab('Garden', () => [...GARDEN_STOCK])] : [];
+      return [stockTab('Buy', () => storeStock(seasonOf(st.day), st.flags)), upTab, ...garden, sellTab];
     }
     if (id === 'cafe') return [stockTab('Buy', () => [...CAFE_STOCK]), sellTab];
     const tools: Tab = {

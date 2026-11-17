@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { BUNDLES } from '../src/data/bundles';
 import { NPCS } from '../src/data/npcs';
 import { FESTIVAL_NAMES } from '../src/data/festivals';
+import { GARDEN_ON } from '../src/features/garden/catalog';
 import { nextGoal } from '../src/game/goals';
 import type { GameState } from '../src/game/state';
 import { newGame } from '../src/game/state';
@@ -121,6 +122,12 @@ describe('the next goal', () => {
     meet(st, ...NPCS.map((n) => n.id));
     st.flags.shrineSeen = true;
     soil(st)['5,5'] = { wet: true, crop: { id: 'radish', age: 1, regrowing: false, dead: false } };
+    // with gold in the pocket, the garden comes up first; with none, or once a lantern is out, it does not
+    expect(id(st)).toBe(GARDEN_ON ? 'garden' : 'lantern');
+    st.player.gold = 40;
+    expect(id(st)).toBe('lantern');
+    st.player.gold = 900;
+    (st.locations.farm as { objects: Record<string, unknown> }).objects['9,9'] = { k: 'decor', v: 0, hp: 1 };
     expect(id(st)).toBe('lantern');
     for (const b of BUNDLES) st.bundles[b.id] = b.slots.map((s) => s.n);
     expect(id(st)).toBe('finale');

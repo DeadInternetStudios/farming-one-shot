@@ -94,6 +94,7 @@ export class WorldScene extends Phaser.Scene {
     this.fx = new Fx(this, () => ({ x: this.player.x, y: this.player.y }));
     this.angler = new Angler({ scene: this, player: this.player, fx: this.fx, map: () => this.def, say: (m) => this.say(m) });
     this.lighting = new Lighting(this, this.rig, this.objects.lights);
+    this.objects.lightsDirty = false;
     this.ambient = new Ambient(this, this.rig);
     this.controls = new Controls(this);
     this.cursor = this.add.image(0, 0, 'atlas', 'fx/cursor').setDepth(7000).setAlpha(0.9);
@@ -170,6 +171,7 @@ export class WorldScene extends Phaser.Scene {
     this.view = new MapView(this, this.def, loc, season);
     this.objects = new ObjectsView(this, this.def, loc, season);
     this.lighting?.setSpots(this.objects.lights);
+    this.objects.lightsDirty = false;
     this.cameras.main.setZoom(this.zoomFor());
     this.rig.setMap(this.def.w * 16, this.def.h * 16);
     this.npcs?.destroy();
@@ -447,6 +449,13 @@ export class WorldScene extends Phaser.Scene {
   private refresh(keys: string[]): void {
     for (const k of keys) this.objects.syncTile(k);
     this.view.refresh(keys);
+    // a lantern put down or picked up changes what the light map has to draw
+    if (this.objects.lightsDirty) this.useLights();
+  }
+
+  private useLights(): void {
+    this.objects.lightsDirty = false;
+    this.lighting.setSpots(this.objects.lights);
   }
 
   private talk(id: string): void {
@@ -709,6 +718,7 @@ export class WorldScene extends Phaser.Scene {
       give: (id: string, n: number) => addItem(session.state.player.slots, id, n),
       weather: (w: Weather) => { session.state.weather = w; },
       ambient: () => this.ambient.count(),
+      lights: () => ({ spots: this.objects.lights.length, glows: this.objects.glows.length }),
       fish: (bite = false, rig?: { item: string; difficulty: number }) => this.angler.debug(bite, rig),
       water: (x: number, y: number) => isWater(this.def, x, y),
       audio: () => audio.debug(),

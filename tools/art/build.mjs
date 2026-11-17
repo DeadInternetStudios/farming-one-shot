@@ -20,6 +20,7 @@ import * as N from './gen/npcs.mjs';
 import * as MA from './gen/machines.mjs';
 import * as W from './gen/wild.mjs';
 import * as T from './gen/title.mjs';
+import * as GA from './gen/garden.mjs';
 
 const OUT = 'public/assets';
 mkdirSync(OUT, { recursive: true });
@@ -252,6 +253,21 @@ for (const c of crops) {
   for (const [k, ramp] of Object.entries({ minnow: R.teal, perch: R.leaf, trout: R.blossom, carp: R.orange, eel: R.ink, koi: R.red })) add(`item/fish-${k}`, I.RES.fish(ramp)());
   for (const [k, ramp] of Object.entries({ amethyst: R.purple, topaz: R.yellow, aquamarine: R.water, ruby: R.red })) add(`item/gem-${k}`, I.RES.gem(ramp)());
   for (const [k, ramp] of Object.entries({ soup: R.orange, stew: R.dirt, pie: R.yellow, salad: R.leaf, jam: R.purple, tea: R.leaf })) add(`item/dish-${k}`, I.RES.dish(ramp)());
+}
+
+// the garden: things to put down on the farm, and the icons they have in the bag
+{
+  for (const [k, ramp] of Object.entries({ red: R.red, gold: R.yellow, teal: R.teal, pink: R.pink })) {
+    const l = GA.paperLantern(ramp);
+    add(`deco/lantern-${k}`, l.day); add(`deco/lantern-${k}-glow`, l.glow); add(`item/deco-lantern-${k}`, GA.icon(l.day));
+  }
+  const sl = GA.stoneLantern();
+  add('deco/stone-lantern', sl.day); add('deco/stone-lantern-glow', sl.glow); add('item/deco-stone-lantern', GA.icon(sl.day));
+  for (const sn of SEASONS) add(`deco/planter-${sn}`, GA.planter(sn));
+  add('item/deco-planter', GA.icon(GA.planter('spring')));
+  const bb = GA.birdBath(); add('deco/birdbath', bb); add('item/deco-birdbath', GA.icon(bb));
+  const gn = GA.gnome(); add('deco/gnome', gn.day); add('deco/gnome-glow', gn.glow); add('item/deco-gnome', GA.icon(gn.day));
+  add('item/deco-lamp-post', GA.icon(B.lanternPost().day));
 }
 
 // ui

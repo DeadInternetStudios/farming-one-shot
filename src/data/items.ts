@@ -1,4 +1,5 @@
 import cropsJson from './crops.json';
+import { DECOR, decorItemId } from '../features/garden/catalog';
 import type { Season, ToolId } from '../game/types';
 
 export type ItemKind = 'tool' | 'seed' | 'crop' | 'resource' | 'forage' | 'fish' | 'food' | 'gem' | 'goods' | 'gift' | 'special' | 'machine';
@@ -111,7 +112,12 @@ const cropItems: ItemDef[] = CROP_LIST.flatMap((c): ItemDef[] => [
   { id: c.id, name: c.name, kind: 'crop', icon: `item/${c.id}`, sell: c.sell, stack: 99, blurb: c.blurb, energy: Math.round(c.sell / 3) },
 ]);
 
-export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries([...BASE, ...EXTRA, ...cropItems].map((i) => [i.id, i]));
+/** Garden pieces are bought in the store and put down like a chest. */
+const decorItems: ItemDef[] = DECOR.map((d) => ({
+  id: decorItemId(d), name: d.name, kind: 'machine', icon: `item/${decorItemId(d)}`, sell: 0, stack: 99, blurb: d.blurb, buy: d.price,
+}));
+
+export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries([...BASE, ...EXTRA, ...cropItems, ...decorItems].map((i) => [i.id, i]));
 
 export function itemDef(id: string): ItemDef {
   const d = ITEMS[id];

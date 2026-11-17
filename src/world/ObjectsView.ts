@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { cropFrame } from '../game/farming';
+import { decorAt, frameOf } from '../features/garden/catalog';
 import type { LocationState, ObjectState } from '../game/state';
 import type { Season } from '../game/types';
 import { parseKey, tileKey } from '../game/types';
@@ -21,6 +22,10 @@ interface Placed {
   sprite: Phaser.GameObjects.Image;
   shadow?: Phaser.GameObjects.Image;
   kind: ObjectKind;
+  /** The look variant it was built with. */
+  v: number;
+  /** A garden piece that lights up at night: its glowing frame and the pool of light on the ground. */
+  lit?: { glow?: Phaser.GameObjects.Image; spot?: LightSpot };
 }
 
 const SHADOW: Partial<Record<ObjectKind, { frame: string; alpha: number; dy: number }>> = {
@@ -37,6 +42,7 @@ const SHADOW: Partial<Record<ObjectKind, { frame: string; alpha: number; dy: num
   chest: { frame: 'fx/shadow-m', alpha: 0.4, dy: -1 },
   furnace: { frame: 'fx/shadow-m', alpha: 0.45, dy: -1 },
   sprinkler: { frame: 'fx/shadow-s', alpha: 0.4, dy: -1 },
+  decor: { frame: 'fx/shadow-s', alpha: 0.4, dy: -1 },
   berries: { frame: 'fx/shadow-m', alpha: 0.4, dy: -1 },
 };
 
@@ -55,6 +61,8 @@ export class ObjectsView {
   private shrine: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image } | null = null;
   private grassTick = 0;
   private owned: Phaser.GameObjects.Image[] = [];
+  /** Set when a garden light came or went, so the light map knows to pick up the new list. */
+  lightsDirty = false;
 
   constructor(private scene: Phaser.Scene, readonly def: MapDef, private loc: LocationState, private season: Season) {
     for (const b of def.buildings) {
@@ -149,7 +157,44 @@ export class ObjectsView {
       case 'chest': return 'obj/chest';
       case 'furnace': return 'obj/furnace';
       case 'sprinkler': return 'obj/sprinkler';
+      case 'decor': { const d = decorAt(o.v); return d ? frameOf(d, s) : 'fx/cursor'; }
     }
+  }
+
+  /** Take a placed object off the map, along with its shadow and any light it was giving. */
+  private drop(key: string, have: Placed): void {
+    have.sprite.destroy();
+    have.shadow?.destroy();
+    if (have.lit) {
+      if (have.lit.glow) {
+        const i = this.glows.indexOf(have.lit.glow);
+        if (i >= 0) this.glows.splice(i, 1);
+        have.lit.glow.destroy();
+      }
+      if (have.lit.spot) {
+        const i = this.lights.indexOf(have.lit.spot);
+        if (i >= 0) this.lights.splice(i, 1);
+        this.lightsDirty = true;
+      }
+    }
+    this.placed.delete(key);
+  }
+
+  /** A garden piece that glows: the lit frame over it and a pool of light around it. */
+  private lightUp(o: ObjectState, px: number, py: number): Placed['lit'] {
+    const d = o.k === 'decor' ? decorAt(o.v) : undefined;
+    if (!d || (!d.glow && !d.light)) return undefined;
+    const lit: NonNullable<Placed['lit']> = {};
+    if (d.glow) {
+      lit.glow = this.img(px, py, d.glow).setOrigin(0.5, 1).setDepth(py + 0.5).setAlpha(0);
+      this.glows.push(lit.glow);
+    }
+    if (d.light) {
+      lit.spot = { x: px, y: py - d.light.y, r: d.light.r, color: d.light.color, flicker: true };
+      this.lights.push(lit.spot);
+      this.lightsDirty = true;
+    }
+    return lit;
   }
 
   /** Make the sprites for one tile match the state. */
@@ -159,20 +204,15 @@ export class ObjectsView {
     const have = this.placed.get(key);
     if (!o) {
       if (have) {
-        have.sprite.destroy();
-        have.shadow?.destroy();
-        this.placed.delete(key);
+        this.drop(key, have);
         this.grass = this.grass.filter((g) => g.sprite.active);
       }
     } else {
       const frame = this.frameFor(o, x, y);
-      if (have && have.kind === o.k) {
+      if (have && have.kind === o.k && have.v === o.v) {
         have.sprite.setFrame(frame);
       } else {
-        if (have) {
-          have.sprite.destroy();
-          have.shadow?.destroy();
-        }
+        if (have) this.drop(key, have);
         const px = x * 16 + 8;
         const py = (y + 1) * 16;
         const sprite = this.img(px, py, frame).setOrigin(0.5, 1).setDepth(py);
@@ -180,7 +220,7 @@ export class ObjectsView {
         const sh = SHADOW[o.k];
         if (sh) shadow = this.img(px, py + sh.dy, sh.frame).setAlpha(sh.alpha).setDepth(DEPTH.ground);
         if (o.k === 'tree') shadow?.setDisplaySize(30, 11);
-        this.placed.set(key, { sprite, shadow, kind: o.k });
+        this.placed.set(key, { sprite, shadow, kind: o.k, v: o.v, lit: this.lightUp(o, px, py) });
         if (o.k === 'tallgrass') this.grass.push({ sprite, phase: (x * 7 + y * 3) % 4 });
       }
     }
