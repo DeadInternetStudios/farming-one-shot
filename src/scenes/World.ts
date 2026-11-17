@@ -19,6 +19,7 @@ import { Angler } from '../entities/Angler';
 import { Npcs } from '../entities/Npcs';
 import { Player } from '../entities/Player';
 import { subscribe } from '../systems/bus';
+import { Ambient } from '../systems/Ambient';
 import { CameraRig } from '../systems/CameraRig';
 import { Controls } from '../systems/Controls';
 import { Fx } from '../systems/Fx';
@@ -43,6 +44,7 @@ export class WorldScene extends Phaser.Scene {
   private objects!: ObjectsView;
   private npcs!: Npcs;
   private angler!: Angler;
+  private ambient!: Ambient;
   private lastTenth = 0;
   private lastMachineSync = 0;
   private player!: Player;
@@ -76,6 +78,7 @@ export class WorldScene extends Phaser.Scene {
     this.fx = new Fx(this, () => ({ x: this.player.x, y: this.player.y }));
     this.angler = new Angler({ scene: this, player: this.player, fx: this.fx, map: () => this.def, say: (m) => this.say(m) });
     this.lighting = new Lighting(this, this.rig, this.objects.lights);
+    this.ambient = new Ambient(this, this.rig);
     this.controls = new Controls(this);
     this.cursor = this.add.image(0, 0, 'atlas', 'fx/cursor').setDepth(7000).setAlpha(0.9);
 
@@ -224,6 +227,7 @@ export class WorldScene extends Phaser.Scene {
       this.syncMachines();
     }
     this.rig.update(dt, this.player.x, this.player.y - 8);
+    this.ambient.update(dt, { season: seasonOf(st.day), weather: st.weather, minute: st.minute, kind: this.def.kind });
     const sky = skyFor(seasonOf(st.day), st.minute, st.weather, this.def.kind);
     this.lighting.update(sky, time, this.objects.glows, this.torch());
     const dark = 1 - Math.min(1, sky.day * 1.3);
@@ -534,6 +538,7 @@ export class WorldScene extends Phaser.Scene {
       info: () => ({ paused: session.paused, sleeping: this.sleeping, swinging: this.player.swinging, facing: this.player.facing, target: this.targetTile(), keyboard: !!this.input.keyboard?.enabled, active: this.input.isActive() }),
       give: (id: string, n: number) => addItem(session.state.player.slots, id, n),
       weather: (w: Weather) => { session.state.weather = w; },
+      ambient: () => this.ambient.count(),
       fish: (bite = false, rig?: { item: string; difficulty: number }) => this.angler.debug(bite, rig),
       water: (x: number, y: number) => isWater(this.def, x, y),
     };
