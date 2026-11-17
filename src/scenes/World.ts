@@ -618,9 +618,11 @@ export class WorldScene extends Phaser.Scene {
 
   private endFinale(): void {
     const st = session.state;
+    const report = finaleReport(st);
+    // the goal pill behind the card already moves on
+    finishFinale(st);
     session.events.emit('cinema', false);
-    session.events.emit('finale', finaleReport(st), () => {
-      finishFinale(st);
+    session.events.emit('finale', report, () => {
       this.npcs.setGathered(false);
       this.focus = null;
       this.cameras.main.setZoom(this.zoomFor());

@@ -53,12 +53,12 @@ export interface Button {
 export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', onClick: () => void): Button {
   const frame = (s: string): string => `ui/btn-${kind}-${s}`;
   const ns = scene.add.nineslice(x, y, 'atlas', frame('up'), w, h, 6, 6, 6, 6).setOrigin(0, 0);
-  const tx = label(scene, x + w / 2, y + h / 2 - 3, text, { outline: true, origin: [0.5, 0.5] });
+  const tx = label(scene, x + w / 2, y + h / 2 + 1, text, { outline: true, origin: [0.5, 0.5] });
   const zone = scene.add.zone(x, y, w, h).setOrigin(0, 0).setInteractive({ useHandCursor: true });
   let enabled = true;
   const set = (s: string): void => {
     ns.setTexture('atlas', enabled ? frame(s) : 'ui/btn-disabled');
-    tx.setY(Math.round(y + h / 2 - 3 + (s === 'down' && enabled ? 1 : 0)));
+    tx.setY(Math.round(y + h / 2 + 1 + (s === 'down' && enabled ? 1 : 0)));
   };
   zone.on('pointerover', () => set('hover'));
   zone.on('pointerout', () => set('up'));
