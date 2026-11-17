@@ -219,6 +219,7 @@ export const CROP_STAGES: Readonly<Record<string, number>> = ${JSON.stringify(cr
 export const ART_COUNTS: Readonly<Record<string, number>> = ${JSON.stringify(manifest.counts)};
 export const FRAME_NAMES: readonly string[] = ${JSON.stringify(manifest.frames)};
 export const CHAR_FRAME = { w: ${C.FW}, h: ${C.FH}, originX: 16, originY: 30 } as const;
+export const PAL = ${JSON.stringify(Object.fromEntries(Object.entries(R).map(([k, v]) => [k, v])))} as const;
 `;
 writeFileSync('src/gen/art.ts', ts);
 console.log('wrote src/gen/art.ts');

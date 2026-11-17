@@ -16,8 +16,11 @@ export function panel() {
   rounded(img, 4, 4, 16, 16, 2, R.cream[1]);
   img.hline(4, 4, 16, R.cream[3]); img.vline(4, 4, 16, R.cream[2]);
   img.hline(5, 19, 14, R.cream[0]); img.vline(19, 5, 14, R.cream[0]);
+  // paper grain only inside the four corners, so nine-slice stretching never smears it
   const rng = new Rng(4);
-  for (let i = 0; i < 14; i++) { const x = 5 + rng.int(0, 13), y = 5 + rng.int(0, 13); if (img.col(x, y) === R.cream[1]) img.set(x, y, R.cream[2]); }
+  for (const [cx, cy] of [[4, 4], [16, 4], [4, 16], [16, 16]]) {
+    for (let i = 0; i < 3; i++) { const x = cx + rng.int(0, 3), y = cy + rng.int(0, 3); if (img.col(x, y) === R.cream[1]) img.set(x, y, R.cream[2]); }
+  }
   // corner studs
   for (const [x, y] of [[2, 2], [21, 2], [2, 21], [21, 21]]) img.set(x, y, R.yellow[2]);
   return img;

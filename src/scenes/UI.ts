@@ -1,0 +1,50 @@
+import Phaser from 'phaser';
+import type { DaySummary } from '../game/day';
+import { session } from '../game/session';
+import { fitUiCamera, getLayout } from '../display';
+import type { Layout } from '../display';
+import { subscribe } from '../systems/bus';
+import { Hud } from '../ui/Hud';
+import { Modals } from '../ui/Modals';
+import { Touch } from '../ui/Touch';
+
+/** The interface layer: a second camera at a whole-number zoom, drawn over the world. */
+export class UIScene extends Phaser.Scene {
+  private hud!: Hud;
+  private modals!: Modals;
+  private touch: Touch | null = null;
+
+  constructor() {
+    super('UI');
+  }
+
+  create(): void {
+    const l = getLayout();
+    fitUiCamera(this.cameras.main, l);
+    this.hud = new Hud(this, l);
+    this.modals = new Modals(this, l);
+    if (l.touch) this.touch = new Touch(this, l);
+
+    subscribe(this, 'toast', (msg: string) => this.hud.toast(msg));
+    subscribe(this, 'picked', (item: string, n: number) => this.hud.picked(item, n));
+    subscribe(this, 'selected', () => this.hud.showTip());
+    subscribe(this, 'ask-sleep', () => this.modals.askSleep(() => session.events.emit('confirm-sleep')));
+    subscribe(this, 'day-summary', (s: DaySummary, done: () => void) => this.modals.daySummary(s, done));
+    subscribe(this, 'dialog', (text: string) => this.modals.dialog(text));
+
+    this.game.events.on('layout', this.onLayout, this);
+    this.events.once('shutdown', () => this.game.events.off('layout', this.onLayout, this));
+  }
+
+  private onLayout(l: Layout): void {
+    fitUiCamera(this.cameras.main, l);
+    this.hud.rebuild(l);
+    this.modals.setLayout(l);
+    this.touch?.destroy();
+    this.touch = l.touch ? new Touch(this, l) : null;
+  }
+
+  override update(): void {
+    this.hud.update();
+  }
+}

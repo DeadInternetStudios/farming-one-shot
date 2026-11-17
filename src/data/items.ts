@@ -1,0 +1,97 @@
+import cropsJson from './crops.json';
+import type { Season, ToolId } from '../game/types';
+
+export type ItemKind = 'tool' | 'seed' | 'crop' | 'resource' | 'forage' | 'fish' | 'food' | 'gem' | 'goods' | 'gift' | 'special';
+
+export interface ItemDef {
+  id: string;
+  name: string;
+  kind: ItemKind;
+  /** Atlas frame name. Tools resolve their tier at draw time. */
+  icon: string;
+  sell: number;
+  stack: number;
+  blurb: string;
+  /** Energy restored when eaten. */
+  energy?: number;
+  /** Price in the general store, when sold there. */
+  buy?: number;
+}
+
+export interface CropDef {
+  id: string;
+  name: string;
+  seasons: Season[];
+  days: number;
+  regrow: number;
+  yield: number;
+  seed: number;
+  sell: number;
+  blurb: string;
+  art: Record<string, string | boolean>;
+}
+
+export const CROPS: Readonly<Record<string, CropDef>> = Object.fromEntries(
+  (cropsJson as unknown as CropDef[]).map((c) => [c.id, c]),
+);
+export const CROP_LIST: readonly CropDef[] = Object.values(CROPS);
+
+export const TOOL_IDS: readonly ToolId[] = ['hoe', 'can', 'axe', 'pick', 'scythe', 'rod'];
+const TOOL_NAMES: Record<ToolId, string> = { hoe: 'Hoe', can: 'Watering Can', axe: 'Axe', pick: 'Pickaxe', scythe: 'Scythe', rod: 'Fishing Rod' };
+const TOOL_BLURBS: Record<ToolId, string> = {
+  hoe: 'Turns grass into soil that is ready to plant.',
+  can: 'Waters your crops. Refill it at any water.',
+  axe: 'Chops trees, stumps and logs.',
+  pick: 'Breaks rocks and digs out ore.',
+  scythe: 'Cuts weeds and tall grass.',
+  rod: 'For catching fish. Hold, then reel at the bite.',
+};
+
+const resource = (id: string, name: string, sell: number, blurb: string, extra: Partial<ItemDef> = {}): ItemDef => ({
+  id, name, kind: 'resource', icon: `item/${id}`, sell, stack: 99, blurb, ...extra,
+});
+
+const BASE: ItemDef[] = [
+  ...TOOL_IDS.map((id): ItemDef => ({ id, name: TOOL_NAMES[id], kind: 'tool', icon: `item/${id}`, sell: 0, stack: 1, blurb: TOOL_BLURBS[id] })),
+  resource('wood', 'Wood', 8, 'A sturdy length of timber.'),
+  resource('stone', 'Stone', 6, 'Good for walls, paths and furnaces.'),
+  resource('fiber', 'Fiber', 4, 'Springy plant fiber.'),
+  resource('hay', 'Hay', 5, 'Sweet dried grass. Animals love it.'),
+  resource('coal', 'Coal', 25, 'Burns hot and long.'),
+  resource('copperOre', 'Copper Ore', 18, 'A glint of orange in grey rock.'),
+  resource('ironOre', 'Iron Ore', 30, 'Heavy and dependable.'),
+  resource('goldOre', 'Gold Ore', 55, 'It catches the lantern light.'),
+  resource('copperBar', 'Copper Bar', 90, 'Smelted copper, ready to be a tool.'),
+  resource('ironBar', 'Iron Bar', 160, 'A bar of good iron.'),
+  resource('goldBar', 'Gold Bar', 300, 'Shining and heavy.'),
+  resource('clay', 'Clay', 12, 'Soft, cool and good for pots.'),
+  resource('sap', 'Sap', 14, 'Sticky amber from the trees.'),
+  { id: 'coin', name: 'Coin', kind: 'special', icon: 'item/coin', sell: 0, stack: 1, blurb: 'Shiny.' },
+  { id: 'egg', name: 'Egg', kind: 'goods', icon: 'item/egg', sell: 50, stack: 99, blurb: 'Still warm.', energy: 20 },
+  { id: 'milk', name: 'Milk', kind: 'goods', icon: 'item/milk', sell: 120, stack: 99, blurb: 'Creamy and fresh.', energy: 30 },
+  { id: 'loaf', name: 'Country Loaf', kind: 'food', icon: 'item/loaf', sell: 60, stack: 99, blurb: 'Crusty on the outside.', energy: 35, buy: 90 },
+  { id: 'mushroom', name: 'Red Cap Mushroom', kind: 'forage', icon: 'item/mushroom', sell: 40, stack: 99, blurb: 'Found where the forest is damp.', energy: 15 },
+  { id: 'berry', name: 'Wild Berries', kind: 'forage', icon: 'item/berry', sell: 25, stack: 99, blurb: 'A handful of sweet-sour jewels.', energy: 12 },
+  { id: 'flower', name: 'Wildflower', kind: 'forage', icon: 'item/flower', sell: 20, stack: 99, blurb: 'Too pretty to leave in the grass.' },
+  { id: 'lantern', name: 'Valley Lantern', kind: 'special', icon: 'item/lantern', sell: 0, stack: 1, blurb: 'It wants to be lit.' },
+];
+
+const cropItems: ItemDef[] = CROP_LIST.flatMap((c): ItemDef[] => [
+  {
+    id: `seed-${c.id}`, name: `${c.name} Seeds`, kind: 'seed', icon: `item/seed-${c.id}`,
+    sell: Math.floor(c.seed / 2), stack: 99, blurb: `Grows in ${c.seasons.join(' and ')}. Ripe in ${c.days} days${c.regrow ? `, then every ${c.regrow}` : ''}.`,
+    buy: c.id === 'strawberry' ? undefined : c.seed,
+  },
+  { id: c.id, name: c.name, kind: 'crop', icon: `item/${c.id}`, sell: c.sell, stack: 99, blurb: c.blurb, energy: Math.round(c.sell / 3) },
+]);
+
+export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries([...BASE, ...cropItems].map((i) => [i.id, i]));
+
+export function itemDef(id: string): ItemDef {
+  const d = ITEMS[id];
+  if (!d) throw new Error(`Unknown item: ${id}`);
+  return d;
+}
+
+export const seedFor = (cropId: string): string => `seed-${cropId}`;
+export const cropOfSeed = (seedId: string): CropDef | undefined => (seedId.startsWith('seed-') ? CROPS[seedId.slice(5)] : undefined);

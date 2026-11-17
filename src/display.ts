@@ -1,0 +1,71 @@
+import Phaser from 'phaser';
+
+/**
+ * The canvas is measured in device pixels (CSS size x pixel ratio) and shown at 1/ratio, so one
+ * canvas pixel is one screen pixel. The world and the interface each get a whole-number zoom,
+ * so every art pixel is the same size on screen and nothing shimmers.
+ */
+export interface Layout {
+  dpr: number;
+  cssW: number;
+  cssH: number;
+  devW: number;
+  devH: number;
+  /** Device pixels per world pixel. */
+  worldZoom: number;
+  /** Device pixels per interface pixel. */
+  uiZoom: number;
+  /** Interface size in interface pixels. */
+  uiW: number;
+  uiH: number;
+  touch: boolean;
+}
+
+export function computeLayout(cssW: number, cssH: number, dpr: number, touch: boolean): Layout {
+  const devW = Math.max(1, Math.round(cssW * dpr));
+  const devH = Math.max(1, Math.round(cssH * dpr));
+  const cssShort = Math.min(cssW, cssH);
+  const devShort = Math.min(devW, devH);
+  const tilesShort = cssShort < 520 ? 11 : cssShort < 800 ? 13 : 15;
+  const worldZoom = Math.max(1, Math.round(devShort / tilesShort / 16));
+  const cssPerUi = cssShort >= 800 ? 3 : 2;
+  const uiZoom = Math.max(1, Math.round(cssPerUi * dpr));
+  return { dpr, cssW, cssH, devW, devH, worldZoom, uiZoom, uiW: Math.floor(devW / uiZoom), uiH: Math.floor(devH / uiZoom), touch };
+}
+
+let current: Layout = computeLayout(960, 600, 1, false);
+export const getLayout = (): Layout => current;
+
+export const isTouchDevice = (): boolean =>
+  typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0) && window.matchMedia('(pointer: coarse)').matches;
+
+export function measure(parent: HTMLElement): Layout {
+  const r = parent.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  return computeLayout(Math.max(1, r.width), Math.max(1, r.height), dpr, isTouchDevice());
+}
+
+/** Keeps the canvas matched to its parent. Emits `layout` on the game's event emitter. */
+export function installLayout(game: Phaser.Game, parent: HTMLElement): void {
+  const apply = (): void => {
+    const next = measure(parent);
+    const same = next.devW === current.devW && next.devH === current.devH && next.dpr === current.dpr;
+    current = next;
+    if (!same) {
+      game.scale.setZoom(1 / next.dpr);
+      game.scale.resize(next.devW, next.devH);
+    }
+    game.events.emit('layout', next);
+  };
+  new ResizeObserver(apply).observe(parent);
+  window.addEventListener('orientationchange', () => window.setTimeout(apply, 200));
+  window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.('change', apply);
+  current = measure(parent);
+}
+
+/** Zoom a camera so interface coordinates start at the top left. */
+export function fitUiCamera(cam: Phaser.Cameras.Scene2D.Camera, l: Layout): void {
+  cam.setSize(l.devW, l.devH);
+  cam.setZoom(l.uiZoom);
+  cam.setScroll(-(l.devW - l.devW / l.uiZoom) / 2, -(l.devH - l.devH / l.uiZoom) / 2);
+}

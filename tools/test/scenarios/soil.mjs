@@ -1,0 +1,25 @@
+const SWING = 520;
+export default async ({ press, lh, state, wait, log, shot }) => {
+  const act = async (ms = SWING) => { await lh('act'); await wait(ms); };
+  await lh('teleport', 20, 19, 'down');
+  await press('1');
+  await act();
+  await lh('teleport', 20, 18, 'down');
+  await wait(300);
+  await shot('s1');
+  await lh('setMinute', 1300);
+  await lh('sleep');
+  await wait(2600);
+  await press('Space', 1800);
+  await lh('teleport', 20, 18, 'down');
+  await wait(400);
+  await shot('s2');
+  await lh('refreshTile', 20, 20);
+  await wait(300);
+  await shot('s3-refresh-tile');
+  await lh('repaint');
+  await wait(300);
+  await shot('s4-repaint');
+  const s = await state();
+  log('soil', JSON.stringify(s.locations.farm.soil));
+};
