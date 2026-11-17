@@ -35,8 +35,8 @@ export class Bag {
     return this.add(nine(this.scene, kind, x, y, w, h), bump);
   }
 
-  btn(x: number, y: number, w: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', fn: () => void, h = 17): Button {
-    const b = button(this.scene, x, y, w, h, text, kind, fn);
+  btn(x: number, y: number, w: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', fn: () => void, h = 17, icon?: string): Button {
+    const b = button(this.scene, x, y, w, h, text, kind, fn, icon);
     for (const p of b.parts) (p as unknown as Depthed).setDepth(this.depth + 4);
     this.buttons.push(b);
     return b;
@@ -72,20 +72,38 @@ export interface Row {
 
 interface Slot {
   bg: Phaser.GameObjects.Rectangle;
+  mark: Phaser.GameObjects.Rectangle;
   icon: Phaser.GameObjects.Image;
   text: Phaser.GameObjects.BitmapText;
   right: Phaser.GameObjects.BitmapText;
-  zone: Phaser.GameObjects.Zone;
 }
 
-/** A scrolling list with one selected row. Works with keys, taps and the wheel. */
+/** Sets a label, cutting it with dots if it would be wider than `room`. */
+function fitText(t: Phaser.GameObjects.BitmapText, full: string, room: number): void {
+  t.setText(full);
+  let n = full.length;
+  while (t.width > room && n > 1) {
+    n -= 1;
+    t.setText(`${full.slice(0, n).trimEnd()}...`);
+  }
+}
+
+/** Pointer travel, in interface pixels, before a press turns into a scroll instead of a tap. */
+const DRAG_SLOP = 4;
+
+/** A scrolling list with one selected row. Works with keys, taps, the wheel, and a drag with a finger or the mouse. */
 export class ListView {
   private slots: Slot[] = [];
   private rows: Row[] = [];
   private offset = 0;
   sel = 0;
   private more: Phaser.GameObjects.Image;
+  private bar: Phaser.GameObjects.Rectangle;
+  private track: Phaser.GameObjects.Rectangle;
+  private press: { y0: number; off0: number; moved: boolean } | null = null;
   private wheel: (p: Phaser.Input.Pointer, o: unknown, dx: number, dy: number) => void;
+  private onMove: (p: Phaser.Input.Pointer) => void;
+  private onUp: (p: Phaser.Input.Pointer) => void;
   readonly visible: number;
 
   constructor(
@@ -102,24 +120,56 @@ export class ListView {
     this.visible = Math.max(1, Math.floor(h / rowH));
     for (let i = 0; i < this.visible; i++) {
       const ry = y + i * rowH;
-      const bg = bag.rect(x, ry, w, rowH - 1, PAL.yellow[3], 0, 1);
+      const bg = bag.rect(x, ry, w, rowH - 1, PAL.yellow[2], 1, 1).setAlpha(0);
+      const mark = bag.rect(x, ry, 2, rowH - 1, PAL.red[3], 1, 2).setVisible(false);
       const icon = bag.img(x + 9, ry + rowH / 2, 'item/stone').setVisible(false);
       const text = bag.text(x + 20, ry + Math.floor((rowH - 9) / 2), '');
       const right = bag.text(x + w - 3, ry + Math.floor((rowH - 9) / 2), '', { origin: [1, 0] });
-      const zone = bag.zone(x, ry, w, rowH, () => this.tap(i));
-      this.slots.push({ bg, icon, text, right, zone });
+      this.slots.push({ bg, mark, icon, text, right });
     }
-    this.more = bag.img(x + w / 2, y + this.visible * rowH + 3, 'ui/arrow-down').setVisible(false);
+    const span = this.visible * rowH;
+    this.track = bag.rect(x + w - 2, y, 2, span - 1, PAL.wood[2], 0.25, 2).setVisible(false);
+    this.bar = bag.rect(x + w - 2, y, 2, 4, PAL.wood[3], 1, 3).setVisible(false);
+    this.more = bag.img(x + w / 2, y + span + 3, 'ui/arrow-down').setVisible(false);
+
+    // one zone for the whole list: a press that barely moves is a tap, one that travels scrolls
+    const zone = bag.add(bag.scene.add.zone(x, y, w, span).setOrigin(0, 0).setInteractive({ useHandCursor: true }), 5);
+    zone.on('pointerdown', (p: Phaser.Input.Pointer) => { this.press = { y0: this.uiY(p), off0: this.offset, moved: false }; });
+    this.onMove = (p) => {
+      const d = this.press;
+      if (!d || !p.isDown) return;
+      const dy = this.uiY(p) - d.y0;
+      if (!d.moved && Math.abs(dy) < DRAG_SLOP) return;
+      d.moved = true;
+      this.offset = Math.max(0, Math.min(Math.max(0, this.rows.length - this.visible), d.off0 - Math.round(dy / this.rowH)));
+      this.paint();
+    };
+    this.onUp = (p) => {
+      const d = this.press;
+      this.press = null;
+      if (!d || d.moved) return;
+      const wp = bag.scene.cameras.main.getWorldPoint(p.x, p.y);
+      if (wp.x < this.x || wp.x > this.x + this.w || wp.y < this.y || wp.y >= this.y + span) return;
+      this.tap(Math.floor((wp.y - this.y) / this.rowH));
+    };
     this.wheel = (p, _o, _dx, dy) => {
       const wp = bag.scene.cameras.main.getWorldPoint(p.x, p.y);
-      if (wp.x < this.x || wp.x > this.x + this.w || wp.y < this.y || wp.y > this.y + this.visible * this.rowH) return;
+      if (wp.x < this.x || wp.x > this.x + this.w || wp.y < this.y || wp.y > this.y + span) return;
       this.move(dy > 0 ? 1 : -1);
     };
     bag.scene.input.on('wheel', this.wheel);
+    bag.scene.input.on('pointermove', this.onMove);
+    bag.scene.input.on('pointerup', this.onUp);
+  }
+
+  private uiY(p: Phaser.Input.Pointer): number {
+    return this.bag.scene.cameras.main.getWorldPoint(p.x, p.y).y;
   }
 
   destroy(): void {
     this.bag.scene.input.off('wheel', this.wheel);
+    this.bag.scene.input.off('pointermove', this.onMove);
+    this.bag.scene.input.off('pointerup', this.onUp);
   }
 
   get count(): number {
@@ -169,24 +219,37 @@ export class ListView {
   }
 
   paint(): void {
+    const scrolls = this.rows.length > this.visible;
+    const edge = this.x + this.w - (scrolls ? 7 : 3);
     this.slots.forEach((s, i) => {
       const idx = this.offset + i;
       const r = this.rows[idx];
       if (!r) {
         s.bg.setAlpha(0);
+        s.mark.setVisible(false);
         s.icon.setVisible(false);
         s.text.setText('');
         s.right.setText('');
         return;
       }
-      s.bg.setAlpha(idx === this.sel ? 0.4 : 0);
-      s.text.setText(r.text).setTint(r.tint ?? (r.dim ? COL.dim : COL.ink));
-      s.right.setText(r.right ?? '').setTint(r.tint ?? (r.dim ? COL.dim : COL.ink));
+      const tint = r.tint ?? (r.dim ? COL.dim : COL.ink);
+      s.bg.setAlpha(idx === this.sel ? 0.5 : 0);
+      s.mark.setVisible(idx === this.sel);
+      s.right.setText(r.right ?? '').setTint(tint).setX(edge);
+      const left = this.x + (r.icon ? 20 : 3);
+      fitText(s.text.setTint(tint).setX(left), r.text, edge - left - (r.right ? s.right.width + 6 : 0));
       if (r.icon) s.icon.setFrame(r.icon).setVisible(true).setAlpha(r.dim ? 0.55 : 1);
       else s.icon.setVisible(false);
-      s.text.setX(this.x + (r.icon ? 20 : 3));
     });
     this.more.setVisible(this.offset + this.visible < this.rows.length);
+    this.track.setVisible(scrolls);
+    this.bar.setVisible(scrolls);
+    if (scrolls) {
+      const span = this.visible * this.rowH - 1;
+      const thumb = Math.max(6, Math.round((span * this.visible) / this.rows.length));
+      const room = Math.max(1, this.rows.length - this.visible);
+      this.bar.setSize(2, thumb).setY(this.y + Math.round(((span - thumb) * this.offset) / room));
+    }
   }
 }
 

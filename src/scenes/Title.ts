@@ -336,10 +336,18 @@ export class TitleScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ the logo and the way in
 
+  /** Where the logo starts when it is centred. On a narrow screen it would run under the sound button, so it starts below it. */
+  private logoTop(): number {
+    const { uiW, uiH, touch } = this.l;
+    const button = touch ? 22 : 18;
+    const under = uiW < 2 * (88 + button + 6);
+    return Math.max(10, Math.round(uiH * 0.045), under ? 6 + button + 4 : 0);
+  }
+
   private header(short: boolean): void {
     const { uiW } = this.l;
     const x = short ? Math.round(uiW * 0.28) : Math.floor(uiW / 2);
-    const top = short ? 6 : Math.max(10, Math.round(this.l.uiH * 0.045));
+    const top = short ? 6 : this.logoTop();
     const glow = this.add.image(x, top + 38, 'atlas', 'fx/glow-128').setTint(0xffb457).setBlendMode(Phaser.BlendModes.ADD).setScale(2.4, 1.1).setAlpha(0.28).setDepth(D.ui - 2);
     this.tweens.add({ targets: glow, alpha: 0.42, duration: 2600, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     const logo = this.add.image(x, top, 'title', 'logo').setOrigin(0.5, 0).setDepth(D.ui - 1);
@@ -354,7 +362,7 @@ export class TitleScene extends Phaser.Scene {
     const bh = l.touch ? 22 : 18;
     const gap = l.touch ? 7 : 6;
     const x = short ? Math.round(l.uiW * 0.74) : Math.floor(l.uiW / 2);
-    const top = short ? Math.max(20, Math.round(l.uiH * 0.3)) : Math.max(10, Math.round(l.uiH * 0.045)) + 104;
+    const top = short ? Math.max(20, Math.round(l.uiH * 0.3)) : this.logoTop() + 104;
     if (short) label(this, x, top - 15, 'A cozy farming tale', { tint: PAL.cream[1], origin: [0.5, 0], outline: true }).setDepth(D.ui + 2);
     this.choices = [];
     if (saved) this.choices.push({ text: 'Continue', kind: 'leaf', run: () => this.start(false) });

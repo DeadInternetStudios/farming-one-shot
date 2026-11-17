@@ -737,6 +737,8 @@ export class WorldScene extends Phaser.Scene {
       water: (x: number, y: number) => isWater(this.def, x, y),
       audio: () => audio.debug(),
       sfx: (name: string) => session.events.emit('sfx', name),
+      interact: (what: unknown) => session.events.emit('interact', what),
+      emit: (name: string, ...args: unknown[]) => session.events.emit(name, ...args),
     };
     (window as unknown as { __lh: unknown }).__lh = api;
   }

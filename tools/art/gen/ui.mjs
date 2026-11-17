@@ -208,3 +208,88 @@ export function hand() {
   i.set(1, 6, R.skin1[3]); i.set(2, 7, R.skin1[3]);
   return i.pad(1, 1, 1, 1).outline(() => R.ink[0]);
 }
+
+// Menu tab icons, 12 x 12, drawn from letter maps. They sit on wood and on leaf green, so they are light on a dark edge.
+const TAB_MAPS = {
+  bag: [
+    '....kkkk....',
+    '...kLLLLk...',
+    '...kLkkLk...',
+    '..kkkkkkkk..',
+    '.kbbbbbbbbk.',
+    'kbbbbbbbbbbk',
+    'kbbbYYYYbbbk',
+    'kbbbYGGYbbbk',
+    'kbbbbbbbbbbk',
+    'kddddddddddk',
+    '.kddddddddk.',
+    '..kkkkkkkk..',
+  ],
+  craft: [
+    '............',
+    '.kkkkkkkkkk.',
+    'kSssssssssdk',
+    'kSssssssssdk',
+    '.kkkkWWkkkk.',
+    '....kwwk....',
+    '....kwwk....',
+    '....kwwk....',
+    '....kwwk....',
+    '....kwwk....',
+    '....kddk....',
+    '.....kk.....',
+  ],
+  lantern: [
+    '.....kk.....',
+    '....kccek...',
+    '...kkkkkk...',
+    '..kRRRRRRk..',
+    '.kRHrrrrRRk.',
+    '.kRryyyyrRk.',
+    '.kRryyyyrRk.',
+    '.kRRrrrrRRk.',
+    '..kRRRRRRk..',
+    '...kkkkkk...',
+    '....kddk....',
+    '.....kk.....',
+  ],
+  friends: [
+    '............',
+    '..kkk..kkk..',
+    '.kRRRkkRRRk.',
+    'kRHHRRRRRRRk',
+    'kRHRRRRRRRRk',
+    'kRRRRRRRRRRk',
+    '.kRRRRRRRRk.',
+    '..kRRRRRRk..',
+    '...kRRRRk...',
+    '....kRRk....',
+    '.....kk.....',
+    '............',
+  ],
+};
+
+export function tabIcon(kind) {
+  const i = new Img(12, 12);
+  if (kind === 'options') {
+    // a cog: a ring with eight teeth and a hole
+    const c = 5.5;
+    for (const [x, y, w, h] of [[5, 1, 2, 2], [5, 9, 2, 2], [1, 5, 2, 2], [9, 5, 2, 2], [2, 2, 2, 2], [8, 2, 2, 2], [2, 8, 2, 2], [8, 8, 2, 2]]) i.rect(x, y, w, h, R.stone[5]);
+    i.disc(c, c, 3.9, R.stone[5]);
+    i.disc(c, c, 3.2, R.stone[6]);
+    i.set(3, 3, R.cream[3]); i.set(4, 2, R.cream[3]); i.set(2, 4, R.cream[3]); i.set(5, 2, R.cream[3]);
+    i.disc(c, c, 1.8, null);
+    i.outline(() => R.ink[0]);
+    return i;
+  }
+  const colors = {
+    k: R.ink[0], L: R.wood[3], b: R.wood[5], d: R.wood[3], Y: R.yellow[4], G: R.yellow[3],
+    S: R.stone[6], s: R.stone[5], w: R.wood[4], W: R.wood[2],
+    c: R.wood[3], e: R.wood[2], R: R.red[3], H: R.pink[3], r: R.red[4], y: R.yellow[4],
+  };
+  if (kind === 'friends') { colors.R = R.red[3]; colors.H = R.pink[4]; }
+  if (kind === 'lantern') { colors.R = R.orange[3]; colors.H = R.orange[4]; colors.r = R.orange[4]; colors.y = R.yellow[4]; colors.d = R.red[3]; }
+  if (kind === 'craft') colors.d = R.stone[3];
+  TAB_MAPS[kind].forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') i.set(x, y, colors[ch] ?? R.ink[0]); }));
+  return i;
+}

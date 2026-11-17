@@ -5,7 +5,7 @@ import { cropOfSeed, itemDef } from '../data/items';
 import { NPCS } from '../data/npcs';
 import { RECIPES } from '../data/recipes';
 import type { Recipe } from '../data/recipes';
-import { getLayout } from '../display';
+import { getLayout, slotPitch, tapH } from '../display';
 import { BACKUP_ON, backupToFile, restoreFromFile } from '../features/backup/backup';
 import { POSTCARD_ON } from '../features/postcard/layout';
 import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offline';
@@ -13,17 +13,21 @@ import { PACE_REAL_MINUTES, dayOfSeason, seasonOf } from '../game/clock';
 import type { PaceId } from '../game/clock';
 import { available, donate, isComplete, progressOf, slotDone } from '../game/bundles';
 import { have, make, plan } from '../game/crafting';
+import { weatherFor } from '../game/day';
+import { nextGoal } from '../game/goals';
 import { plantAdvice } from '../game/farming';
 import { saveGame } from '../game/save';
 import { session } from '../game/session';
 import { settings, saveSettings } from '../game/settings';
 import { friendOf, heartsOf } from '../game/social';
 import type { GameState } from '../game/state';
-import { COL, iconFor } from './kit';
+import { LINE, bodyOf, cardHeight, chip, drawCard, footer, paragraph, popup, tabStrip } from './chrome';
+import type { Area, CardSpec, Chip } from './chrome';
+import { COL, WEATHER_NAMES, iconFor, wrapText } from './kit';
 import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Screens';
+import { PAL } from '../gen/art';
 import { Bag, ListView, hearts } from './widgets';
 import type { Row } from './widgets';
-import { wrapText } from './DialogueUI';
 
 export interface Line {
   t: string;
@@ -41,30 +45,25 @@ export interface Entry {
   extra?: (bag: Bag, x: number, y: number, w: number) => number;
 }
 
-interface Area {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
 /** A list on one side and a card about the selected entry on the other. Shared by the menu pages. */
 export class ListPane {
   private list: ListView;
   private info: Bag;
   private entries: Entry[] = [];
-  private wide: boolean;
   private card: Area;
   /** Set when the screen is torn down, which an action can do (taking a postcard closes the menu), so nothing paints after it. */
   private closed = false;
   say: (m: string) => void = () => undefined;
 
-  constructor(bag: Bag, private scene: Phaser.Scene, a: Area, wide: boolean, private get: () => Entry[], private onChange: () => void = () => undefined) {
-    this.wide = wide;
+  constructor(bag: Bag, scene: Phaser.Scene, a: Area, wide: boolean, private get: () => Entry[], private onChange: () => void = () => undefined, private rowH = 17) {
     const listW = wide ? Math.floor(a.w * 0.5) - 4 : a.w;
-    const listH = wide ? a.h : Math.floor(a.h * 0.46);
-    this.list = new ListView(bag, a.x, a.y, listW, listH, 17, (i) => this.pick(i, 0), () => this.paint(), false);
-    this.card = wide ? { x: a.x + listW + 10, y: a.y, w: a.w - listW - 10, h: a.h } : { x: a.x, y: a.y + listH + 8, w: a.w, h: a.h - listH - 8 };
+    // stacked, the card is as tall as its tallest entry needs, so it never jumps, and the list gets the rest
+    const entries = this.get();
+    const cardH = wide ? 0 : Math.max(0, ...entries.map((e) => cardHeight(scene, a.w, e, rowH)));
+    const rows = Math.max(3, Math.floor((a.h - 8 - cardH) / rowH));
+    const listH = wide ? a.h : Math.max(1, Math.min(rows, entries.length)) * rowH;
+    this.list = new ListView(bag, a.x, a.y, listW, listH, rowH, (i) => this.pick(i, 0), () => this.paint(), false);
+    this.card = wide ? { x: a.x + listW + 10, y: a.y, w: a.w - listW - 10, h: a.h } : { x: a.x, y: a.y + listH + 8, w: a.w, h: Math.min(a.h - listH - 8, cardH) };
     this.info = new Bag(scene, bag.depth);
     this.refresh(true);
   }
@@ -98,27 +97,7 @@ export class ListPane {
     const b = this.info;
     b.destroy();
     const e = this.entries[this.list.sel];
-    if (!e) return;
-    const { x, y, w, h } = this.card;
-    let ty: number;
-    if (e.icon) {
-      b.img(x + 17, y + 17, e.icon).setScale(2);
-      b.text(x + 38, y + 4, e.title, { wrap: w - 40 });
-      ty = y + 38;
-    } else {
-      b.text(x + 2, y + 2, e.title, { wrap: w - 4 });
-      ty = y + 16;
-    }
-    for (const ln of e.lines) {
-      const line = typeof ln === 'string' ? { t: ln } : ln;
-      const tx = b.text(x + 2, ty, wrapText(this.scene, line.t, w - 4), { tint: line.tint ?? COL.dim });
-      ty += Math.ceil(tx.height) + 3;
-    }
-    if (e.extra) ty = e.extra(b, x + 2, ty + 1, w - 4);
-    const acts = e.actions ?? [];
-    const bw = Math.floor((w - 4 - (acts.length - 1) * 4) / Math.max(1, acts.length));
-    const by = this.wide ? y + h - 18 : Math.min(y + h - 18, ty + 2);
-    acts.forEach((a, i) => b.btn(x + 2 + i * (bw + 4), by, bw, a.label, a.kind, () => this.pick(this.list.sel, i)));
+    if (e) drawCard(b, this.card, e, this.rowH, (i) => this.pick(this.list.sel, i));
   }
 
   key(code: string, ev: KeyboardEvent): boolean {
@@ -252,7 +231,7 @@ function postcardEntry(closeMenu: () => void): Entry {
   return {
     row: { text: 'Take a postcard' },
     title: 'Take a postcard',
-    lines: ['Takes a picture of where you are standing and makes it into a postcard you can keep or send.', 'On a keyboard you can also press P.'],
+    lines: ['Takes a picture of where you are standing and makes it into a postcard you can keep or send.', ...(getLayout().touch ? [] : ['On a keyboard you can also press P.'])],
     actions: [{ label: 'Take it', kind: 'leaf', run: () => { closeMenu(); session.events.emit('postcard'); return null; } }],
   };
 }
@@ -296,7 +275,7 @@ export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry
   const slider = (name: string, key: 'music' | 'sfx', hint: string): Entry => ({
     row: { text: name, right: pct(settings[key]) },
     title: name,
-    lines: [hint, 'Press left or right to change it.'],
+    lines: [hint, getLayout().touch ? 'Tap - or + to change it.' : 'Press left or right to change it.'],
     adjust: (d) => { settings[key] = Math.max(0, Math.min(1, Math.round((settings[key] + d * 0.1) * 10) / 10)); saveSettings(); session.events.emit('settings'); },
     actions: [
       { label: '-', kind: 'wood', run: () => { settings[key] = Math.max(0, Math.round((settings[key] - 0.1) * 10) / 10); saveSettings(); session.events.emit('settings'); return null; } },
@@ -349,34 +328,62 @@ class BagView {
   private cols: number;
   private ox: number;
   private oy: number;
-  private infoY: number;
+  /** Where the card about the selected stack goes: under the grid, or beside it when the page is too short for that. */
+  private box: Area;
 
-  constructor(bag: Bag, private scene: Phaser.Scene, a: Area, private say: (m: string) => void) {
+  constructor(bag: Bag, scene: Phaser.Scene, a: Area, private say: (m: string) => void, private pitch: number, private btnH: number) {
     const slots = session.state.player.slots;
-    this.cols = Math.max(5, Math.min(10, Math.floor((a.w - 4) / 21)));
-    const pitch = 21;
-    this.ox = a.x + Math.floor((a.w - this.cols * pitch) / 2) + 1;
+    const st = session.state;
+    const goal = nextGoal(st);
+    const next = wrapText(scene, goal ? `Next: ${goal.text}` : 'Nothing is pressing. Enjoy the valley.', a.w - 18).split('\n').slice(0, 2);
+    const todayH = next.length * LINE + 5 + LINE;
+    const below = (cols: number): number => a.h - 5 - todayH - 8 - Math.ceil(slots.length / cols) * pitch;
+    const stacked = Math.max(5, Math.min(10, Math.floor((a.w - 4) / pitch)));
+    // under the grid there should be room for a name and a few lines; if not, the card goes beside the grid
+    const beside = below(stacked) < 4 * LINE + btnH && a.w >= 260;
+    this.cols = beside ? Math.max(4, Math.min(10, Math.floor((a.w - 120) / pitch))) : stacked;
+    this.ox = a.x + (beside ? 2 : Math.floor((a.w - this.cols * pitch) / 2) + 1);
     this.oy = a.y + 2;
-    const rows = Math.ceil(slots.length / this.cols);
-    this.infoY = this.oy + rows * pitch + 6;
+    const gridH = Math.ceil(slots.length / this.cols) * pitch;
+    let todayTop = a.y + a.h - todayH;
+    if (beside) {
+      this.box = { x: this.ox + this.cols * pitch + 8, y: a.y, w: a.x + a.w - (this.ox + this.cols * pitch + 8), h: todayTop - 5 - a.y };
+    } else {
+      // on a tall page the card is only as tall as its tallest stack needs, and the today lines follow it
+      const top = this.oy + gridH + 4;
+      const need = Math.max(...slots.map((s) => cardHeight(scene, a.w, this.cardOf(s), btnH)), cardHeight(scene, a.w, this.cardOf(null), btnH));
+      const h = Math.min(todayTop - 5 - top, need);
+      this.box = { x: a.x, y: top, w: a.w, h };
+      todayTop = top + h + 10;
+    }
     for (let i = 0; i < slots.length; i++) {
       const x = this.ox + (i % this.cols) * pitch;
       const y = this.oy + Math.floor(i / this.cols) * pitch;
-      const bg = bag.img(x, y, i < 10 ? 'ui/slot' : 'ui/slot', [0, 0], 1);
+      const bg = bag.img(x, y, 'ui/slot', [0, 0], 1);
       const icon = bag.img(x + 10, y + 10, 'item/stone').setVisible(false);
       const count = bag.text(x + 18, y + 12, '', { origin: [1, 0], outline: true, tint: COL.cream });
-      bag.zone(x, y, 20, 20, () => this.tap(i));
+      bag.zone(x, y, pitch, pitch, () => this.tap(i));
       this.cells.push({ bg, icon, count });
     }
     this.cursor = bag.img(0, 0, 'ui/slot-sel', [0, 0], 3);
+    this.drawToday(bag, a, todayTop, next);
     this.info = new Bag(scene, bag.depth);
-    this.width = a.w;
-    this.ax = a.x;
     this.paint();
   }
 
-  private width: number;
-  private ax: number;
+  /** What to do next and what the weather does tomorrow: the two things worth a glance before closing the bag. */
+  private drawToday(bag: Bag, a: Area, top: number, next: string[]): void {
+    const st = session.state;
+    const x = a.x + 2;
+    const rain = weatherFor(st.seed, st.day + 1);
+    const outlook = `Tomorrow is ${WEATHER_NAMES[rain].toLowerCase()}${rain === 'rain' || rain === 'storm' ? '. No need to water.' : '.'}`;
+    bag.rect(a.x + 2, top - 5, a.w - 4, 1, PAL.wood[1], 0.35, 2);
+    bag.img(x + 4, top + 5, 'ui/arrow-right').setTint(COL.berry);
+    bag.text(x + 15, top, next.join('\n'), { tint: COL.ink });
+    const wy = top + next.length * LINE + 5;
+    bag.img(x + 5, wy + 5, `ui/weather-${rain}`);
+    bag.text(x + 15, wy, outlook, { tint: COL.dim });
+  }
 
   destroy(): void {
     this.info.destroy();
@@ -429,22 +436,21 @@ class BagView {
       else { c.icon.setVisible(false); c.count.setText(''); }
       c.bg.setAlpha(i === this.carry ? 0.55 : 1);
     });
-    const pitch = 21;
+    const pitch = this.pitch;
     this.cursor.setPosition(this.ox + (this.sel % this.cols) * pitch - 2, this.oy + Math.floor(this.sel / this.cols) * pitch - 2);
     const b = this.info;
     b.destroy();
     const s = slots[this.sel];
-    const x = this.ax + 6;
-    if (s) {
-      const d = itemDef(s.id);
-      b.text(x, this.infoY, d.name, {});
-      const crop = cropOfSeed(s.id);
-      b.text(x, this.infoY + 12, wrapText(this.scene, crop ? `${d.blurb} ${plantAdvice(crop.id, st.day)}` : d.blurb, this.width - 80), { tint: COL.dim });
-      if (d.energy) b.btn(this.ax + this.width - 66, this.infoY, 60, 'Eat', 'leaf', () => this.eat());
-      b.text(x, this.infoY + 38, this.carry >= 0 ? 'Choose where it goes.' : 'Select a stack, then another slot to swap.', { tint: COL.dim });
-    } else {
-      b.text(x, this.infoY, this.carry >= 0 ? 'Choose where it goes.' : 'An empty slot.', { tint: COL.dim });
-    }
+    drawCard(b, this.box, this.cardOf(s ?? null), this.btnH, () => this.eat());
+  }
+
+  /** What the card says about a stack (or an empty slot). */
+  private cardOf(s: { id: string; n: number } | null): CardSpec {
+    if (!s) return { title: 'An empty slot', lines: [this.carry >= 0 ? 'Choose where it goes.' : 'Nothing here yet.'] };
+    const d = itemDef(s.id);
+    const crop = cropOfSeed(s.id);
+    const hint = this.carry >= 0 ? 'Choose where it goes.' : 'Select a stack, then another slot to swap.';
+    return { title: d.name, lines: [crop ? `${d.blurb} ${plantAdvice(crop.id, session.state.day)}` : d.blurb, hint], actions: d.energy ? [{ label: 'Eat', kind: 'leaf' }] : [] };
   }
 
   key(code: string): boolean {
@@ -465,13 +471,14 @@ class BagView {
 
 type TabId = 'bag' | 'craft' | 'bundles' | 'friends' | 'options';
 const TAB_NAMES: Record<TabId, string> = { bag: 'Bag', craft: 'Craft', bundles: 'Lanterns', friends: 'Friends', options: 'Options' };
+const TAB_ICONS: Record<TabId, string> = { bag: 'ui/tab-bag', craft: 'ui/tab-craft', bundles: 'ui/tab-lantern', friends: 'ui/tab-friends', options: 'ui/tab-options' };
+const TABS = (Object.keys(TAB_NAMES) as TabId[]).map((id) => ({ id, label: TAB_NAMES[id], icon: TAB_ICONS[id] }));
 
 export class MenuScreen extends Screen {
   private tab: TabId = 'bag';
   private body!: Bag;
   private pane: ListPane | null = null;
   private bagView: BagView | null = null;
-  private msgText: Phaser.GameObjects.BitmapText | null = null;
 
   constructor(host: ConstructorParameters<typeof Screen>[0], private toTitle: () => void, start: TabId = 'bag') {
     super(host);
@@ -481,35 +488,23 @@ export class MenuScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const wide = l.uiW >= 290;
-    const w = Math.min(l.uiW - 8, 360);
-    const h = Math.min(l.uiH - 8, wide ? 232 : 340);
-    const x = Math.floor((l.uiW - w) / 2);
-    const y = Math.floor((l.uiH - h) / 2);
-    bag.panel(x, y, w, h);
     const st = session.state;
-    bag.text(x + 12, y + 10, `${SEASON_NAMES[seasonOf(st.day)]} ${dayOfSeason(st.day)}`, {});
-    bag.img(x + w - 54, y + 14, 'ui/coin');
-    bag.text(x + w - 46, y + 11, `${st.player.gold}g`, { tint: COL.berry });
-    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
-
-    const ids = Object.keys(TAB_NAMES) as TabId[];
-    const tabW = Math.floor((w - 20 - (ids.length - 1) * 3) / ids.length);
-    ids.forEach((id, i) => {
-      bag.btn(x + 10 + i * (tabW + 3), y + 25, tabW, TAB_NAMES[id], id === this.tab ? 'leaf' : 'wood', () => this.setTab(id), 16);
-    });
-
+    const p = popup(bag, l, { title: '', wideH: 232, tallH: 340, maxW: 360, close: () => this.close() });
+    chip(bag, p, 'ui/coin', 10, COL.berry, `${st.player.gold}g`);
+    const strip = tabStrip(bag, l, p, p.top + 2, TABS, this.tab, (id) => this.setTab(id));
+    // with room for every name the title tells the date; with icons alone it names the page
+    p.title.setText(strip.labelled ? `${SEASON_NAMES[seasonOf(st.day)]} ${dayOfSeason(st.day)}` : TAB_NAMES[this.tab]);
+    const area = bodyOf(p, strip.bottom + 5);
+    const say = footer(bag, p);
+    const row = tapH(l);
     this.body = this.own(new Bag(this.scene, bag.depth));
-    const area = { x: x + 10, y: y + 47, w: w - 20, h: h - 47 - 18 };
-    this.msgText = bag.text(x + w / 2, y + h - 12, '', { origin: [0.5, 0], tint: COL.ink });
-    const say = (m: string): void => { this.msgText?.setText(m); };
     this.pane = null;
     this.bagView = null;
-    if (this.tab === 'bag') this.bagView = this.own(new BagView(this.body, this.scene, area, say));
-    else if (this.tab === 'craft') this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => recipeEntries('craft')));
-    else if (this.tab === 'bundles') this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => bundleEntries(false)));
-    else if (this.tab === 'friends') this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => friendEntries()));
-    else this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => optionEntries(() => { this.close(); this.toTitle(); }, () => this.close())));
+    if (this.tab === 'bag') this.bagView = this.own(new BagView(this.body, this.scene, area, say, slotPitch(l), row));
+    else if (this.tab === 'craft') this.pane = this.own(new ListPane(this.body, this.scene, area, p.wide, () => recipeEntries('craft'), undefined, row));
+    else if (this.tab === 'bundles') this.pane = this.own(new ListPane(this.body, this.scene, area, p.wide, () => bundleEntries(false), undefined, row));
+    else if (this.tab === 'friends') this.pane = this.own(new ListPane(this.body, this.scene, area, p.wide, () => friendEntries(), undefined, row));
+    else this.pane = this.own(new ListPane(this.body, this.scene, area, p.wide, () => optionEntries(() => { this.close(); this.toTitle(); }, () => this.close()), undefined, row));
     if (this.pane) this.pane.say = say;
   }
 
@@ -530,7 +525,6 @@ export class MenuScreen extends Screen {
 
 export class RecipeScreen extends Screen {
   private pane: ListPane | null = null;
-  private msgText: Phaser.GameObjects.BitmapText | null = null;
 
   constructor(host: ConstructorParameters<typeof Screen>[0], private kind: Recipe['kind'], private title: string) {
     super(host);
@@ -539,19 +533,10 @@ export class RecipeScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.45);
-    const wide = l.uiW >= 290;
-    const w = Math.min(l.uiW - 8, 340);
-    const h = Math.min(l.uiH - 8, wide ? 200 : 300);
-    const x = Math.floor((l.uiW - w) / 2);
-    const y = Math.floor((l.uiH - h) / 2);
-    bag.panel(x, y, w, h);
-    bag.text(x + 12, y + 10, this.title, {});
-    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const p = popup(bag, l, { title: this.title, wideH: 200, tallH: 300, close: () => this.close() });
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.msgText = bag.text(x + w / 2, y + h - 12, '', { origin: [0.5, 0] });
-    const say = (m: string): void => { this.msgText?.setText(m); };
-    this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 28, w: w - 20, h: h - 28 - 18 }, wide, () => recipeEntries(this.kind)));
-    this.pane.say = say;
+    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, p.top + 5), p.wide, () => recipeEntries(this.kind), undefined, tapH(l)));
+    this.pane.say = footer(bag, p);
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {
@@ -562,34 +547,23 @@ export class RecipeScreen extends Screen {
 
 export class ShrineScreen extends Screen {
   private pane: ListPane | null = null;
-  private msgText: Phaser.GameObjects.BitmapText | null = null;
-  private litText: Phaser.GameObjects.BitmapText | null = null;
+  private lit: Chip | null = null;
 
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const wide = l.uiW >= 290;
-    const w = Math.min(l.uiW - 8, 340);
-    const h = Math.min(l.uiH - 8, wide ? 220 : 320);
-    const x = Math.floor((l.uiW - w) / 2);
-    const y = Math.floor((l.uiH - h) / 2);
-    bag.panel(x, y, w, h);
-    bag.text(x + 12, y + 10, 'The Lantern Shrine', {});
-    bag.img(x + w - 64, y + 14, 'item/lantern');
-    this.litText = bag.text(x + w - 56, y + 11, '', { tint: COL.gold });
+    const p = popup(bag, l, { title: 'Lantern Shrine', wideH: 220, tallH: 320, close: () => this.close() });
+    this.lit = chip(bag, p, 'item/lantern', 14, COL.ink, '');
     this.showLit();
-    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
-    bag.text(x + 12, y + 25, 'Give what the valley gave you, and a lantern lights.', { tint: COL.dim, wrap: w - 24 });
+    const end = paragraph(bag, p.x + 12, p.top + 2, p.w - 24, 2 * LINE, 'Give what the valley gave you, and a lantern lights.');
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.msgText = bag.text(x + w / 2, y + h - 12, '', { origin: [0.5, 0] });
-    const say = (m: string): void => { this.msgText?.setText(m); };
-    this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 40, w: w - 20, h: h - 40 - 18 }, wide, () => bundleEntries(true), () => this.showLit()));
-    this.pane.say = say;
+    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, end + 5), p.wide, () => bundleEntries(true), () => this.showLit(), tapH(l)));
+    this.pane.say = footer(bag, p);
   }
 
   private showLit(): void {
     const lit = BUNDLES.filter((b) => isComplete(session.state, b)).length;
-    this.litText?.setText(`${lit}/${BUNDLES.length}`);
+    this.lit?.set(`${lit}/${BUNDLES.length}`);
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {

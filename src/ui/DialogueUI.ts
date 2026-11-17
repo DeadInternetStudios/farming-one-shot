@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { session } from '../game/session';
-import { COL, label } from './kit';
+import { tapH } from '../display';
+import { LINE } from './chrome';
+import { COL, label, wrapText } from './kit';
 import { Screen, isBack, isConfirm, isDown, isUp } from './Screens';
 import { Bag, ListView } from './widgets';
 
@@ -13,26 +15,6 @@ export interface DialogueOpts {
   done?: () => void;
   /** Sound pitch for the voice blips, so each speaker sounds a little different. */
   voice?: number;
-}
-
-/** Breaks text into lines that fit, so the typewriter never makes words jump. */
-export function wrapText(scene: Phaser.Scene, s: string, maxW: number): string {
-  const probe = label(scene, 0, 0, '').setVisible(false);
-  const lines: string[] = [];
-  for (const para of s.split('\n')) {
-    let line = '';
-    for (const word of para.split(' ')) {
-      const next = line ? `${line} ${word}` : word;
-      probe.setText(next);
-      if (probe.width > maxW && line) {
-        lines.push(line);
-        line = word;
-      } else line = next;
-    }
-    lines.push(line);
-  }
-  probe.destroy();
-  return lines.join('\n');
 }
 
 const CPS = 64;
@@ -56,9 +38,14 @@ export class Dialogue extends Screen {
     this.list = null;
     this.dim(0.18);
     const w = Math.min(l.uiW - 8, 340);
-    const h = 70;
+    // tall enough for the longest page: narrow screens wrap into more lines
+    const room = w - 10 - (this.o.portrait ? 70 : 14);
+    const lines = Math.max(1, ...this.o.pages.map((p) => wrapText(this.scene, p, room).split('\n').length));
+    const h = Math.max(70, 12 + lines * LINE + 12);
     const x = Math.floor((l.uiW - w) / 2);
-    const y = l.uiH - h - 32;
+    // on a short screen (a phone held sideways) the box goes up, because the people talking stand in the middle
+    this.high = l.uiH < 230;
+    const y = this.high ? 14 : l.uiH - h - 32;
     bag.panel(x, y, w, h);
     let x0 = x + 14;
     if (this.o.portrait) {
@@ -79,6 +66,7 @@ export class Dialogue extends Screen {
   }
 
   private textW = 0;
+  private high = false;
   private box = { x: 0, y: 0, w: 0, h: 0 };
 
   private startPage(i: number, instant = false): void {
@@ -108,10 +96,10 @@ export class Dialogue extends Screen {
     const ch = this.o.choices ?? [];
     const { x, y, w } = this.box;
     const cw = Math.min(124, w - 12);
-    const rowH = 16;
+    const rowH = Math.max(16, tapH(this.l));
     const ph = ch.length * rowH + 10;
     const px = x + w - cw - 6;
-    const py = y - ph - 3;
+    const py = this.high ? y + this.box.h + 3 : y - ph - 3;
     const cbag = this.own(new Bag(this.scene, this.bag.depth + 10));
     cbag.panel(px, py, cw, ph, 'parchment', 0);
     this.list = this.own(new ListView(cbag, px + 6, py + 5, cw - 12, ch.length * rowH, rowH, (i) => this.choose(i), () => undefined, true));

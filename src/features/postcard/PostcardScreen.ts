@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { tapH } from '../../display';
 import { session } from '../../game/session';
 import { COL } from '../../ui/kit';
 import { Screen, isBack, isConfirm } from '../../ui/Screens';
@@ -27,7 +28,7 @@ export class PostcardScreen extends Screen {
     tex.addCanvas(KEY, this.taken.canvas)?.setFilter(Phaser.Textures.FilterMode.LINEAR);
     this.dim(0.68);
 
-    const bh = l.touch ? 22 : 17;
+    const bh = tapH(l);
     const wide = l.uiW >= l.uiH * 1.45;
     const cw = this.taken.canvas.width;
     const ch = this.taken.canvas.height;

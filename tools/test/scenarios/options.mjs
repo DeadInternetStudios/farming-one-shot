@@ -29,8 +29,8 @@ export default async ({ lh, page, press, wait, shot, state, log }) => {
 
   // the list, top to bottom
   const rows = touch
-    ? ['Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Controls side', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title']
-    : ['Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title'];
+    ? ['Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Controls side', 'Take a postcard', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title']
+    : ['Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Take a postcard', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title'];
   const go = async (name) => {
     const to = rows.indexOf(name);
     for (let i = 0; i < (to - cur + rows.length) % rows.length; i++) await press('ArrowDown', 60);
@@ -66,7 +66,8 @@ export default async ({ lh, page, press, wait, shot, state, log }) => {
   const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 8000 }), press('Enter', 100)]);
   await chooser.setFiles(other);
   await wait(350);
-  await shot('options-4-restored');
+  // the page reloads itself 900 ms after a restore, which can land in the middle of a slow screenshot
+  await shot('options-4-restored').catch(() => log('[probe] (the page restarted during the screenshot)'));
   const stored = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? 'null'), KEY);
   expect(stored && stored.player.gold === 4242 && stored.day === 9, 'the restored farm is the saved game');
 

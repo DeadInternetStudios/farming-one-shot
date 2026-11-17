@@ -4,6 +4,8 @@ import type { Season } from '../game/types';
 export interface ShopDef {
   id: string;
   name: string;
+  /** A shorter name for narrow screens. */
+  short?: string;
   keeper: string;
   /** Opening hours in minutes since midnight. */
   open: number;
@@ -14,7 +16,7 @@ export interface ShopDef {
 
 export const SHOPS: Readonly<Record<string, ShopDef>> = {
   store: {
-    id: 'store', name: "Mirren's General Store", keeper: 'mirren', open: 9 * 60, close: 18 * 60,
+    id: 'store', name: "Mirren's General Store", short: "Mirren's Store", keeper: 'mirren', open: 9 * 60, close: 18 * 60,
     greeting: 'Seeds, supplies, and a smile. What can I get you?',
     closedLine: 'The store is closed. Mirren opens at 9 in the morning and closes at 6.',
   },

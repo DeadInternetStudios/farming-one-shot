@@ -15,6 +15,8 @@ export const COL = {
   water: PAL.water[3],
 } as const;
 
+export const WEATHER_NAMES = { sun: 'Sunny', cloud: 'Cloudy', rain: 'Rainy', storm: 'Stormy', snow: 'Snowy' } as const;
+
 export function iconFor(state: GameState, id: string): string {
   const d = itemDef(id);
   return d.kind === 'tool' ? `${d.icon}-${state.player.tools[id as ToolId]}` : d.icon;
@@ -49,27 +51,64 @@ export interface Button {
   destroy(): void;
 }
 
-/** A rounded nine-slice button with a label and a hit zone. */
-export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', onClick: () => void): Button {
+/** A rounded nine-slice button with a label and a hit zone. With an icon and no text the icon sits in the middle; with both they are centred as a pair. */
+export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', onClick: () => void, icon?: string): Button {
   const frame = (s: string): string => `ui/btn-${kind}-${s}`;
   const ns = scene.add.nineslice(x, y, 'atlas', frame('up'), w, h, 6, 6, 6, 6).setOrigin(0, 0);
   const tx = label(scene, x + w / 2, y + h / 2 + 1, text, { outline: true, origin: [0.5, 0.5] });
+  const pic = icon ? scene.add.image(0, 0, 'atlas', icon) : null;
   const zone = scene.add.zone(x, y, w, h).setOrigin(0, 0).setInteractive({ useHandCursor: true });
+  if (pic && text) {
+    const gap = 3;
+    const start = x + (w - (pic.width + gap + tx.width)) / 2;
+    pic.setPosition(Math.round(start + pic.width / 2), 0);
+    tx.setOrigin(0, 0.5).setX(Math.round(start + pic.width + gap));
+  } else if (pic) {
+    pic.setX(Math.round(x + w / 2));
+  }
   let enabled = true;
   const set = (s: string): void => {
+    const push = s === 'down' && enabled ? 1 : 0;
     ns.setTexture('atlas', enabled ? frame(s) : 'ui/btn-disabled');
-    tx.setY(Math.round(y + h / 2 + 1 + (s === 'down' && enabled ? 1 : 0)));
+    tx.setY(Math.round(y + h / 2 + 1 + push));
+    pic?.setY(Math.round(y + h / 2 + push));
   };
+  set('up');
+  // a press has to start on the button too, so letting go of a list drag over a button does not press it
+  let armed = false;
   zone.on('pointerover', () => set('hover'));
-  zone.on('pointerout', () => set('up'));
-  zone.on('pointerdown', () => set('down'));
+  zone.on('pointerout', () => { armed = false; set('up'); });
+  zone.on('pointerdown', () => { armed = true; set('down'); });
   zone.on('pointerup', () => {
     set('hover');
-    if (enabled) onClick();
+    if (armed && enabled) onClick();
+    armed = false;
   });
+  const parts: Phaser.GameObjects.GameObject[] = [ns, tx, zone];
+  if (pic) parts.push(pic);
   return {
-    parts: [ns, tx, zone],
+    parts,
     setEnabled: (v) => { enabled = v; set('up'); },
-    destroy: () => { ns.destroy(); tx.destroy(); zone.destroy(); },
+    destroy: () => { for (const p of parts) p.destroy(); },
   };
+}
+
+/** Breaks text into lines that fit, so the typewriter never makes words jump. */
+export function wrapText(scene: Phaser.Scene, s: string, maxW: number): string {
+  const probe = label(scene, 0, 0, '').setVisible(false);
+  const lines: string[] = [];
+  for (const para of s.split('\n')) {
+    let line = '';
+    for (const word of para.split(' ')) {
+      const next = line ? `${line} ${word}` : word;
+      probe.setText(next);
+      if (probe.width > maxW && line) {
+        lines.push(line);
+        line = word;
+      } else line = next;
+    }
+    lines.push(line);
+  }
+  probe.destroy();
+  return lines.join('\n');
 }

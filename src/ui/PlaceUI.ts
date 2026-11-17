@@ -7,6 +7,8 @@ import type { Slots } from '../game/inventory';
 import { deliver } from '../game/requests';
 import { session } from '../game/session';
 import type { ThingState } from '../game/state';
+import { tapH, slotPitch } from '../display';
+import { bodyOf, footer, popup } from './chrome';
 import { COL, iconFor } from './kit';
 import { ListPane } from './MenuUI';
 import type { Entry } from './MenuUI';
@@ -59,16 +61,9 @@ export class PickScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const wide = l.uiW >= 290;
-    const w = Math.min(l.uiW - 8, 340);
-    const h = Math.min(l.uiH - 8, wide ? 200 : 320);
-    const x = Math.floor((l.uiW - w) / 2);
-    const y = Math.floor((l.uiH - h) / 2);
-    bag.panel(x, y, w, h);
-    bag.text(x + 12, y + 10, this.cfg.title, {});
-    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const p = popup(bag, l, { title: this.cfg.title, wideH: 200, tallH: 320, close: () => this.close() });
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 28, w: w - 20, h: h - 28 - 10 }, wide, () => this.entries()));
+    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, p.top + 5, false), p.wide, () => this.entries(), undefined, tapH(l)));
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {
@@ -80,8 +75,6 @@ export class PickScreen extends Screen {
 /** The notice board by the shrine: errands for the villagers. */
 export class BoardScreen extends Screen {
   private pane: ListPane | null = null;
-  private msg: Phaser.GameObjects.BitmapText | null = null;
-
   private entries(): Entry[] {
     const st = session.state;
     const list = [...st.requests].sort((a, b) => a.until - b.until);
@@ -118,18 +111,10 @@ export class BoardScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const wide = l.uiW >= 290;
-    const w = Math.min(l.uiW - 8, 340);
-    const h = Math.min(l.uiH - 8, wide ? 200 : 300);
-    const x = Math.floor((l.uiW - w) / 2);
-    const y = Math.floor((l.uiH - h) / 2);
-    bag.panel(x, y, w, h);
-    bag.text(x + 12, y + 10, 'Notice Board', {});
-    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const p = popup(bag, l, { title: 'Notice Board', wideH: 200, tallH: 300, close: () => this.close() });
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.msg = bag.text(x + w / 2, y + h - 12, '', { origin: [0.5, 0] });
-    this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 28, w: w - 20, h: h - 28 - 18 }, wide, () => this.entries()));
-    this.pane.say = (m) => this.msg?.setText(m);
+    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, p.top + 5), p.wide, () => this.entries(), undefined, tapH(l)));
+    this.pane.say = footer(bag, p);
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {
@@ -166,16 +151,16 @@ class SlotGrid {
   sel = 0;
   private cursor: Phaser.GameObjects.Image;
 
-  constructor(bag: Bag, private x: number, private y: number, cols: number, private slots: () => Slots, private onPick: (i: number) => void) {
+  constructor(bag: Bag, private x: number, private y: number, cols: number, private pitch: number, private slots: () => Slots, private onPick: (i: number) => void) {
     this.cols = cols;
     const n = slots().length;
     for (let i = 0; i < n; i++) {
-      const cx = x + (i % cols) * 21;
-      const cy = y + Math.floor(i / cols) * 21;
+      const cx = x + (i % cols) * pitch;
+      const cy = y + Math.floor(i / cols) * pitch;
       const bg = bag.img(cx, cy, 'ui/slot', [0, 0], 1);
       const icon = bag.img(cx + 10, cy + 10, 'item/stone').setVisible(false);
       const count = bag.text(cx + 18, cy + 12, '', { origin: [1, 0], outline: true, tint: COL.cream });
-      bag.zone(cx, cy, 20, 20, () => { this.sel = i; this.onPick(i); });
+      bag.zone(cx, cy, pitch, pitch, () => { this.sel = i; this.onPick(i); });
       this.cells.push({ bg, icon, count });
     }
     this.cursor = bag.img(0, 0, 'ui/slot-sel', [0, 0], 3);
@@ -194,7 +179,7 @@ class SlotGrid {
       else c.icon.setVisible(false);
       c.count.setText(s && s.n > 1 ? String(s.n) : '');
     });
-    this.cursor.setVisible(active).setPosition(this.x + (this.sel % this.cols) * 21 - 2, this.y + Math.floor(this.sel / this.cols) * 21 - 2);
+    this.cursor.setVisible(active).setPosition(this.x + (this.sel % this.cols) * this.pitch - 2, this.y + Math.floor(this.sel / this.cols) * this.pitch - 2);
   }
 }
 
@@ -216,22 +201,25 @@ export class ChestScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const cols = Math.max(6, Math.min(10, Math.floor((l.uiW - 36) / 21)));
-    const w = cols * 21 + 20;
-    const bagRows = Math.ceil(session.state.player.slots.length / cols);
-    const chestRows = Math.ceil(CHEST_SLOTS / cols);
-    const h = 28 + chestRows * 21 + 16 + bagRows * 21 + 26;
-    const x = Math.floor((l.uiW - w) / 2);
-    const y = Math.max(2, Math.floor((l.uiH - h) / 2));
-    bag.panel(x, y, w, h);
-    bag.text(x + 12, y + 10, 'Chest', {});
-    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const pitch = slotPitch(l);
+    const bagSlots = session.state.player.slots.length;
+    // a touch screen's title bar is taller, to hold a close button big enough for a finger
+    const lift = l.touch ? tapH(l) - 14 : 0;
+    const tall = (c: number): number => 28 + lift + Math.ceil(CHEST_SLOTS / c) * pitch + 16 + Math.ceil(bagSlots / c) * pitch + 26;
+    // as many columns as the screen's width allows, but no more than it takes to fit its height
+    const most = Math.max(6, Math.floor((l.uiW - 36) / pitch));
+    let cols = Math.min(10, most);
+    while (cols < most && tall(cols) > l.uiH - 8) cols++;
+    const h = tall(cols);
+    const p = popup(bag, l, { title: 'Chest', maxW: cols * pitch + 20, wideH: h, tallH: h, close: () => this.close() });
+    const { x, y } = p;
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.chest = new SlotGrid(body, x + 10, y + 26, cols, () => this.items, (i) => { this.focus = 'chest'; this.move('chest', i); });
-    const by = y + 26 + chestRows * 21 + 6;
+    const chestRows = Math.ceil(CHEST_SLOTS / cols);
+    this.chest = new SlotGrid(body, x + 10, y + 26 + lift, cols, pitch, () => this.items, (i) => { this.focus = 'chest'; this.move('chest', i); });
+    const by = y + 26 + lift + chestRows * pitch + 6;
     bag.text(x + 12, by - 1, 'Bag', { tint: COL.dim });
-    this.pack = new SlotGrid(body, x + 10, by + 11, cols, () => session.state.player.slots, (i) => { this.focus = 'bag'; this.move('bag', i); });
-    this.line = bag.text(x + w / 2, y + h - 14, 'Tap a stack to move it across.', { origin: [0.5, 0], tint: COL.dim });
+    this.pack = new SlotGrid(body, x + 10, by + 11, cols, pitch, () => session.state.player.slots, (i) => { this.focus = 'bag'; this.move('bag', i); });
+    this.line = bag.text(p.x + p.w / 2, p.y + p.h - 14, 'Tap a stack to move it across.', { origin: [0.5, 0], tint: COL.dim });
     this.paint();
   }
 
@@ -286,7 +274,6 @@ const clockText = (mins: number): string => {
 /** Feed ore and coal in, come back later for bars. */
 export class FurnaceScreen extends Screen {
   private pane: ListPane | null = null;
-  private msg: Phaser.GameObjects.BitmapText | null = null;
 
   constructor(host: Host, private loc: string, private key: string) {
     super(host);
@@ -348,18 +335,10 @@ export class FurnaceScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const wide = l.uiW >= 290;
-    const w = Math.min(l.uiW - 8, 340);
-    const h = Math.min(l.uiH - 8, wide ? 190 : 300);
-    const x = Math.floor((l.uiW - w) / 2);
-    const y = Math.floor((l.uiH - h) / 2);
-    bag.panel(x, y, w, h);
-    bag.text(x + 12, y + 10, 'Furnace', {});
-    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const p = popup(bag, l, { title: 'Furnace', wideH: 190, tallH: 300, close: () => this.close() });
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.msg = bag.text(x + w / 2, y + h - 12, '', { origin: [0.5, 0] });
-    this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 28, w: w - 20, h: h - 28 - 18 }, wide, () => this.entries()));
-    this.pane.say = (m) => this.msg?.setText(m);
+    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, p.top + 5), p.wide, () => this.entries(), undefined, tapH(l)));
+    this.pane.say = footer(bag, p);
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {

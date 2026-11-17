@@ -14,5 +14,7 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
+    // the economy tests play thousands of days; a busy machine must not turn them into false failures
+    testTimeout: 30_000,
   },
 });

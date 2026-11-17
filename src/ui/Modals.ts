@@ -8,15 +8,16 @@ import type { FinaleReport } from '../game/finale';
 import { session } from '../game/session';
 import { watchKey } from '../systems/keys';
 import { PAL } from '../gen/art';
-import type { Layout } from '../display';
-import { COL, button, iconFor, label, nine } from './kit';
+import { tapH, type Layout } from '../display';
+import { COL, WEATHER_NAMES, button, iconFor, label, nine } from './kit';
 import type { Button } from './kit';
 
-const WEATHER_NAMES = { sun: 'Sunny', cloud: 'Cloudy', rain: 'Rainy', storm: 'Stormy', snow: 'Snowy' } as const;
 const SEASON_NAMES = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' } as const;
 
 interface Open {
   parts: Phaser.GameObjects.GameObject[];
+  /** The y of the open panel's bottom edge. */
+  bottom: number;
   buttons: Button[];
   confirm: () => void;
   cancel?: () => void;
@@ -56,15 +57,22 @@ export class Modals {
     this.close();
     session.hold();
     const dim = this.scene.add.rectangle(0, 0, this.l.uiW, this.l.uiH, PAL.ink[0], 0.5).setOrigin(0, 0).setDepth(this.depth).setInteractive();
-    const open: Open = { parts: [dim], buttons: [], confirm, cancel };
+    const open: Open = { parts: [dim], bottom: 0, buttons: [], confirm, cancel };
     this.cur = open;
     return { open, dim };
   }
 
+  /** A touch screen's buttons are taller, so every panel grows by the difference. */
+  private get extra(): number {
+    return tapH(this.l) - 17;
+  }
+
   private panel(open: Open, w: number, h: number): { x: number; y: number } {
+    const tall = h + this.extra;
     const x = Math.floor((this.l.uiW - w) / 2);
-    const y = Math.floor((this.l.uiH - h) / 2);
-    open.parts.push(nine(this.scene, 'parchment', x, y, w, h).setDepth(this.depth + 1));
+    const y = Math.floor((this.l.uiH - tall) / 2);
+    open.parts.push(nine(this.scene, 'parchment', x, y, w, tall).setDepth(this.depth + 1));
+    open.bottom = y + tall;
     return { x, y };
   }
 
@@ -74,8 +82,10 @@ export class Modals {
     return t;
   }
 
-  private btn(open: Open, x: number, y: number, w: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', fn: () => void): void {
-    const b = button(this.scene, x, y, w, 17, text, kind, fn);
+  /** A button on the bottom edge of the open panel. */
+  private btn(open: Open, x: number, w: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', fn: () => void): void {
+    const h = 17 + this.extra;
+    const b = button(this.scene, x, open.bottom - 9 - h, w, h, text, kind, fn);
     for (const p of b.parts) (p as Phaser.GameObjects.GameObject & { setDepth: (d: number) => unknown }).setDepth(this.depth + 3);
     open.buttons.push(b);
   }
@@ -96,8 +106,8 @@ export class Modals {
     const missing = festivalToday(st.day) === 'lantern' && !finaleDone(st);
     this.text(open, x + w / 2, y + 13, missing ? 'The lanterns rise tonight.' : late ? 'Ready for bed?' : 'It is still early.', { origin: [0.5, 0] });
     this.text(open, x + w / 2, y + 26, missing ? 'Sleep now and you will miss the festival.' : late ? 'The day ends and your crops grow.' : 'Sleep now and end the day?', { origin: [0.5, 0], tint: COL.dim, wrap: w - 20, align: 'center' });
-    this.btn(open, x + 10, y + h - 26, Math.floor((w - 28) / 2), 'Sleep', 'leaf', yes);
-    this.btn(open, x + w - 10 - Math.floor((w - 28) / 2), y + h - 26, Math.floor((w - 28) / 2), 'Not yet', 'wood', () => this.close());
+    this.btn(open, x + 10, Math.floor((w - 28) / 2), 'Sleep', 'leaf', yes);
+    this.btn(open, x + w - 10 - Math.floor((w - 28) / 2), Math.floor((w - 28) / 2), 'Not yet', 'wood', () => this.close());
   }
 
   // ---------------------------------------------------------------- signs and notes
@@ -110,7 +120,7 @@ export class Modals {
     t.destroy();
     const { x, y } = this.panel(open, w, h);
     this.text(open, x + 12, y + 12, text, { wrap: w - 24 });
-    this.btn(open, x + w - 60, y + h - 26, 50, 'Okay', 'leaf', () => this.close());
+    this.btn(open, x + w - 60, 50, 'Okay', 'leaf', () => this.close());
   }
 
   // ---------------------------------------------------------------- the letter that starts the story
@@ -157,7 +167,7 @@ export class Modals {
         cy += (heights[i] as number) + 7;
       });
       if (last) open.parts.push(this.scene.add.image(x + 24, y + h - 21, 'title', 'seal').setDepth(this.depth + 2));
-      this.btn(open, x + w - 76, y + h - 26, 64, last ? 'Let us go' : 'Next', 'leaf', go);
+      this.btn(open, x + w - 76, 64, last ? 'Let us go' : 'Next', 'leaf', go);
     };
     show(0);
   }
@@ -197,7 +207,7 @@ export class Modals {
           this.text(open, x + pad, cy, t, { wrap: inner });
           cy += (heights[i] as number) + 7;
         });
-        this.btn(open, x + w - 76, y + h - 26, 64, 'Next', 'leaf', go);
+        this.btn(open, x + w - 76, 64, 'Next', 'leaf', go);
       } else {
         const h = 20 + 14 + r.rows.length * 13 + 12 + 34;
         const { x, y } = this.panel(open, w, h);
@@ -211,7 +221,7 @@ export class Modals {
           this.text(open, x + w - pad, cy, v, { origin: [1, 0] });
           cy += 13;
         }
-        this.btn(open, x + Math.floor((w - 84) / 2), y + h - 27, 84, 'Keep playing', 'leaf', go);
+        this.btn(open, x + Math.floor((w - 84) / 2), 84, 'Keep playing', 'leaf', go);
       }
     };
     show(0);
@@ -280,6 +290,6 @@ export class Modals {
     rule();
     open.parts.push(this.scene.add.image(x + pad, cy + 1, 'atlas', `ui/weather-${s.weather}`).setOrigin(0, 0).setDepth(this.depth + 2));
     this.text(open, x + pad + 18, cy + 3, `Tomorrow is ${WEATHER_NAMES[s.weather].toLowerCase()}`);
-    this.btn(open, x + Math.floor((w - 84) / 2), y + h - 27, 84, 'Good morning', 'leaf', finish);
+    this.btn(open, x + Math.floor((w - 84) / 2), 84, 'Good morning', 'leaf', finish);
   }
 }

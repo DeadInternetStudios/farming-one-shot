@@ -25,6 +25,7 @@
       #boot .lamp { width: 18px; height: 18px; border-radius: 50%; background: #ffc95e; box-shadow: 0 0 24px 10px rgba(255, 166, 58, 0.55); animation: glow 1.6s ease-in-out infinite; }
       #boot.done { opacity: 0; }
       @keyframes glow { 0%, 100% { transform: scale(0.85); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { #boot .lamp { animation: none; } }
     </style>
   </head>
   <body>

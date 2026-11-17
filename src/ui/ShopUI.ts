@@ -7,11 +7,13 @@ import { countItem } from '../game/inventory';
 import { session } from '../game/session';
 import { NEXT_TIER, availableUpgrades, buy, buyPrice, buyUpgrade, canSellHere, collectForge, sell, sellPrice, startForge } from '../game/shop';
 import type { ToolId } from '../game/types';
+import { tapH } from '../display';
+import { bodyOf, cardHeight, chip, drawCard, footer, popup, tabStrip } from './chrome';
+import type { Chip } from './chrome';
 import { COL, iconFor } from './kit';
 import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Screens';
 import { Bag, ListView } from './widgets';
 import type { Row } from './widgets';
-import { wrapText } from './DialogueUI';
 
 interface Info {
   icon?: string;
@@ -41,8 +43,8 @@ export class ShopScreen extends Screen {
   private tab = 0;
   private list: ListView | null = null;
   private msg = '';
-  private msgText: Phaser.GameObjects.BitmapText | null = null;
-  private goldText: Phaser.GameObjects.BitmapText | null = null;
+  private speak: (m: string, color?: number) => void = () => undefined;
+  private gold: Chip | null = null;
   private infoBag!: Bag;
 
   constructor(host: ConstructorParameters<typeof Screen>[0], private shopId: string, greeting?: string) {
@@ -211,43 +213,40 @@ export class ShopScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.45);
-    const wide = l.uiW >= 290;
-    const w = Math.min(l.uiW - 8, 340);
-    const h = Math.min(l.uiH - 8, wide ? 214 : 300);
-    const x = Math.floor((l.uiW - w) / 2);
-    const y = Math.floor((l.uiH - h) / 2);
-    bag.panel(x, y, w, h);
     const shop = SHOPS[this.shopId];
-    bag.text(x + 12, y + 10, shop?.name ?? 'Shop', {});
-    const gx = x + w - 14;
-    this.goldText = bag.text(gx - 14, y + 11, `${session.state.player.gold}g`, { origin: [1, 0], tint: COL.berry });
-    bag.img(gx - 6, y + 14, 'ui/coin');
-    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
-
-    // tabs
-    let tx = x + 10;
-    this.tabs.forEach((t, i) => {
-      const tw = Math.max(40, t.name.length * 5 + 16);
-      bag.btn(tx, y + 25, tw, t.name, i === this.tab ? 'leaf' : 'wood', () => this.setTab(i), 16);
-      tx += tw + 4;
-    });
-
-    const top = y + 46;
-    const bottom = y + h - 16;
-    const listW = wide ? Math.floor(w * 0.5) - 6 : w - 20;
-    const listH = wide ? bottom - top : Math.floor((bottom - top) * 0.5);
-    this.list = this.own(new ListView(bag, x + 10, top, listW, listH, 17, (i) => this.pickRow(i), () => this.paintInfo(), false));
+    const p = popup(bag, l, { title: shop?.name ?? 'Shop', wideH: 214, tallH: 340, close: () => this.close() });
+    if (!p.wide && shop?.short) p.title.setText(shop.short);
+    this.gold = chip(bag, p, 'ui/coin', 10, COL.berry, `${session.state.player.gold}g`);
+    const specs = this.tabs.map((t, i) => ({ id: String(i), label: t.name }));
+    const strip = tabStrip(bag, l, p, p.top + 2, specs, String(this.tab), (id) => this.setTab(Number(id)));
+    const area = bodyOf(p, strip.bottom + 5);
+    const row = tapH(l);
+    const listW = p.wide ? Math.floor(area.w * 0.5) - 6 : area.w;
+    const cardH = p.wide ? 0 : this.tallestCard(area.w, row);
+    const count = (this.tabs[this.tab] as Tab).rows().length;
+    const listH = p.wide ? area.h : Math.max(1, Math.min(count, Math.max(3, Math.floor((area.h - 8 - cardH) / row)))) * row;
+    this.list = this.own(new ListView(bag, area.x, area.y, listW, listH, row, (i) => this.pickRow(i), () => this.paintInfo(), false));
     this.infoBag = this.own(new Bag(this.scene, bag.depth));
-    this.dynBox = wide
-      ? { x: x + 10 + listW + 10, y: top, w: w - listW - 30, h: bottom - top }
-      : { x: x + 10, y: top + listH + 6, w: w - 20, h: bottom - top - listH - 6 };
-    bag.text(x + w / 2, y + h - 12, '', { origin: [0.5, 0] });
-    this.msgText = bag.objs[bag.objs.length - 1] as Phaser.GameObjects.BitmapText;
-    this.msgText.setText(wrapText(this.scene, this.msg, w - 24).split('\n')[0] ?? '').setTint(COL.dim);
+    this.dynBox = p.wide
+      ? { x: area.x + listW + 10, y: area.y, w: area.w - listW - 10, h: area.h }
+      : { x: area.x, y: area.y + listH + 8, w: area.w, h: Math.min(area.h - listH - 8, cardH) };
+    this.speak = footer(bag, p, COL.dim);
+    this.speak(this.msg, COL.dim);
     this.refreshList(true);
   }
 
   private dynBox = { x: 0, y: 0, w: 0, h: 0 };
+
+  /** The height of the tallest card on this tab, so a stacked list can leave exactly that much room. */
+  private tallestCard(w: number, btnH: number): number {
+    const t = this.tabs[this.tab] as Tab;
+    let tall = 0;
+    for (let i = 0; i < t.rows().length; i++) {
+      const info = t.info(i);
+      if (info) tall = Math.max(tall, cardHeight(this.scene, w, { ...info, actions: t.actions(i) }, btnH));
+    }
+    return tall;
+  }
 
   private setTab(i: number): void {
     this.tab = i;
@@ -259,7 +258,7 @@ export class ShopScreen extends Screen {
     const t = this.tabs[this.tab] as Tab;
     this.list?.setRows(t.rows(), !reset);
     this.paintInfo();
-    this.goldText?.setText(`${session.state.player.gold}g`);
+    this.gold?.set(`${session.state.player.gold}g`);
   }
 
   private paintInfo(): void {
@@ -269,25 +268,8 @@ export class ShopScreen extends Screen {
     const sel = this.list?.sel ?? 0;
     const info = t.info(sel);
     if (!info) return;
-    const { x, y, w, h } = this.dynBox;
-    const wide = this.l.uiW >= 290;
-    let ty: number;
-    if (info.icon) {
-      b.img(x + 17, y + 17, info.icon).setScale(2);
-      b.text(x + 38, y + 4, info.title, { wrap: w - 40 });
-      ty = y + 38;
-    } else {
-      b.text(x + 2, y + 2, info.title, { wrap: w - 4 });
-      ty = y + 16;
-    }
-    for (const line of info.lines) {
-      const tx = b.text(x + 2, ty, wrapText(this.scene, line, w - 4), { tint: COL.dim });
-      ty += Math.ceil(tx.height) + 4;
-    }
     const acts = t.actions(sel);
-    const bw = Math.floor((w - 4 - (acts.length - 1) * 4) / Math.max(1, acts.length));
-    const by = wide ? y + h - 18 : Math.min(y + h - 18, ty + 2);
-    acts.forEach((a, i) => b.btn(x + 2 + i * (bw + 4), by, bw, a.label, a.kind, () => this.run(a)));
+    drawCard(b, this.dynBox, { ...info, actions: acts }, tapH(this.l), (i) => { const a = acts[i]; if (a) this.run(a); });
   }
 
   private run(a: Action): void {
@@ -298,7 +280,7 @@ export class ShopScreen extends Screen {
 
   private say(m: string): void {
     this.msg = m;
-    this.msgText?.setText(wrapText(this.scene, m, this.l.uiW - 40).split('\n')[0] ?? '').setTint(COL.ink);
+    this.speak(m, COL.ink);
   }
 
   private pickRow(i: number): void {

@@ -33,6 +33,15 @@ export function computeLayout(cssW: number, cssH: number, dpr: number, touch: bo
   return { dpr, cssW, cssH, devW, devH, worldZoom, uiZoom, uiW: Math.floor(devW / uiZoom), uiH: Math.floor(devH / uiZoom), touch };
 }
 
+/** A fingertip needs about this many CSS pixels. */
+const FINGER = 44;
+
+/** Height of anything you press, in interface pixels: 17 for a pointer, enough for a fingertip on touch. */
+export const tapH = (l: Layout): number => (l.touch ? Math.max(17, Math.ceil(FINGER / (l.uiZoom / l.dpr))) : 17);
+
+/** The distance between slot cells in a grid: a 20 px slot plus a gap, roomier for fingers. */
+export const slotPitch = (l: Layout): number => (l.touch ? Math.max(21, Math.ceil(FINGER / (l.uiZoom / l.dpr))) : 21);
+
 let current: Layout = computeLayout(960, 600, 1, false);
 export const getLayout = (): Layout => current;
 
