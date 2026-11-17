@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { watchKey } from './keys';
 
 /**
  * Keyboard, plus the on-screen stick and buttons, as one set of intents for the world to read.
@@ -22,7 +23,7 @@ export class Controls {
       w: 'W', a: 'A', s: 'S', d: 'D', up: 'UP', down: 'DOWN', left: 'LEFT', right: 'RIGHT', shift: 'SHIFT',
     }) as Record<string, Phaser.Input.Keyboard.Key>;
     kb.addCapture('SPACE,TAB,UP,DOWN,LEFT,RIGHT');
-    kb.on('keydown', (ev: KeyboardEvent) => this.onKey(ev));
+    watchKey(scene, 'keydown', (ev) => this.onKey(ev));
     scene.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => {
       if (dy !== 0) this.queuedCycle += dy > 0 ? 1 : -1;
     });

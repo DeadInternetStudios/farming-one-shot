@@ -3,9 +3,24 @@ import type { GameState } from './state';
 
 const KEY = 'lantern-hollow:save:v1';
 
+/** Set once a backup has been put in place: the running game must not write over it on its way out. */
+let frozen = false;
+
 export function saveGame(state: GameState): boolean {
+  if (frozen) return false;
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Swap in a save that came from outside, such as a backup file, and stop the running game saving over it. */
+export function replaceSave(state: GameState): boolean {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    frozen = true;
     return true;
   } catch {
     return false;

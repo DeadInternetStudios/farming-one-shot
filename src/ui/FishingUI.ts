@@ -5,6 +5,7 @@ import { minutesPerSecond } from '../game/clock';
 import { FishFight } from '../game/fishing';
 import { mulberry32 } from '../game/rng';
 import { session } from '../game/session';
+import { watchKey } from '../systems/keys';
 import { COL } from './kit';
 import { Screen, isBack } from './Screens';
 import type { Host } from './Screens';
@@ -69,16 +70,15 @@ export class FishingScreen extends Screen {
     const up = (ev: KeyboardEvent): void => { if (ev.code === 'Space' || ev.code === 'KeyE' || ev.code === 'Enter') this.holding = false; };
     const pdown = (): void => { this.holding = true; };
     const pup = (): void => { this.holding = false; };
-    const kb = this.scene.input.keyboard;
-    kb?.on('keydown', down);
-    kb?.on('keyup', up);
+    const stopDown = watchKey(this.scene, 'keydown', down);
+    const stopUp = watchKey(this.scene, 'keyup', up);
     this.scene.input.on('pointerdown', pdown);
     this.scene.input.on('pointerup', pup);
     this.scene.input.on('pointerupoutside', pup);
     this.own({
       destroy: () => {
-        kb?.off('keydown', down);
-        kb?.off('keyup', up);
+        stopDown();
+        stopUp();
         this.scene.input.off('pointerdown', pdown);
         this.scene.input.off('pointerup', pup);
         this.scene.input.off('pointerupoutside', pup);

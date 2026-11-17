@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { session } from '../game/session';
+import { watchKey } from './keys';
 
 /** Above the night overlay, so every light stays bright. */
 const TOP = 9200;
@@ -59,10 +60,10 @@ export class Finale {
       this.finish(done);
     };
     this.scene.input.on('pointerdown', skip);
-    this.scene.input.keyboard?.on('keydown', skip);
+    const stopKey = watchKey(this.scene, 'keydown', skip);
     this.off = () => {
       this.scene.input.off('pointerdown', skip);
-      this.scene.input.keyboard?.off('keydown', skip);
+      stopKey();
     };
   }
 

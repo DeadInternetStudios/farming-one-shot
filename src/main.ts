@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { installLayout, measure } from './display';
+import { startOffline } from './features/pwa/offline';
 import { BootScene } from './scenes/Boot';
 import { TitleScene } from './scenes/Title';
 import { UIScene } from './scenes/UI';
@@ -29,3 +30,4 @@ const game = new Phaser.Game({
 });
 
 installLayout(game, parent);
+startOffline();

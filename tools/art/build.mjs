@@ -21,6 +21,7 @@ import * as MA from './gen/machines.mjs';
 import * as W from './gen/wild.mjs';
 import * as T from './gen/title.mjs';
 import * as GA from './gen/garden.mjs';
+import * as AI from './gen/appicon.mjs';
 
 const OUT = 'public/assets';
 mkdirSync(OUT, { recursive: true });
@@ -373,3 +374,12 @@ export const PAL = ${JSON.stringify(Object.fromEntries(Object.entries(R).map(([k
 `;
 writeFileSync('src/gen/art.ts', ts);
 console.log('wrote src/gen/art.ts');
+
+// ---------------------------------------------------------------- app icons
+// One drawing, kept inside the safe circle so the same file works as a plain and a maskable icon.
+{
+  const icon = AI.appIcon();
+  const sizes = { 'icon-192': 192, 'icon-512': 512, 'apple-touch-icon': 180, 'favicon-32': 32 };
+  for (const [name, size] of Object.entries(sizes)) writePNG(`public/icons/${name}.png`, AI.resize(icon, size));
+  console.log(`icons ${Object.keys(sizes).join(', ')}`);
+}

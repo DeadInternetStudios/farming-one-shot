@@ -5,6 +5,9 @@ import { cropOfSeed, itemDef } from '../data/items';
 import { NPCS } from '../data/npcs';
 import { RECIPES } from '../data/recipes';
 import type { Recipe } from '../data/recipes';
+import { getLayout } from '../display';
+import { BACKUP_ON, backupToFile, restoreFromFile } from '../features/backup/backup';
+import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offline';
 import { PACE_REAL_MINUTES, dayOfSeason, seasonOf } from '../game/clock';
 import type { PaceId } from '../game/clock';
 import { available, donate, isComplete, progressOf, slotDone } from '../game/bundles';
@@ -14,6 +17,7 @@ import { saveGame } from '../game/save';
 import { session } from '../game/session';
 import { settings, saveSettings } from '../game/settings';
 import { friendOf, heartsOf } from '../game/social';
+import type { GameState } from '../game/state';
 import { COL, iconFor } from './kit';
 import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Screens';
 import { Bag, ListView, hearts } from './widgets';
@@ -30,7 +34,8 @@ export interface Entry {
   title: string;
   icon?: string;
   lines: (string | Line)[];
-  actions?: { label: string; kind: 'leaf' | 'wood' | 'berry' | 'sky'; run: () => string | null }[];
+  /** What a button does. It may answer later, as the file pickers do; the answer is what gets said. */
+  actions?: { label: string; kind: 'leaf' | 'wood' | 'berry' | 'sky'; run: () => string | null | Promise<string | null> }[];
   adjust?: (d: number) => void;
   extra?: (bag: Bag, x: number, y: number, w: number) => number;
 }
@@ -76,7 +81,8 @@ export class ListPane {
     const a = this.entries[i]?.actions?.[which];
     if (!a) return;
     const m = a.run();
-    if (m) this.say(m);
+    if (typeof m === 'string') this.say(m);
+    else if (m) void m.then((late) => { if (late) this.say(late); this.refresh(); });
     this.onChange();
     this.refresh();
   }
@@ -210,6 +216,60 @@ export function friendEntries(): Entry[] {
   });
 }
 
+/** Settings that make the game easier on the eyes and hands. */
+function accessEntries(): Entry[] {
+  const toggle = (key: 'calm' | 'lefty'): void => { settings[key] = !settings[key]; saveSettings(); session.events.emit('settings'); };
+  const out: Entry[] = [
+    {
+      row: { text: 'Calm motion', right: settings.calm ? 'On' : 'Off' },
+      title: 'Calm motion',
+      lines: ['Fewer drifting specks, steady lantern light, no lightning flashes and no screen shake.', 'It starts on when your device asks for reduced motion.'],
+      adjust: () => toggle('calm'),
+      actions: [{ label: 'Toggle', kind: 'leaf', run: () => { toggle('calm'); return null; } }],
+    },
+  ];
+  if (getLayout().touch) {
+    out.push({
+      row: { text: 'Controls side', right: settings.lefty ? 'Left hand' : 'Right hand' },
+      title: 'Controls side',
+      lines: ['Right hand puts the stick on the left and the action button on the right. Left hand swaps them.'],
+      adjust: () => toggle('lefty'),
+      actions: [{ label: 'Swap sides', kind: 'leaf', run: () => { toggle('lefty'); return null; } }],
+    });
+  }
+  return out;
+}
+
+/** Installing the game, and carrying a save from one device to another. */
+function appEntries(st: GameState): Entry[] {
+  const out: Entry[] = [];
+  if (PWA_ON && !isInstalled() && canInstall()) {
+    out.push({
+      row: { text: 'Install the game' },
+      title: 'Install the game',
+      lines: ['Put Lantern Hollow on your home screen. It opens full screen and plays with no connection.'],
+      actions: [{ label: 'Install', kind: 'leaf', run: () => install().then((ok) => (ok ? 'Installed. Look for the lantern.' : 'Maybe another time.')) }],
+    });
+  }
+  if (BACKUP_ON) {
+    out.push(
+      {
+        row: { text: 'Back up your farm' },
+        title: 'Back up your farm',
+        lines: ['Saves a file with your whole farm in it. Keep it safe, or use it to move your game to another device.'],
+        actions: [{ label: 'Save a file', kind: 'leaf', run: () => backupToFile(st) }],
+      },
+      {
+        row: { text: 'Restore a backup' },
+        title: 'Restore a backup',
+        lines: ['Pick a backup file. It replaces the game saved on this device, then the game starts again from it.'],
+        actions: [{ label: 'Choose a file', kind: 'wood', run: () => restoreFromFile() }],
+      },
+    );
+  }
+  return out;
+}
+
 const PACES: PaceId[] = ['relaxed', 'standard', 'brisk'];
 const PACE_NAMES: Record<PaceId, string> = { relaxed: 'Relaxed', standard: 'Standard', brisk: 'Brisk' };
 
@@ -243,6 +303,8 @@ export function optionEntries(toTitle: () => void): Entry[] {
       adjust: () => { settings.shake = !settings.shake; saveSettings(); },
       actions: [{ label: 'Toggle', kind: 'leaf', run: () => { settings.shake = !settings.shake; saveSettings(); return null; } }],
     },
+    ...accessEntries(),
+    ...appEntries(st),
     {
       row: { text: 'Save game' },
       title: 'Save game',

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { daylight, goldenHour } from '../game/clock';
+import { settings } from '../game/settings';
 import type { Season, Weather } from '../game/types';
 import type { MapKind } from '../world/mapkit';
 import type { LightSpot } from '../world/ObjectsView';
@@ -98,7 +99,7 @@ export class Lighting {
     rt.fill(sky.ambient, 1);
     const all = this.spots.concat(extra);
     all.forEach((s, i) => {
-      const flick = s.flicker ? 1 + Math.sin(time * 0.011 + i * 1.7) * 0.035 + Math.sin(time * 0.037 + i) * 0.02 : 1;
+      const flick = s.flicker && !settings.calm ? 1 + Math.sin(time * 0.011 + i * 1.7) * 0.035 + Math.sin(time * 0.037 + i) * 0.02 : 1;
       const r = s.r * flick;
       if (s.x + r < ox || s.x - r > ox + this.w || s.y + r < oy || s.y - r > oy + this.h) return;
       rt.stamp('atlas', 'fx/glow-128', s.x - ox, s.y - oy, { originX: 0.5, originY: 0.5, scale: r / 64, tint: s.color, alpha: Math.min(1, sky.lamps * 1.15 + 0.05), blendMode: Phaser.BlendModes.ADD });
@@ -107,7 +108,7 @@ export class Lighting {
     this.spots.forEach((s, i) => {
       const h = this.halos[i];
       if (!h) return;
-      const flick = s.flicker ? 1 + Math.sin(time * 0.011 + i * 1.7) * 0.03 : 1;
+      const flick = s.flicker && !settings.calm ? 1 + Math.sin(time * 0.011 + i * 1.7) * 0.03 : 1;
       h.setAlpha(sky.lamps * 0.2).setScale((s.r * 0.8 * flick) / 64);
     });
   }

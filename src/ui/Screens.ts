@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { session } from '../game/session';
+import { watchKey } from '../systems/keys';
 import type { Layout } from '../display';
 import { Bag, dimmer } from './widgets';
 
@@ -64,7 +65,7 @@ export class ScreenStack implements Host {
   private stack: Screen[] = [];
 
   constructor(readonly scene: Phaser.Scene, public l: Layout) {
-    scene.input.keyboard?.on('keydown', (ev: KeyboardEvent) => {
+    watchKey(scene, 'keydown', (ev) => {
       if (ev.repeat && !/Arrow|Key[WASD]/.test(ev.code)) return;
       this.top?.onKey(ev.code, ev);
     });

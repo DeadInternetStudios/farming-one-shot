@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { dayOfSeason, seasonOf } from '../game/clock';
 import { loadGame } from '../game/save';
 import { session } from '../game/session';
+import { watchKey } from '../systems/keys';
 import { saveSettings, settings } from '../game/settings';
 import type { GameState } from '../game/state';
 import { fitUiCamera, getLayout } from '../display';
@@ -80,7 +81,7 @@ export class TitleScene extends Phaser.Scene {
     this.menu(short);
     this.soundButton();
 
-    this.input.keyboard?.on('keydown', (ev: KeyboardEvent) => this.onKey(ev));
+    watchKey(this, 'keydown', (ev) => this.onKey(ev));
     audio.override('title');
     this.game.events.on('layout', this.onResize, this);
     this.events.once('shutdown', () => this.game.events.off('layout', this.onResize, this));

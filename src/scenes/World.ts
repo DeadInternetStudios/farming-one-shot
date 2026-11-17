@@ -14,6 +14,7 @@ import { finaleDue, finaleReport, finishFinale } from '../game/finale';
 import { nextGoal } from '../game/goals';
 import { saveGame } from '../game/save';
 import { session } from '../game/session';
+import { shakeOn } from '../game/settings';
 import { litCount } from '../game/bundles';
 import { furnaceState } from '../game/furnace';
 import { addItem } from '../game/inventory';
@@ -439,7 +440,7 @@ export class WorldScene extends Phaser.Scene {
         targets: ghost, angle: dir * 90, duration: 520, ease: 'quad.in',
         onComplete: () => {
           this.fx.dust(ghost.x + dir * 14, ghost.y - 2);
-          this.cameras.main.shake(90, 0.0015);
+          if (shakeOn()) this.cameras.main.shake(90, 0.0015);
           this.tweens.add({ targets: ghost, alpha: 0, duration: 400, delay: 200, onComplete: () => ghost.destroy() });
         },
       });
@@ -719,6 +720,7 @@ export class WorldScene extends Phaser.Scene {
       weather: (w: Weather) => { session.state.weather = w; },
       ambient: () => this.ambient.count(),
       lights: () => ({ spots: this.objects.lights.length, glows: this.objects.glows.length }),
+      game: () => this.game,
       fish: (bite = false, rig?: { item: string; difficulty: number }) => this.angler.debug(bite, rig),
       water: (x: number, y: number) => isWater(this.def, x, y),
       audio: () => audio.debug(),

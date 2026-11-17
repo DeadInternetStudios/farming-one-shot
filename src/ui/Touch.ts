@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import { session } from '../game/session';
+import { settings } from '../game/settings';
 import type { Layout } from '../display';
 import { iconFor } from './kit';
 
 const RADIUS = 22;
 
-/** A floating stick on the left half of the screen, plus an action button at the bottom right. */
+/** A floating stick on the left half of the screen, plus an action button at the bottom right. Left-handed play swaps the sides. */
 export class Touch {
   private objs: Phaser.GameObjects.GameObject[] = [];
   private base: Phaser.GameObjects.Image;
@@ -18,7 +19,9 @@ export class Touch {
   private onUp: (p: Phaser.Input.Pointer) => void;
 
   constructor(private scene: Phaser.Scene, l: Layout) {
-    const zone = scene.add.zone(0, 0, Math.floor(l.uiW * 0.55), l.uiH - 30).setOrigin(0, 0).setInteractive().setDepth(1);
+    const lefty = settings.lefty;
+    const zoneW = Math.floor(l.uiW * 0.55);
+    const zone = scene.add.zone(lefty ? l.uiW - zoneW : 0, 0, zoneW, l.uiH - 30).setOrigin(0, 0).setInteractive().setDepth(1);
     this.objs.push(zone);
     this.base = scene.add.image(0, 0, 'atlas', 'ui/stick-base').setVisible(false).setDepth(5).setAlpha(0.85);
     this.knob = scene.add.image(0, 0, 'atlas', 'ui/stick-knob').setVisible(false).setDepth(6);
@@ -54,7 +57,7 @@ export class Touch {
     scene.input.on('pointerupoutside', this.onUp);
 
     // the button shows what is in your hand, so you know what a press will do
-    const bx = l.uiW - 26;
+    const bx = lefty ? 26 : l.uiW - 26;
     const by = l.uiH - 52;
     const btn = scene.add.image(bx, by, 'atlas', 'ui/action-btn').setDepth(5).setInteractive();
     this.icon = scene.add.image(bx, by, 'atlas', 'ui/hand').setDepth(6);

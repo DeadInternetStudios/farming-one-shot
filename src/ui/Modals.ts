@@ -6,6 +6,7 @@ import type { DaySummary } from '../game/day';
 import { finaleDone } from '../game/finale';
 import type { FinaleReport } from '../game/finale';
 import { session } from '../game/session';
+import { watchKey } from '../systems/keys';
 import { PAL } from '../gen/art';
 import type { Layout } from '../display';
 import { COL, button, iconFor, label, nine } from './kit';
@@ -27,7 +28,7 @@ export class Modals {
   private depth = 40;
 
   constructor(private scene: Phaser.Scene, private l: Layout) {
-    scene.input.keyboard?.on('keydown', (ev: KeyboardEvent) => {
+    watchKey(scene, 'keydown', (ev) => {
       if (!this.cur) return;
       if (ev.code === 'Space' || ev.code === 'Enter' || ev.code === 'KeyE') this.cur.confirm();
       else if (ev.code === 'Escape' && this.cur.cancel) this.cur.cancel();

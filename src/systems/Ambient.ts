@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { session } from '../game/session';
+import { settings } from '../game/settings';
 import type { Season, Weather } from '../game/types';
 import type { MapKind } from '../world/mapkit';
 import type { CameraRig } from './CameraRig';
@@ -119,12 +120,14 @@ export class Ambient {
     if (sky.kind !== 'outdoor') return none;
     const night = sky.minute >= 19 * 60 + 30 || sky.minute < 5 * 60;
     const dry = sky.weather === 'sun' || sky.weather === 'cloud';
+    // calm mode keeps the weather readable with a lot less moving at once
+    const k = settings.calm ? 0.35 : 1;
     return {
-      rain: sky.weather === 'rain' ? Math.min(260, Math.round(area / 430)) : sky.weather === 'storm' ? Math.min(380, Math.round(area / 260)) : 0,
-      snow: sky.weather === 'snow' ? Math.min(220, Math.round(area / 520)) : 0,
-      petal: sky.season === 'spring' && dry && !night ? Math.round(area / 6000) : 0,
-      leaf: sky.season === 'fall' && sky.weather !== 'storm' && !night ? Math.round(area / 4200) : 0,
-      firefly: night && dry && sky.season !== 'winter' ? Math.round(area / 5200) : 0,
+      rain: Math.round((sky.weather === 'rain' ? Math.min(260, area / 430) : sky.weather === 'storm' ? Math.min(380, area / 260) : 0) * (settings.calm ? 0.55 : 1)),
+      snow: Math.round((sky.weather === 'snow' ? Math.min(220, area / 520) : 0) * k),
+      petal: sky.season === 'spring' && dry && !night ? Math.round((area / 6000) * k) : 0,
+      leaf: sky.season === 'fall' && sky.weather !== 'storm' && !night ? Math.round((area / 4200) * k) : 0,
+      firefly: night && dry && sky.season !== 'winter' ? Math.round((area / 5200) * k) : 0,
     };
   }
 
@@ -182,7 +185,7 @@ export class Ambient {
     this.nextFlash -= dt;
     if (this.nextFlash > 0) return;
     this.nextFlash = 7 + Math.random() * 11;
-    this.scene.cameras.main.flash(170, 230, 236, 255, true);
+    if (!settings.calm) this.scene.cameras.main.flash(170, 230, 236, 255, true);
     this.scene.time.delayedCall(450 + Math.random() * 900, () => session.events.emit('sfx', 'thunder'));
   }
 }

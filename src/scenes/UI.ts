@@ -41,6 +41,7 @@ export class UIScene extends Phaser.Scene {
     subscribe(this, 'dialog', (text: string) => this.modals.dialog(text));
     subscribe(this, 'letter', () => this.modals.letter(() => { session.release(); session.events.emit('sfx', 'tick'); }));
     subscribe(this, 'finale', (report: FinaleReport, done: () => void) => this.modals.finale(report, done));
+    subscribe(this, 'settings', () => this.rebuildTouch());
     subscribe(this, 'cinema', (on: boolean) => this.tweens.add({ targets: this.cameras.main, alpha: on ? 0 : 1, duration: 600 }));
     subscribe(this, 'interact', (what: Interact) => interact(this.stack, what, () => window.location.reload()));
 
@@ -53,6 +54,10 @@ export class UIScene extends Phaser.Scene {
     this.hud.rebuild(l);
     this.modals.setLayout(l);
     this.stack.setLayout(l);
+    this.rebuildTouch(l);
+  }
+
+  private rebuildTouch(l: Layout = getLayout()): void {
     this.touch?.destroy();
     this.touch = l.touch ? new Touch(this, l) : null;
   }
