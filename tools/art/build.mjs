@@ -15,6 +15,9 @@ import * as I from './gen/items.mjs';
 import * as U from './gen/ui.mjs';
 import * as FX from './gen/fx.mjs';
 import * as IN from './gen/interior.mjs';
+import * as V from './gen/village.mjs';
+import * as N from './gen/npcs.mjs';
+import * as MA from './gen/machines.mjs';
 
 const OUT = 'public/assets';
 mkdirSync(OUT, { recursive: true });
@@ -170,6 +173,30 @@ for (const c of crops) {
   const hl = IN.hangLamp(); add('int/lamp', hl.day); add('int/lamp-glow', hl.glow);
 }
 
+// village: shops, homes, the hall, the shrine and street furniture
+{
+  const b = (name, o) => { add(`building/${name}`, o.day); add(`building/${name}-glow`, o.glow); };
+  b('store', V.store()); b('cafe', V.cafe()); b('smithy', V.smithy()); b('hall', V.hall());
+  for (let k = 0; k < 3; k++) b(`home-${k}`, V.home(k));
+  for (let n = 0; n <= 7; n++) { const sh = V.shrine(n); add(`shrine/${n}`, sh.day); add(`shrine/${n}-glow`, sh.glow); }
+  add('prop/fountain-0', V.fountain(0)); add('prop/fountain-1', V.fountain(1));
+  add('prop/bench', V.bench()); add('prop/notice', V.noticeBoard());
+  add('prop/stall-red', V.stall()); add('prop/stall-blue', V.stall(R.blue, R.cream));
+  add('prop/barrel', V.barrel()); add('prop/crate', V.crate()); add('prop/well', V.well());
+  add('prop/hay', V.hayBale()); add('prop/scarecrow', V.scarecrow());
+  add('prop/signpost-farm', V.signpost('FARM', 'left')); add('prop/signpost-lake', V.signpost('LAKE', 'right')); add('prop/signpost-forest', V.signpost('WOODS', 'left'));
+  for (const sn of SEASONS) add(`prop/bunting-${sn}`, V.bunting(sn));
+  for (const n of N.NPCS) add(`portrait/${n.id}`, N.portrait(n.spec));
+}
+
+// machines
+{
+  add('item/sprinkler', MA.sprinkler()); add('item/furnace', MA.furnaceIcon()); add('item/chest', MA.chestIcon());
+  add('obj/furnace', MA.furnace(false)); add('obj/furnace-lit', MA.furnace(true)); add('obj/furnace-glow', MA.furnaceGlow());
+  add('obj/sprinkler', MA.sprinklerWorld(0)); add('obj/sprinkler-on', MA.sprinklerWorld(1));
+  add('obj/chest', MA.chestWorld(false)); add('obj/chest-open', MA.chestWorld(true));
+}
+
 // items
 {
   for (const tier of Object.keys(C.TIERS)) for (const t of [...C.TOOLS, 'rod']) {
@@ -239,6 +266,12 @@ const PLAYER = { skin: R.skin2, hair: R.hairBrown, hairStyle: 'short', shirt: R.
     items.push({ name: `${who}/idle-${dir}-0`, img: C.idleFrame(PLAYER, dir) });
     for (const tool of C.TOOLS) for (const tier of Object.keys(C.TIERS)) for (let t = 0; t < 4; t++) {
       items.push({ name: `${who}/${tool}-${tier}-${dir}-${t}`, img: C.toolFrame(PLAYER, dir, t, tool, tier) });
+    }
+  }
+  for (const n of N.NPCS) {
+    for (const dir of DIRS) {
+      const poses = dir === 'side' ? C.WALK_SIDE : C.WALK;
+      poses.forEach((p, i) => items.push({ name: `npc/${n.id}/walk-${dir}-${i}`, img: C.frame(n.spec, dir, p) }));
     }
   }
   const { atlas, json, frames } = packAtlas(items, { maxW: 1024, pad: 2, extrude: 1, imageName: 'chars.png' });

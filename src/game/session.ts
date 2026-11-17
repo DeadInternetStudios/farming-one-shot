@@ -10,8 +10,17 @@ import type { LocationState } from './state';
 class Session {
   state: GameState = newGame(1);
   readonly events = new Phaser.Events.EventEmitter();
-  /** True while a pop-up or the night is holding the world still. */
-  paused = false;
+  /** How many pop-ups are holding the world still. */
+  private holds = 0;
+  get paused(): boolean {
+    return this.holds > 0;
+  }
+  hold(): void {
+    this.holds += 1;
+  }
+  release(): void {
+    this.holds = Math.max(0, this.holds - 1);
+  }
   private maps = new Map<string, MapDef>();
 
   reset(seed = 1): void {

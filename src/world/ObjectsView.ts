@@ -43,6 +43,8 @@ export class ObjectsView {
   /** Window panes and the like: frames that fade in over their day frame as night falls. */
   readonly nightFrames: Phaser.GameObjects.Image[] = [];
   private bin: Phaser.GameObjects.Image | null = null;
+  private animated: { img: Phaser.GameObjects.Image; frames: string[] }[] = [];
+  private shrine: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image } | null = null;
   private grassTick = 0;
   private owned: Phaser.GameObjects.Image[] = [];
 
@@ -69,10 +71,12 @@ export class ObjectsView {
       if (!p.noShadow && !p.flat) this.img(ax, ay - 2, 'fx/shadow-m').setAlpha(0.4).setDepth(DEPTH.ground);
       const s = this.img(ax, sy, p.sprite).setOrigin(0.5, 1).setDepth(depth);
       if (p.interact === 'bin') this.bin = s;
+      if (p.frames) this.animated.push({ img: s, frames: p.frames });
       if (p.nightFrame) this.nightFrames.push(this.img(ax, sy, p.nightFrame).setOrigin(0.5, 1).setDepth(depth + 0.4).setAlpha(0));
       if (p.glow) {
         const g = this.img(ax, sy, p.glow).setOrigin(0.5, 1).setDepth(depth + 0.5).setAlpha(0);
         this.glows.push(g);
+        if (p.id === 'shrine') this.shrine = { img: s, glow: g };
       }
       if (p.light) this.lights.push({ x: ax + p.light.x, y: ay + p.light.y, r: p.light.r, color: p.light.color ?? 0xffbe66, flicker: true });
     }
@@ -85,8 +89,16 @@ export class ObjectsView {
     return i;
   }
 
+  /** Show how many lanterns on the shrine are lit. */
+  setLit(n: number): void {
+    this.shrine?.img.setFrame(`shrine/${n}`);
+    this.shrine?.glow.setFrame(`shrine/${n}-glow`);
+  }
+
   destroy(): void {
     for (const i of this.owned) i.destroy();
+    this.animated = [];
+    this.shrine = null;
     this.owned = [];
     this.placed.clear();
     this.crops.clear();
@@ -197,6 +209,8 @@ export class ObjectsView {
   }
 
   update(time: number): void {
+    const beat = Math.floor(time / 380);
+    for (const a of this.animated) a.img.setFrame(a.frames[beat % a.frames.length] as string);
     const tick = Math.floor(time / 320);
     if (tick !== this.grassTick) {
       this.grassTick = tick;

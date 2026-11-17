@@ -2,6 +2,7 @@ import { itemDef } from '../data/items';
 import { DAY_START, dayOfSeason, seasonOf } from './clock';
 import { CAN_CAPACITY, applyRain, growOvernight, witherOutOfSeason } from './farming';
 import type { NightReport } from './farming';
+import { refreshRequests } from './requests';
 import { chance, pick, randInt, rngFor } from './rng';
 import type { Rand } from './rng';
 import type { GameState } from './state';
@@ -95,6 +96,7 @@ export function sleepThrough(state: GameState, farm: MapDef, passedOut: boolean)
   }
 
   spawnClutter(state, farm, rngFor(state.seed, state.day, 5));
+  refreshRequests(state);
 
   const p = state.player;
   let lostGold = 0;

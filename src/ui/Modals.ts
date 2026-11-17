@@ -45,14 +45,12 @@ export class Modals {
     this.cur = null;
     for (const p of c.parts) p.destroy();
     for (const b of c.buttons) b.destroy();
-    this.scene.time.delayedCall(80, () => {
-      if (!this.cur) session.paused = false;
-    });
+    this.scene.time.delayedCall(80, () => session.release());
   }
 
   private begin(confirm: () => void, cancel?: () => void): { open: Open; dim: Phaser.GameObjects.Rectangle } {
     this.close();
-    session.paused = true;
+    session.hold();
     const dim = this.scene.add.rectangle(0, 0, this.l.uiW, this.l.uiH, PAL.ink[0], 0.5).setOrigin(0, 0).setDepth(this.depth).setInteractive();
     const open: Open = { parts: [dim], buttons: [], confirm, cancel };
     this.cur = open;

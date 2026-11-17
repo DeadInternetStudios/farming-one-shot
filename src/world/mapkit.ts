@@ -60,6 +60,8 @@ export interface Prop {
   lift?: number;
   /** A frame that fades in at night over the day frame, such as a window. */
   nightFrame?: string;
+  /** Frames to cycle through, for things that move like a fountain. */
+  frames?: string[];
 }
 
 /** A patch of floor you can use with the action key. */

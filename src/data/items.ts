@@ -1,7 +1,7 @@
 import cropsJson from './crops.json';
 import type { Season, ToolId } from '../game/types';
 
-export type ItemKind = 'tool' | 'seed' | 'crop' | 'resource' | 'forage' | 'fish' | 'food' | 'gem' | 'goods' | 'gift' | 'special';
+export type ItemKind = 'tool' | 'seed' | 'crop' | 'resource' | 'forage' | 'fish' | 'food' | 'gem' | 'goods' | 'gift' | 'special' | 'machine';
 
 export interface ItemDef {
   id: string;
@@ -56,9 +56,9 @@ const BASE: ItemDef[] = [
   resource('wood', 'Wood', 8, 'A sturdy length of timber.'),
   resource('stone', 'Stone', 6, 'Good for walls, paths and furnaces.'),
   resource('fiber', 'Fiber', 4, 'Springy plant fiber.'),
-  resource('hay', 'Hay', 5, 'Sweet dried grass. Animals love it.'),
-  resource('coal', 'Coal', 25, 'Burns hot and long.'),
-  resource('copperOre', 'Copper Ore', 18, 'A glint of orange in grey rock.'),
+  resource('hay', 'Hay', 5, 'Sweet dried grass. Animals love it.', { buy: 12 }),
+  resource('coal', 'Coal', 25, 'Burns hot and long.', { buy: 60 }),
+  resource('copperOre', 'Copper Ore', 18, 'A glint of orange in grey rock.', { buy: 45 }),
   resource('ironOre', 'Iron Ore', 30, 'Heavy and dependable.'),
   resource('goldOre', 'Gold Ore', 55, 'It catches the lantern light.'),
   resource('copperBar', 'Copper Bar', 90, 'Smelted copper, ready to be a tool.'),
@@ -76,6 +76,33 @@ const BASE: ItemDef[] = [
   { id: 'lantern', name: 'Valley Lantern', kind: 'special', icon: 'item/lantern', sell: 0, stack: 1, blurb: 'It wants to be lit.' },
 ];
 
+const fish = (id: string, name: string, sell: number, blurb: string): ItemDef => ({ id: `fish-${id}`, name, kind: 'fish', icon: `item/fish-${id}`, sell, stack: 99, blurb, energy: Math.round(sell / 5) });
+const gem = (id: string, name: string, sell: number, blurb: string): ItemDef => ({ id: `gem-${id}`, name, kind: 'gem', icon: `item/gem-${id}`, sell, stack: 99, blurb });
+const dish = (id: string, name: string, sell: number, energy: number, blurb: string): ItemDef => ({ id: `dish-${id}`, name, kind: 'food', icon: `item/dish-${id}`, sell, stack: 99, blurb, energy });
+const machine = (id: string, name: string, blurb: string): ItemDef => ({ id, name, kind: 'machine', icon: `item/${id}`, sell: 0, stack: 99, blurb });
+
+const EXTRA: ItemDef[] = [
+  fish('minnow', 'Minnow', 35, 'A flash of silver in shallow water.'),
+  fish('perch', 'Perch', 60, 'Striped and spirited.'),
+  fish('trout', 'Trout', 95, 'Quick and clever. Loves cold water.'),
+  fish('carp', 'Carp', 75, 'Slow, wise and mossy.'),
+  fish('eel', 'Eel', 150, 'Slippery, shy, and best at dusk.'),
+  fish('koi', 'Silver Koi', 420, 'Tam has seen her twice. Now you have too.'),
+  gem('amethyst', 'Amethyst', 100, 'Deep purple, like a held breath.'),
+  gem('topaz', 'Topaz', 85, 'Warm as honey in the light.'),
+  gem('aquamarine', 'Aquamarine', 120, 'A chip of lake water, frozen.'),
+  gem('ruby', 'Ruby', 260, 'It glows from the inside.'),
+  dish('soup', 'Vegetable Soup', 130, 50, 'Warm, filling and forgiving.'),
+  dish('stew', 'Hearty Stew', 210, 80, 'Stick-to-your-ribs good.'),
+  dish('pie', 'Fruit Pie', 280, 60, 'The pride of the cafe.'),
+  dish('salad', 'Garden Salad', 150, 45, 'Crunchy, bright and quick.'),
+  dish('jam', 'Berry Jam', 170, 35, 'Sweet and slow.'),
+  dish('tea', 'Wildflower Tea', 100, 30, 'Gentle, golden and calming.'),
+  machine('chest', 'Storage Chest', 'Place it on your land to store things.'),
+  machine('furnace', 'Furnace', 'Smelts ore into bars. Feed it coal.'),
+  machine('sprinkler', 'Sprinkler', 'Waters the four tiles around it every night.'),
+];
+
 const cropItems: ItemDef[] = CROP_LIST.flatMap((c): ItemDef[] => [
   {
     id: `seed-${c.id}`, name: `${c.name} Seeds`, kind: 'seed', icon: `item/seed-${c.id}`,
@@ -85,7 +112,7 @@ const cropItems: ItemDef[] = CROP_LIST.flatMap((c): ItemDef[] => [
   { id: c.id, name: c.name, kind: 'crop', icon: `item/${c.id}`, sell: c.sell, stack: 99, blurb: c.blurb, energy: Math.round(c.sell / 3) },
 ]);
 
-export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries([...BASE, ...cropItems].map((i) => [i.id, i]));
+export const ITEMS: Readonly<Record<string, ItemDef>> = Object.fromEntries([...BASE, ...EXTRA, ...cropItems].map((i) => [i.id, i]));
 
 export function itemDef(id: string): ItemDef {
   const d = ITEMS[id];

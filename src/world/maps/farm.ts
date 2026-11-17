@@ -27,7 +27,7 @@ export function farmMap(seed: number): MapDef {
 
   // doors and roads out
   m.warp({ x: 11, y: 10, w: 2, h: 1, to: 'house', tx: 7.5, ty: 9, dir: 'up' });
-  m.warp({ x: 55, y: 15, w: 1, h: 2, to: 'village', tx: 1, ty: 15, dir: 'right' });
+  m.warp({ x: 55, y: 15, w: 1, h: 2, to: 'village', tx: 1, ty: 11.5, dir: 'right' });
   m.warp({ x: 27, y: 0, w: 2, h: 1, to: 'forest', tx: 20, ty: 38, dir: 'up' });
   m.spawn = { x: 12, y: 12 };
 
