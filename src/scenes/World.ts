@@ -3,6 +3,7 @@ import { itemDef } from '../data/items';
 import { facingTile, interactTile, isSolidTile, isWater, placeMachine, useSeed, useTool } from '../game/actions';
 import type { Ctx, Outcome } from '../game/actions';
 import { DAY_END, minutesPerSecond, seasonOf } from '../game/clock';
+import { CAN_CAPACITY } from '../game/farming';
 import { sleepThrough } from '../game/day';
 import type { DaySummary } from '../game/day';
 import { NPC_BY_ID } from '../data/npcs';
@@ -42,7 +43,7 @@ const REACH = 2.1;
 
 const HINTS: Readonly<Record<string, string>> = {
   bed: 'Bed', chest: 'Chest', stove: 'Cook', counter: 'Counter', shelf: 'Bookshelf', bin: 'Shipping bin', sign: 'Sign', text: 'Look',
-  shop: 'Go in', shrine: 'Lantern Shrine', board: 'Notice board', festival: 'Judging stall', coop: 'Coop',
+  shop: 'Go in', shrine: 'Lantern Shrine', board: 'Notice board', festival: 'Judging stall', coop: 'Coop', well: 'Well',
 };
 
 const OPPOSITE: Readonly<Record<Dir, Dir>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
@@ -521,11 +522,23 @@ export class WorldScene extends Phaser.Scene {
       case 'festival': ev({ kind: 'festival' }); return;
       case 'stove': ev({ kind: 'cook' }); return;
       case 'coop': this.useCoop(h); return;
+      case 'well': this.useWell(h); return;
       case 'chest': ev({ kind: 'chest', loc: this.def.id, key: tileKey(h.x, h.y) }); return;
       case 'counter': this.say('Counter space. The stove next door does the cooking.'); return;
       case 'shelf': this.say('Worn books about weather, soil and seeds.'); return;
       default: this.say(h.text ?? '...');
     }
+  }
+
+  /** Fills the can, whatever is in your hand. */
+  private useWell(h: Hotspot): void {
+    const p = session.state.player;
+    const cap = CAN_CAPACITY[p.tools.can];
+    if (p.water >= cap) return this.say('The can is already full.');
+    p.water = cap;
+    this.fx.splash(h.x * 16 + 16, h.y * 16 + 22);
+    session.events.emit('sfx', 'refill');
+    this.say('You fill the watering can.');
   }
 
   private useBin(h: Hotspot): void {

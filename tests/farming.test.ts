@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CROP_STAGES } from '../src/gen/art';
 import { CROP_LIST } from '../src/data/items';
 import {
-  applyRain, canPlant, cropFrame, cropStage, cropStageCount, growOvernight, harvest, plant, till, untill,
+  applyRain, canPlant, cropFrame, cropStage, cropStageCount, growOvernight, harvest, lastGoodDay, plant, ripensInTime, till, untill,
   waterSoil, waterTiles, witherOutOfSeason,
 } from '../src/game/farming';
 import type { SoilMap } from '../src/game/farming';
@@ -35,6 +35,29 @@ describe('planting', () => {
     expect(untill(soils, K)).toBe(false);
     delete soils[K]!.crop;
     expect(untill(soils, K)).toBe(true);
+  });
+});
+
+describe('planting late in a season', () => {
+  it('a six day crop only makes it when planted on the first day of its season', () => {
+    expect(ripensInTime('melon', 8)).toBe(true); // summer 1, ripe on summer 7
+    expect(ripensInTime('melon', 9)).toBe(false);
+    expect(ripensInTime('pumpkin', 15)).toBe(true);
+    expect(ripensInTime('pumpkin', 16)).toBe(false);
+  });
+
+  it('a crop that suits the next season too can finish there', () => {
+    expect(lastGoodDay('corn', 12)).toBe(21); // summer and fall
+    expect(ripensInTime('corn', 12)).toBe(true);
+    expect(ripensInTime('corn', 16)).toBe(true); // fall 2, ripe on fall 7
+    expect(ripensInTime('corn', 17)).toBe(false);
+  });
+
+  it('every crop can be planted on the first day of its first season and ripen', () => {
+    for (const c of CROP_LIST) {
+      const first = ['spring', 'summer', 'fall'].findIndex((s) => c.seasons.includes(s as 'spring')) * 7 + 1;
+      expect(ripensInTime(c.id, first), c.id).toBe(true);
+    }
   });
 });
 

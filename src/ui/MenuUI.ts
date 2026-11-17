@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BUNDLES } from '../data/bundles';
 import type { BundleDef } from '../data/bundles';
-import { itemDef } from '../data/items';
+import { cropOfSeed, itemDef } from '../data/items';
 import { NPCS } from '../data/npcs';
 import { RECIPES } from '../data/recipes';
 import type { Recipe } from '../data/recipes';
@@ -9,6 +9,7 @@ import { PACE_REAL_MINUTES, dayOfSeason, seasonOf } from '../game/clock';
 import type { PaceId } from '../game/clock';
 import { available, donate, isComplete, progressOf, slotDone } from '../game/bundles';
 import { have, make, plan } from '../game/crafting';
+import { plantAdvice } from '../game/farming';
 import { saveGame } from '../game/save';
 import { session } from '../game/session';
 import { settings, saveSettings } from '../game/settings';
@@ -357,7 +358,8 @@ class BagView {
     if (s) {
       const d = itemDef(s.id);
       b.text(x, this.infoY, d.name, {});
-      b.text(x, this.infoY + 12, wrapText(this.scene, d.blurb, this.width - 80), { tint: COL.dim });
+      const crop = cropOfSeed(s.id);
+      b.text(x, this.infoY + 12, wrapText(this.scene, crop ? `${d.blurb} ${plantAdvice(crop.id, st.day)}` : d.blurb, this.width - 80), { tint: COL.dim });
       if (d.energy) b.btn(this.ax + this.width - 66, this.infoY, 60, 'Eat', 'leaf', () => this.eat());
       b.text(x, this.infoY + 38, this.carry >= 0 ? 'Choose where it goes.' : 'Select a stack, then another slot to swap.', { tint: COL.dim });
     } else {

@@ -1,6 +1,7 @@
-import { itemDef } from '../data/items';
+import { cropOfSeed, itemDef } from '../data/items';
 import { CAFE_STOCK, SHOPS, SMITHY_STOCK, TOOL_UPGRADES, UPGRADES, storeStock } from '../data/shops';
 import { seasonOf } from '../game/clock';
+import { plantAdvice } from '../game/farming';
 import { addItem, countItem, removeItem } from '../game/inventory';
 import { session } from '../game/session';
 import { buy, buyPrice, canSellHere, sell, sellPrice } from '../game/shop';
@@ -61,7 +62,9 @@ export class ShopScreen extends Screen {
         const it = ids()[i];
         if (!it) return null;
         const d = itemDef(it);
-        return { icon: iconFor(st, it), title: d.name, lines: [d.blurb, `Costs ${buyPrice(it)}g.`, `You have ${countItem(st.player.slots, it)}.`] };
+        const crop = cropOfSeed(it);
+        const when = crop ? [plantAdvice(crop.id, st.day)] : [];
+        return { icon: iconFor(st, it), title: d.name, lines: [d.blurb, ...when, `Costs ${buyPrice(it)}g.`, `You have ${countItem(st.player.slots, it)}.`] };
       },
       actions: (i) => {
         const it = ids()[i];

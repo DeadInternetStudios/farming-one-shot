@@ -26,6 +26,8 @@ export function farmMap(seed: number, state?: GameState): MapDef {
   m.prop({ sprite: 'building/bin', x: 16, y: 10, solid: true, interact: 'bin' });
   m.prop({ sprite: 'prop/lamp', glow: 'prop/lamp-glow', x: 14, y: 12, light: { x: 0, y: -22, r: 74 } });
   m.prop({ sprite: 'prop/sign', x: 26, y: 14, solid: true, interact: 'sign', text: 'East: Hollow Green village.\nNorth: Whisper Wood.' });
+  // a well by the first field, so refilling the can is a few steps and not a walk to the pond
+  m.prop({ sprite: 'prop/well', x: 17, y: 12, w: 2, h: 2, solid: true, interact: 'well' });
 
   // the coop, once it has been built, with its door onto the pen
   if (state && coopBuilt(state)) {

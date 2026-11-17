@@ -2,7 +2,7 @@ import { cropOfSeed, itemDef } from '../data/items';
 import type { MapDef, ObjectKind } from '../world/mapkit';
 import { MACHINE_KINDS, SOLID_OBJECTS, OBJECT_HP } from '../world/mapkit';
 import {
-  CAN_CAPACITY, TOOL_DAMAGE, canPlant, clearDead, harvest, isRipe, plant, tierIndex, till, toolEnergy, untill, waterSoil, waterTiles,
+  CAN_CAPACITY, TOOL_DAMAGE, canPlant, clearDead, harvest, isRipe, plant, ripensInTime, tierIndex, till, toolEnergy, untill, waterSoil, waterTiles,
 } from './farming';
 import { addItem, canAdd, emptySlots, takeFromSlot } from './inventory';
 import type { Rand } from './rng';
@@ -169,7 +169,7 @@ export function useTool(ctx: Ctx, tool: ToolId, tx: number, ty: number, dir: Dir
         p.water = CAN_CAPACITY[tier];
         return done({ sfx: 'refill', fx: [{ t: 'splash', x: tx, y: ty }], energy: 0 });
       }
-      if (p.water <= 0) return fail('The can is empty. Fill it at the pond.', tx, ty);
+      if (p.water <= 0) return fail('The can is empty. Fill it at the well or any water.', tx, ty);
       const tiles = waterTiles({ x: tx, y: ty }, dir, tier);
       const { watered, used } = waterSoil(l.soil, tiles, p.water);
       p.water -= used;
@@ -259,6 +259,7 @@ export function useSeed(ctx: Ctx, seedId: string, slotIndex: number, tx: number,
   if (r === 'no-soil') return fail('Seeds need tilled soil.', tx, ty);
   if (r === 'occupied') return fail('Something is already growing there.', tx, ty);
   if (r === 'wrong-season') return fail(`${crop.name} won't grow in ${season}.`, tx, ty);
+  if (!ctx.map.indoors && !ripensInTime(crop.id, ctx.state.day)) return fail(`Too late in the season: ${crop.name} needs ${crop.days} days.`, tx, ty);
   plant(l.soil, key, crop.id);
   takeFromSlot(ctx.state.player.slots, slotIndex, 1);
   return done({ sfx: 'plant', fx: [{ t: 'dust', x: tx, y: ty }, { t: 'sparkle', x: tx, y: ty }], changed: [key], swing: false });

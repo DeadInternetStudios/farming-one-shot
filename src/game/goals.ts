@@ -1,9 +1,9 @@
 import { BUNDLES } from '../data/bundles';
 import { allLit, isComplete } from './bundles';
-import { seasonOf } from './clock';
+import { dayOfSeason, seasonOf } from './clock';
 import { FESTIVALS, FESTIVAL_NAMES, festivalToday } from '../data/festivals';
 import { enteredToday } from './festival';
-import { isRipe } from './farming';
+import { cropDef, isRipe } from './farming';
 import { FINALE_AT, finaleDone } from './finale';
 import { countItem } from './inventory';
 import type { GameState } from './state';
@@ -42,6 +42,12 @@ export function nextGoal(st: GameState): Goal | null {
   const tomorrow = festivalToday(st.day + 1);
   if (tomorrow && st.minute >= 17 * 60) return gift('festival-eve', `${FESTIVAL_NAMES[tomorrow]} is tomorrow`);
   if (st.day > 28 && !finaleDone(st)) return gift('finale-late', 'Olwen is waiting at the shrine after dark');
+
+  // on the last day of a season, whatever cannot live through the next one is about to wither
+  const nextSeason = seasonOf(st.day + 1);
+  if (dayOfSeason(st.day) === 7 && plots.some((p) => p.crop && !p.crop.dead && !cropDef(p.crop.id).seasons.includes(nextSeason))) {
+    return gift('season-end', `${season.charAt(0).toUpperCase()}${season.slice(1)} ends tonight. Harvest what you can`);
+  }
 
   if (!st.flags.outside) return gift('door', 'Step outside');
   if (first) {

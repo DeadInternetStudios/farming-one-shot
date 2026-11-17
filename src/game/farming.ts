@@ -1,4 +1,5 @@
 import { CROPS } from '../data/items';
+import { DAYS_PER_SEASON, dayOfSeason, seasonOf } from './clock';
 import type { CropDef } from '../data/items';
 import type { Rand } from './rng';
 import type { Dir, Season, Tier, Tile } from './types';
@@ -52,6 +53,26 @@ export function canPlant(soil: SoilState | undefined, cropId: string, season: Se
   if (soil.crop) return 'occupied';
   if (!indoors && !cropDef(cropId).seasons.includes(season)) return 'wrong-season';
   return 'ok';
+}
+
+/** The last day a crop planted on `day` can still be standing: the crop withers on the night its season ends. */
+export function lastGoodDay(cropId: string, day: number): number {
+  const def = cropDef(cropId);
+  let end = Math.ceil(day / DAYS_PER_SEASON) * DAYS_PER_SEASON;
+  while (def.seasons.includes(seasonOf(end + 1))) end += DAYS_PER_SEASON;
+  return end;
+}
+
+/** Whether a crop planted today, and watered every day, is ripe before its season is over. */
+export const ripensInTime = (cropId: string, day: number): boolean => day + cropDef(cropId).days <= lastGoodDay(cropId, day);
+
+/** One line telling the player how long they have to get a seed in the ground. */
+export function plantAdvice(cropId: string, day: number): string {
+  const last = lastGoodDay(cropId, day) - cropDef(cropId).days;
+  if (last < day) return 'Too late to plant it this season.';
+  if (last === day) return 'Plant it today to see it ripen.';
+  const name = seasonOf(last);
+  return `Plant by ${name.charAt(0).toUpperCase()}${name.slice(1)} ${dayOfSeason(last)}.`;
 }
 
 export function plant(soils: SoilMap, key: string, cropId: string): void {

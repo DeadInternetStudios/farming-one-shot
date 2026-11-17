@@ -15,6 +15,29 @@ const meet = (st: GameState, ...ids: string[]): void => {
 };
 const id = (st: GameState): string | undefined => nextGoal(st)?.id;
 
+describe('the last day of a season', () => {
+  it('warns about crops the next season will take', () => {
+    const st = fresh();
+    st.flags.outside = true;
+    st.stats.harvested = 5;
+    st.stats.shipped = 5;
+    meet(st, 'mirren', 'bram', 'ida', 'tam');
+    st.flags.shrineSeen = true;
+    st.deepest = 1;
+    st.day = 13; // summer 6
+    soil(st)['5,5'] = { wet: true, crop: { id: 'melon', age: 3, regrowing: false, dead: false } };
+    expect(id(st)).not.toBe('season-end');
+    st.day = 14;
+    st.minute = 12 * 60;
+    expect(id(st)).toBe('festival-today');
+    st.flags['fair-14'] = 'second';
+    expect(id(st)).toBe('season-end');
+    // a crop that carries on into fall is fine
+    soil(st)['5,5'] = { wet: true, crop: { id: 'corn', age: 3, regrowing: false, dead: false } };
+    expect(id(st)).not.toBe('season-end');
+  });
+});
+
 describe('the next goal', () => {
   it('walks a new player through the first day', () => {
     const st = fresh();
