@@ -1,4 +1,5 @@
 import { itemDef } from '../data/items';
+import { coopBuilt, layEggs } from './animals';
 import { DAYS_PER_YEAR, DAY_START, seasonOf } from './clock';
 import { CAN_CAPACITY, applyRain, growOvernight, witherOutOfSeason } from './farming';
 import type { NightReport } from './farming';
@@ -58,6 +59,8 @@ export interface DaySummary {
   passedOut: boolean;
   lostGold: number;
   weather: Weather;
+  /** Eggs laid in the coop overnight. */
+  eggs: number;
 }
 
 const OUTDOOR = new Set(['farm']);
@@ -98,6 +101,8 @@ export function sleepThrough(state: GameState, mapOf: (id: string) => MapDef, pa
     night.thirsty += r.thirsty;
   }
 
+  const eggs = coopBuilt(state) ? layEggs(state) : 0;
+
   state.day = oldDay + 1;
   const newSeason = seasonOf(state.day);
   let withered = 0;
@@ -132,7 +137,7 @@ export function sleepThrough(state: GameState, mapOf: (id: string) => MapDef, pa
   state.minute = DAY_START;
   state.stats.daysPlayed += 1;
 
-  return { day: oldDay, earned, sold, night, withered, newSeason: newSeason !== oldSeason ? newSeason : null, passedOut, lostGold, weather: state.weather };
+  return { day: oldDay, earned, sold, night, withered, newSeason: newSeason !== oldSeason ? newSeason : null, passedOut, lostGold, weather: state.weather, eggs };
 }
 
 type Open = (x: number, y: number) => boolean;
@@ -163,6 +168,7 @@ export function spawnClutter(state: GameState, map: MapDef, rand: Rand): void {
     if (!map.tillable[i] || map.overlay[i] || map.solid[i]) return false;
     // the yard and the first field stay tidy; the wild corners are where the chores grow
     if (x >= 6 && x < 18 && y >= 4 && y < 19) return false;
+    if (x >= 18 && x < 27 && y >= 4 && y < 15) return false;
     return !(x >= 15 && x < 31 && y >= 17 && y < 29);
   };
   const place = placer(l, map, rand, open);

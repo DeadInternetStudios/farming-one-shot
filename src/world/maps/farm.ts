@@ -1,9 +1,10 @@
 import { GROUND, MapBuilder, OVERLAY } from '../mapkit';
+import { COOP, coopBuilt } from '../../game/animals';
 import type { GameState } from '../../game/state';
 import type { MapDef } from '../mapkit';
 
 /** Lantern Hollow Farm. 56 x 40 tiles. The house sits top left, the pond bottom right. */
-export function farmMap(seed: number, _state?: GameState): MapDef {
+export function farmMap(seed: number, state?: GameState): MapDef {
   const m = new MapBuilder('farm', 'Lantern Hollow Farm', 56, 40, seed);
   m.fill(m.ground, GROUND.Grass);
 
@@ -26,6 +27,15 @@ export function farmMap(seed: number, _state?: GameState): MapDef {
   m.prop({ sprite: 'prop/lamp', glow: 'prop/lamp-glow', x: 14, y: 12, light: { x: 0, y: -22, r: 74 } });
   m.prop({ sprite: 'prop/sign', x: 26, y: 14, solid: true, interact: 'sign', text: 'East: Hollow Green village.\nNorth: Whisper Wood.' });
 
+  // the coop, once it has been built, with its door onto the pen
+  if (state && coopBuilt(state)) {
+    m.building({
+      sprite: 'building/coop', glow: 'building/coop-glow', x: COOP.x, y: COOP.y, w: COOP.w, h: COOP.h,
+      lights: [{ x: 0, y: -22, r: 40 }],
+    });
+    m.hotspot({ x: COOP.x + 1, y: COOP.y + COOP.h - 1, w: 2, h: 1, kind: 'coop' });
+  }
+
   // doors and roads out
   m.warp({ x: 11, y: 10, w: 2, h: 1, to: 'house', tx: 7.5, ty: 9, dir: 'up' });
   m.warp({ x: 55, y: 15, w: 1, h: 2, to: 'village', tx: 1, ty: 11.5, dir: 'right' });
@@ -34,6 +44,7 @@ export function farmMap(seed: number, _state?: GameState): MapDef {
 
   // keep the first field and the yard tidy so the first day has room to breathe
   m.keepClear(6, 4, 12, 15);
+  m.keepClear(18, 4, 9, 11);
   m.keepClear(15, 17, 16, 12);
   m.keepClear(30, 13, 25, 5);
   m.keepClear(23, 0, 8, 17);

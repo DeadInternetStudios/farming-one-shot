@@ -7,6 +7,9 @@ import { sleepThrough } from '../game/day';
 import type { DaySummary } from '../game/day';
 import { NPC_BY_ID } from '../data/npcs';
 import { rngFor } from '../game/rng';
+import { collectEggs, eggsWaiting, feedHens, henList, pet } from '../game/animals';
+import type { Pet } from '../game/state';
+import { nextGoal } from '../game/goals';
 import { saveGame } from '../game/save';
 import { session } from '../game/session';
 import { litCount } from '../game/bundles';
@@ -16,6 +19,7 @@ import type { Dir, ToolId, Weather } from '../game/types';
 import { tileKey } from '../game/types';
 import { getLayout } from '../display';
 import { Angler } from '../entities/Angler';
+import { Critters } from '../entities/Critters';
 import { Npcs } from '../entities/Npcs';
 import { Player } from '../entities/Player';
 import { audio } from '../systems/Audio';
@@ -44,6 +48,7 @@ export class WorldScene extends Phaser.Scene {
   private view!: MapView;
   private objects!: ObjectsView;
   private npcs!: Npcs;
+  private critters: Critters | null = null;
   private angler!: Angler;
   private ambient!: Ambient;
   private lastTenth = 0;
@@ -161,6 +166,9 @@ export class WorldScene extends Phaser.Scene {
     this.rig.setMap(this.def.w * 16, this.def.h * 16);
     this.npcs?.destroy();
     this.npcs = new Npcs(this, this.def, this.staticSolid);
+    this.critters?.destroy();
+    this.critters = id === 'farm' ? new Critters(this, this.def, loc) : null;
+    this.critters?.sync(st);
     this.npcs.sync(st, true);
     this.lastTenth = Math.floor(st.minute / 10);
     this.objects.setLit(litCount(st));
@@ -232,6 +240,7 @@ export class WorldScene extends Phaser.Scene {
       this.player.update(dt, mv.x, mv.y, this.controls.sprint, this.solid);
       this.syncPlayer();
       this.npcs.update(dt, { x: Math.floor(this.player.x / 16), y: Math.floor((this.player.y - 1) / 16) });
+      this.critters?.update(dt, st);
       const tenth = Math.floor(st.minute / 10);
       if (tenth !== this.lastTenth) {
         this.lastTenth = tenth;
@@ -342,6 +351,8 @@ export class WorldScene extends Phaser.Scene {
 
     const who = this.npcs.at(t.x, t.y);
     if (who) return this.talk(who);
+    const friend = this.critters?.at(t.x, t.y);
+    if (friend) return this.petAnimal(friend);
     const spot = this.hotspotAt(t.x, t.y);
     if (spot) return this.useHotspot(spot);
     const door = this.warpAt(t.x, t.y);
@@ -440,6 +451,42 @@ export class WorldScene extends Phaser.Scene {
     this.objects.syncMachines(busy);
   }
 
+  private petAnimal(who: Pet): void {
+    const st = session.state;
+    const first = pet(st, who.id);
+    const at = this.critters?.position(who.id);
+    if (at) this.fx.heart(at.x, at.y - 14);
+    if (first) session.events.emit('sfx', 'heart');
+    this.say(who.kind === 'cat' ? `${who.name} purrs and leans into your hand.` : `${who.name} clucks happily.`);
+  }
+
+  /** The coop door: take the eggs, then give out hay to any hens that have not eaten. */
+  private useCoop(h: Hotspot): void {
+    const st = session.state;
+    const lines: string[] = [];
+    const eggs = collectEggs(st);
+    if (eggs > 0) {
+      this.fx.handle({ t: 'pop', x: h.x, y: h.y, item: 'egg', n: eggs });
+      session.events.emit('sfx', 'pickup');
+      lines.push(`You gather ${eggs === 1 ? 'an egg' : `${eggs} eggs`}.`);
+    } else if (eggsWaiting(st) > 0) {
+      lines.push('Your bag is too full for the eggs.');
+    }
+    const hens = henList(st);
+    if (hens.length === 0) {
+      this.say('The coop is empty and swept. A chicken from the store would feel at home.');
+      return;
+    }
+    const feed = feedHens(st);
+    if (feed.fed > 0) {
+      session.events.emit('sfx', 'eat');
+      lines.push(feed.fed === feed.hungry ? 'You scatter hay and the hens come running.' : `You feed ${feed.fed} of ${feed.hungry} hungry hens.`);
+    } else if (feed.hungry > 0) {
+      lines.push('The hens look hungry. Hay comes from the scythe and tall grass, or from Mirren.');
+    }
+    this.say(lines.length > 0 ? lines.join(' ') : 'The hens are fed and clucking. Eggs come overnight.');
+  }
+
   private lightShrine(): void {
     this.objects.setLit(litCount(session.state));
     const at = this.def.hotspots.find((h) => h.kind === 'shrine');
@@ -461,6 +508,7 @@ export class WorldScene extends Phaser.Scene {
       case 'shrine': ev({ kind: 'shrine' }); return;
       case 'board': ev({ kind: 'board' }); return;
       case 'stove': ev({ kind: 'cook' }); return;
+      case 'coop': this.useCoop(h); return;
       case 'chest': ev({ kind: 'chest', loc: this.def.id, key: tileKey(h.x, h.y) }); return;
       case 'counter': this.say('Counter space. The stove next door does the cooking.'); return;
       case 'shelf': this.say('Worn books about weather, soil and seeds.'); return;
@@ -565,8 +613,9 @@ export class WorldScene extends Phaser.Scene {
       }),
       fps: () => ({ fps: Math.round(this.game.loop.actualFps), delta: Math.round(this.game.loop.delta), objects: this.children.length }),
       state: () => session.state,
+      goal: () => nextGoal(session.state),
       setMinute: (m: number) => { st.minute = m; },
-      setDay: (d: number) => { st.day = d; this.buildStage(this.def.id); },
+      setDay: (d: number) => { st.day = d; session.newMorning(); this.buildStage(this.def.id); },
       go: (id: string, tx: number, ty: number, dir: Dir = 'down') => this.travel({ x: 0, y: 0, w: 0, h: 0, to: id, tx, ty, dir }),
       teleport: (tx: number, ty: number, dir?: Dir) => { this.player.teleport((tx + 0.5) * 16, (ty + 0.8) * 16, dir); this.rig.snapTo(this.player.x, this.player.y - 8); },
       sleep: () => this.beginSleep(false),

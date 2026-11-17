@@ -234,11 +234,11 @@ export class ShopScreen extends Screen {
     if (id === 'chick') {
       st.upgrades.pop();
       const n = st.pets.filter((p) => p.kind === 'chicken').length;
-      st.pets.push({ id: `hen-${n + 1}`, kind: 'chicken', name: ['Clover', 'Pepper', 'Biscuit', 'Daisy'][n] ?? 'Hen', fedDay: 0, happy: 50 });
+      st.pets.push({ id: `hen-${n + 1}`, kind: 'chicken', name: ['Clover', 'Pepper', 'Biscuit', 'Daisy'][n] ?? 'Hen', fedDay: 0, happy: 50, since: st.day });
       return 'A chicken follows you home. It will be in the coop tomorrow.';
     }
     if (id === 'cat') {
-      st.pets.push({ id: 'cat', kind: 'cat', name: 'Biscuit', fedDay: 0, happy: 50 });
+      st.pets.push({ id: 'cat', kind: 'cat', name: 'Marmalade', fedDay: 0, happy: 50, since: st.day });
       return 'A farm cat will be waiting on your porch.';
     }
     return '';

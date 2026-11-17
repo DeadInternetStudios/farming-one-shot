@@ -175,6 +175,7 @@ export class Modals {
     if (s.newSeason) lines.push(`A new season begins: ${SEASON_NAMES[s.newSeason]}.`);
     if (s.withered > 0) lines.push(`${s.withered} crops withered in the cold turn of the season.`);
     if (s.night.ripe > 0) lines.push(`${s.night.ripe} crops are ripe and ready.`);
+    if (s.eggs > 0) lines.push(`${s.eggs === 1 ? 'An egg was' : `${s.eggs} eggs were`} laid in the coop.`);
     if (s.night.thirsty > 0) lines.push(`${s.night.thirsty} crops were thirsty and did not grow.`);
     const notes = lines.map((l) => label(this.scene, 0, 0, l, { wrap: w - pad * 2 }));
     const notesH = notes.reduce((a, t) => a + Math.ceil(t.height) + 3, 0);

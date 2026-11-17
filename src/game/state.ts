@@ -65,9 +65,13 @@ export interface Pet {
   id: string;
   kind: 'chicken' | 'cat';
   name: string;
-  /** Last day it was fed or petted. */
+  /** Last day it was fed. */
   fedDay: number;
   happy: number;
+  /** The day it joined the farm. Chickens are chicks for a few days. */
+  since?: number;
+  /** Last day it was petted. */
+  petDay?: number;
 }
 
 export interface PlayerState {
