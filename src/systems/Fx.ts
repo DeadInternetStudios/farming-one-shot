@@ -88,6 +88,11 @@ export class Fx {
     this.frames(x, y + 3, 'fx/ripple', 3, 120, FX_DEPTH - 1);
   }
 
+  /** A ring spreading on the water. */
+  ripple(x: number, y: number): void {
+    this.frames(x, y, 'fx/ripple', 3, 140, FX_DEPTH - 1, 0.7);
+  }
+
   /** An item hops out of the thing you worked on, then flies into the farmer's hands. */
   pop(x: number, y: number, item: string, n: number): void {
     const img = this.scene.add.image(x, y, 'atlas', `item/${item}`).setDepth(FX_DEPTH + 1).setScale(0.75);

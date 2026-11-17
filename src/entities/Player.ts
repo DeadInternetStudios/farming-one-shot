@@ -10,6 +10,8 @@ export class Player {
   facing: Dir;
   moving = false;
   swinging = false;
+  /** True from the cast until the line is reeled in; the farmer stands still holding the rod. */
+  rodOut = false;
   speed = 62;
   private walkKey = '';
 
@@ -43,7 +45,7 @@ export class Player {
 
   face(dir: Dir): void {
     this.facing = dir;
-    if (!this.moving && !this.swinging) this.idle();
+    if (!this.moving && !this.swinging && !this.rodOut) this.idle();
     this.sprite.setFlipX(dir === 'left');
   }
 
@@ -56,7 +58,7 @@ export class Player {
 
   /** Move with axis-separated collision against a solid-tile test. Feet box is 8 wide, 5 tall. */
   update(dt: number, mx: number, my: number, sprint: boolean, solid: (tx: number, ty: number) => boolean): void {
-    if (this.swinging) {
+    if (this.swinging || this.rodOut) {
       this.moving = false;
       this.place();
       return;
@@ -89,6 +91,30 @@ export class Player {
       this.idle();
     }
     this.place();
+  }
+
+  /** Cast the rod: back, forward and out, then rest with the tip over the water until `rodAway`. */
+  cast(onImpact: () => void): void {
+    this.rodOut = true;
+    this.moving = false;
+    this.walkKey = '';
+    this.sprite.anims.stop();
+    const dir = this.frameDir(this.facing);
+    const times = [110, 90, 70];
+    const step = (i: number): void => {
+      if (!this.rodOut) return;
+      this.sprite.setFrame(`player/rod-basic-${dir}-${i}`);
+      this.sprite.setFlipX(this.facing === 'left');
+      if (i === 2) onImpact();
+      if (i < 3) this.scene.time.delayedCall(times[i] as number, () => step(i + 1));
+    };
+    step(0);
+  }
+
+  rodAway(): void {
+    if (!this.rodOut) return;
+    this.rodOut = false;
+    this.idle();
   }
 
   /** Plays a four frame swing. `onImpact` fires on the frame where the tool lands. */

@@ -15,6 +15,7 @@ import { addItem } from '../game/inventory';
 import type { Dir, ToolId, Weather } from '../game/types';
 import { tileKey } from '../game/types';
 import { getLayout } from '../display';
+import { Angler } from '../entities/Angler';
 import { Npcs } from '../entities/Npcs';
 import { Player } from '../entities/Player';
 import { subscribe } from '../systems/bus';
@@ -41,6 +42,7 @@ export class WorldScene extends Phaser.Scene {
   private view!: MapView;
   private objects!: ObjectsView;
   private npcs!: Npcs;
+  private angler!: Angler;
   private lastTenth = 0;
   private lastMachineSync = 0;
   private player!: Player;
@@ -72,6 +74,7 @@ export class WorldScene extends Phaser.Scene {
     this.buildStage(st.player.loc);
     this.player = new Player(this, st.player.x, st.player.y, st.player.dir);
     this.fx = new Fx(this, () => ({ x: this.player.x, y: this.player.y }));
+    this.angler = new Angler({ scene: this, player: this.player, fx: this.fx, map: () => this.def, say: (m) => this.say(m) });
     this.lighting = new Lighting(this, this.rig, this.objects.lights);
     this.controls = new Controls(this);
     this.cursor = this.add.image(0, 0, 'atlas', 'fx/cursor').setDepth(7000).setAlpha(0.9);
@@ -113,6 +116,7 @@ export class WorldScene extends Phaser.Scene {
     this.def = session.map(id);
     const loc = session.location(id);
     st.player.loc = id;
+    this.angler?.cancel();
     this.view?.destroy();
     this.objects?.destroy();
     const season = seasonOf(st.day);
@@ -187,6 +191,7 @@ export class WorldScene extends Phaser.Scene {
       if (st.minute >= DAY_END) this.beginSleep(true);
 
       const mv = this.controls.move;
+      this.angler.update(dt, Math.hypot(mv.x, mv.y) > 0.25);
       this.player.update(dt, mv.x, mv.y, this.controls.sprint, this.solid);
       this.syncPlayer();
       this.npcs.update(dt, { x: Math.floor(this.player.x / 16), y: Math.floor((this.player.y - 1) / 16) });
@@ -237,6 +242,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private selectSlot(i: number): void {
+    if (this.angler.active) this.angler.cancel();
     session.state.player.selected = i;
     session.events.emit('selected');
   }
@@ -255,8 +261,9 @@ export class WorldScene extends Phaser.Scene {
     const idle = !this.player.swinging && !this.sleeping && !this.travelling && !session.paused;
     const spot = idle ? this.hotspotAt(t.x, t.y) : undefined;
     const who = idle ? this.npcs.at(t.x, t.y) : null;
-    this.cursor.setVisible(idle && (!!held || !!spot || !!who)).setPosition(t.x * 16 + 8, t.y * 16 + 8).setAlpha(0.65 + Math.sin(time * 0.008) * 0.25);
-    const hint = who ? `Talk to ${NPC_BY_ID[who]?.name ?? ''}` : spot ? (HINTS[spot.kind] ?? '') : '';
+    this.cursor.setVisible(idle && (!!held || !!spot || !!who) && !this.angler.active).setPosition(t.x * 16 + 8, t.y * 16 + 8).setAlpha(0.65 + Math.sin(time * 0.008) * 0.25);
+    const rod = idle && held?.id === 'rod' ? this.angler.hint() : '';
+    const hint = who ? `Talk to ${NPC_BY_ID[who]?.name ?? ''}` : spot ? (HINTS[spot.kind] ?? '') : rod;
     if (hint !== this.lastHint || time % 1000 < 20) {
       this.lastHint = hint;
       session.events.emit('hint', hint);
@@ -313,6 +320,9 @@ export class WorldScene extends Phaser.Scene {
         return;
       }
     }
+
+    if (held?.id === 'rod') return this.angler.press(at);
+    if (this.angler.active) this.angler.cancel();
 
     const hand = interactTile(ctx, t.x, t.y);
     if (hand) return this.resolve(hand, null);
@@ -524,6 +534,7 @@ export class WorldScene extends Phaser.Scene {
       info: () => ({ paused: session.paused, sleeping: this.sleeping, swinging: this.player.swinging, facing: this.player.facing, target: this.targetTile(), keyboard: !!this.input.keyboard?.enabled, active: this.input.isActive() }),
       give: (id: string, n: number) => addItem(session.state.player.slots, id, n),
       weather: (w: Weather) => { session.state.weather = w; },
+      fish: (bite = false, rig?: { item: string; difficulty: number }) => this.angler.debug(bite, rig),
       water: (x: number, y: number) => isWater(this.def, x, y),
     };
     (window as unknown as { __lh: unknown }).__lh = api;

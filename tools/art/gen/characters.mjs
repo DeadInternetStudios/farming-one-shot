@@ -252,6 +252,12 @@ export function drawTool(img, tool, hx, hy, angle, tier = 'basic') {
     body.line(1, 1, 3, -0, w2[4]);
     body.outline(() => w2[0]);
     img.blit(body, x - 4, y - 5);
+  } else if (tool === 'rod') {
+    // a slim pole: thick at the grip, thin at the tip, with a little reel
+    line(-3, 6, 0, w[3]); line(-3, 6, 1, w[2]);
+    line(7, 13, 0, w[3]);
+    const [rx, ry] = P(2, 2); img.set(rx, ry, R.stone[4]); img.set(rx + 1, ry, R.stone[3]);
+    const [tx, ty] = P(13, 0); img.set(tx, ty, R.red[3]);
   } else if (tool === 'scythe') {
     line(-2, 12, 0, w[3]); line(-2, 12, 1, w[2]);
     for (let s = 0; s <= 9; s++) { const [x, y] = P(11 - Math.round(Math.sin(s / 9 * 1.6) * 3), s - 1); img.set(x, y, s < 5 ? m[4] : m[3]); const [x2, y2] = P(12 - Math.round(Math.sin(s / 9 * 1.6) * 3), s - 1); img.set(x2, y2, m[2]); }
@@ -303,13 +309,26 @@ const SWING = {
 };
 export const TOOLS = ['hoe', 'axe', 'pick', 'can', 'scythe'];
 
+/** The rod swings back, forward, out, and then rests pointing over the water. */
+const ROD_ANGLES = {
+  side: [-150, -95, -40, -28],
+  down: [-130, -70, 10, 38],
+  up: [-125, -100, -75, -62],
+};
+/** Where the tip of the resting rod sits, in pixels from the feet, for a sprite facing right (mirror x for left). */
+export function rodTip(dir) {
+  const S = SWING[dir][3];
+  const a = (ROD_ANGLES[dir][3] * Math.PI) / 180;
+  return { x: Math.round(OX + S.hand[0] + Math.cos(a) * 13 - 16), y: Math.round(OY + S.hand[1] + Math.sin(a) * 13 - 30) };
+}
+
 export function toolFrame(spec, dir, t, tool, tier = 'basic') {
   const f = new Img(FW, FH);
   const S = SWING[dir][t];
   const body = drawBody(spec, dir, S.pose);
   const ti = new Img(FW, FH);
   // the watering can tilts forward as the swing goes on; every other tool follows the swing angle
-  const angle = tool === 'can' ? (dir === 'up' ? 0 : [0, 14, 42, 70][t]) : S.angle;
+  const angle = tool === 'can' ? (dir === 'up' ? 0 : [0, 14, 42, 70][t]) : tool === 'rod' ? ROD_ANGLES[dir][t] : S.angle;
   drawTool(ti, tool, OX + S.hand[0], OY + S.hand[1], angle, tier);
   ti.outline((c) => outlineOf(c));
   if (dir === 'up') { f.blit(ti, 0, 0); f.blit(body, OX, OY); } else { f.blit(body, OX, OY); f.blit(ti, 0, 0); }

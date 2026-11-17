@@ -166,8 +166,9 @@ export const NPCS: readonly NpcDef[] = [
     birthdayLine: 'A gift for an old man? Well, now. That is the best kind of day.',
     gift: { love: 'Ha! Now this is a gift. You have good taste, friend.', like: 'Kind of you. Very kind.', neutral: 'Thank you. I will think of you when I eat it.', dislike: 'Hmph. Well. It is the thought.' },
     unlocks: [
-      { hearts: 2, text: 'A good fisher needs a good line. Take this rod. It served me well for years. Treat it kindly.', item: { id: 'rod', n: 1 } },
-      { hearts: 5, text: 'I have taught you what I know. The rest is time and water.', flag: 'tam-5' },
+      { hearts: 0, text: 'A good fisher needs a good line. Take this rod. It served me well for years. Treat it kindly.', item: { id: 'rod', n: 1 } },
+      { hearts: 2, text: 'Tea for the long waits. Patience goes better with something warm.', item: { id: 'dish-tea', n: 3 } },
+      { hearts: 5, text: 'I have taught you what I know. The rest is time and water. Your hands will keep the line steady now.', flag: 'tam-5' },
     ],
   },
   {

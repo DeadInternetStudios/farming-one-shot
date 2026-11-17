@@ -6,5 +6,6 @@ const player = { skin: R.skin2, hair: R.hairBrown, hairStyle: 'short', shirt: R.
 const items = [];
 for (const tool of ['hoe', 'can', 'axe']) for (const dir of ['down', 'side', 'up']) for (let t = 0; t < 4; t++) items.push({ name: `${tool[0]}${dir[0]}${t}`, img: C.toolFrame(player, dir, t, tool) });
 for (const tool of ['pick', 'scythe']) for (const dir of ['down', 'side', 'up']) for (let t = 0; t < 4; t++) items.push({ name: `${tool[0]}${dir[0]}${t}`, img: C.toolFrame(player, dir, t, tool, 'gold') });
+for (const dir of ['down', 'side', 'up']) for (let t = 0; t < 4; t++) items.push({ name: `r${dir[0]}${t}`, img: C.toolFrame(player, dir, t, 'rod') });
 writePNG('.100x/art/swings.png', sheet(items, { cols: 12, scale: 3, cellW: 32, cellH: 40 }));
 console.log('ok', items.length);

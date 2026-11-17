@@ -302,6 +302,7 @@ const PLAYER = { skin: R.skin2, hair: R.hairBrown, hairStyle: 'short', shirt: R.
     for (const tool of C.TOOLS) for (const tier of Object.keys(C.TIERS)) for (let t = 0; t < 4; t++) {
       items.push({ name: `${who}/${tool}-${tier}-${dir}-${t}`, img: C.toolFrame(PLAYER, dir, t, tool, tier) });
     }
+    for (let t = 0; t < 4; t++) items.push({ name: `${who}/rod-basic-${dir}-${t}`, img: C.toolFrame(PLAYER, dir, t, 'rod', 'basic') });
   }
   for (const n of N.NPCS) {
     for (const dir of DIRS) {
@@ -334,6 +335,7 @@ export const CROP_STAGES: Readonly<Record<string, number>> = ${JSON.stringify(cr
 export const ART_COUNTS: Readonly<Record<string, number>> = ${JSON.stringify(manifest.counts)};
 export const FRAME_NAMES: readonly string[] = ${JSON.stringify(manifest.frames)};
 export const CHAR_FRAME = { w: ${C.FW}, h: ${C.FH}, originX: 16, originY: 30 } as const;
+export const ROD_TIP = ${JSON.stringify({ down: C.rodTip('down'), up: C.rodTip('up'), side: C.rodTip('side') })} as const;
 export const PAL = ${JSON.stringify(Object.fromEntries(Object.entries(R).map(([k, v]) => [k, v])))} as const;
 `;
 writeFileSync('src/gen/art.ts', ts);

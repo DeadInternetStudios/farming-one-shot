@@ -12,8 +12,8 @@ export const MINE_ENTRY = { x: 4, y: 4 } as const;
 
 const inGrid = (x: number, y: number): boolean => x > 0 && y > 1 && x < W - 1 && y < H - 1;
 
-/** Cellular automata caves: rough noise smoothed into rooms and tunnels, then trimmed to one connected space. */
-function carve(rand: Rand): Uint8Array {
+/** Rough noise smoothed into rooms and tunnels, then trimmed to the space you can walk to from the entry. */
+function carveOnce(rand: Rand): Uint8Array {
   let cells = new Uint8Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) cells[y * W + x] = inGrid(x, y) && !chance(rand, 0.43) ? 1 : 0;
   for (let pass = 0; pass < 4; pass++) {
@@ -44,6 +44,18 @@ function carve(rand: Rand): Uint8Array {
   }
   return seen;
 }
+
+/** Tries again until the cave is big enough to be worth a trip; the same random stream always gives the same cave. */
+function carve(rand: Rand): Uint8Array {
+  let best = carveOnce(rand);
+  for (let attempt = 0; attempt < 30 && count(best) < 300; attempt++) {
+    const next = carveOnce(rand);
+    if (count(next) > count(best)) best = next;
+  }
+  return best;
+}
+
+const count = (cells: Uint8Array): number => cells.reduce((a, b) => a + b, 0);
 
 /** The floor tile farthest from the entry by walking, where the way down goes. */
 function farthest(floor: Uint8Array): { x: number; y: number } {
