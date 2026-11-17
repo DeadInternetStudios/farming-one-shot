@@ -19,6 +19,7 @@ import * as V from './gen/village.mjs';
 import * as N from './gen/npcs.mjs';
 import * as MA from './gen/machines.mjs';
 import * as W from './gen/wild.mjs';
+import * as T from './gen/title.mjs';
 
 const OUT = 'public/assets';
 mkdirSync(OUT, { recursive: true });
@@ -287,6 +288,21 @@ for (const c of crops) {
   writeFileSync(`${OUT}/atlas.json`, JSON.stringify(json));
   manifest.frames = Object.keys(frames);
   console.log(`atlas.png ${atlas.w}x${atlas.h}, ${A.length} frames`);
+}
+
+// ---------------------------------------------------------------- the title screen
+{
+  const items = [];
+  const put = (name, img) => items.push({ name, img });
+  for (const k of ['far', 'mid', 'near']) put(`hills/${k}`, T.hills(k));
+  for (let i = 0; i < 3; i++) put(`cloud/${i}`, T.cloud(i));
+  put('moon', T.moon()); put('seal', T.seal()); put('logo', T.logo());
+  for (const k of ['red', 'gold', 'pink']) put(`lantern/${k}`, T.lantern(k));
+  put('star/0', T.star(0)); put('star/1', T.star(1));
+  const { atlas, json } = packAtlas(items, { maxW: 1024, pad: 2, extrude: 1, imageName: 'title.png' });
+  writePNG(`${OUT}/title.png`, atlas);
+  writeFileSync(`${OUT}/title.json`, JSON.stringify(json));
+  console.log(`title.png ${atlas.w}x${atlas.h}, ${items.length} frames`);
 }
 
 // ---------------------------------------------------------------- characters

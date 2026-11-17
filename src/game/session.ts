@@ -9,6 +9,8 @@ import type { LocationState } from './state';
 /** The running game: its state, the current map, and a bus the scenes talk through. */
 class Session {
   state: GameState = newGame(1);
+  /** True once a game is being played, so that quitting from the title never overwrites a save. */
+  live = false;
   readonly events = new Phaser.Events.EventEmitter();
   /** How many pop-ups are holding the world still. */
   private holds = 0;

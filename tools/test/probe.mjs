@@ -11,7 +11,7 @@ const flag = (name, d) => { const i = args.indexOf(`--${name}`); return i >= 0 ?
 const scenarioPath = args.find((a) => !a.startsWith('--') && a.endsWith('.mjs'));
 if (!scenarioPath) { console.error('usage: probe.mjs <scenario.mjs>'); process.exit(2); }
 
-const url = flag('url', `http://127.0.0.1:${process.env.PORT ?? 53868}/?mute=1&debug=1&new=1`);
+const url = flag('url', `http://127.0.0.1:${process.env.PORT ?? 53868}/?mute=1&debug=1&new=1&play=1&skip=1`);
 const [w, h] = flag('size', '1280x720').split('x').map(Number);
 const dpr = Number(flag('dpr', '1'));
 const outDir = flag('out', '.100x/shots/probe');

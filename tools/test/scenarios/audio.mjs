@@ -1,6 +1,6 @@
 // Checks what the sound system decides, without listening: which tune, which background sounds, what is loaded.
 // Run with the sound switched on in the page (no ?mute) and the browser itself muted:
-//   node tools/test/probe.mjs tools/test/scenarios/audio.mjs --url "http://127.0.0.1:53868/?debug=1&new=1"
+//   node tools/test/probe.mjs tools/test/scenarios/audio.mjs --url "http://127.0.0.1:53868/?debug=1&new=1&play=1&skip=1"
 export default async ({ lh, press, wait, log, page }) => {
   const snap = async (label) => {
     const a = await lh('audio');

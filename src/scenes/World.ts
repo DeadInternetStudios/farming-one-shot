@@ -109,15 +109,38 @@ export class WorldScene extends Phaser.Scene {
     });
     subscribe(this, 'lantern', () => this.lightShrine());
 
+    // keep the farm safe if the tab is closed or the phone is put away
+    const keep = (): void => {
+      if (document.hidden && session.live && !this.travelling) {
+        this.syncPlayer();
+        saveGame(session.state);
+      }
+    };
+    document.addEventListener('visibilitychange', keep);
+    this.events.once('shutdown', () => document.removeEventListener('visibilitychange', keep));
+
+    if (!st.flags.letter && st.player.loc === 'house') {
+      st.flags.letter = true;
+      session.hold();
+      this.time.delayedCall(900, () => session.events.emit('letter'));
+    }
+
     this.registerDebug();
     this.cameras.main.fadeIn(500, 26, 20, 35);
   }
 
   private applyLayout(): void {
     const l = getLayout();
-    this.cameras.main.setSize(l.devW, l.devH).setZoom(l.worldZoom);
+    this.cameras.main.setSize(l.devW, l.devH).setZoom(this.zoomFor());
     this.rig.setMap(this.def.w * 16, this.def.h * 16);
     this.rig.snapTo(this.player?.x ?? 0, (this.player?.y ?? 0) - 8);
+  }
+
+  /** Rooms are small, so they are drawn as large as will fit; the open air uses the usual zoom. */
+  private zoomFor(): number {
+    const l = getLayout();
+    if (this.def.kind !== 'interior') return l.worldZoom;
+    return Math.max(l.worldZoom, Math.floor(Math.min(l.devW / (this.def.w * 16), l.devH / (this.def.h * 16))));
   }
 
   /** Build the ground and everything standing on it for one map, replacing the one before. */
@@ -126,6 +149,7 @@ export class WorldScene extends Phaser.Scene {
     this.def = session.map(id);
     const loc = session.location(id);
     st.player.loc = id;
+    if (id !== 'house') st.flags.outside = true;
     this.angler?.cancel();
     this.view?.destroy();
     this.objects?.destroy();
@@ -133,6 +157,7 @@ export class WorldScene extends Phaser.Scene {
     this.view = new MapView(this, this.def, loc, season);
     this.objects = new ObjectsView(this, this.def, loc, season);
     this.lighting?.setSpots(this.objects.lights);
+    this.cameras.main.setZoom(this.zoomFor());
     this.rig.setMap(this.def.w * 16, this.def.h * 16);
     this.npcs?.destroy();
     this.npcs = new Npcs(this, this.def, this.staticSolid);

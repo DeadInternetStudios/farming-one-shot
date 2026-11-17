@@ -87,7 +87,9 @@ export function interact(host: Host, what: Interact, toTitle: () => void): void 
   switch (what.kind) {
     case 'talk': return startTalk(host, what.id);
     case 'shop': return startShop(host, what.id);
-    case 'shrine': return host.open(new ShrineScreen(host));
+    case 'shrine':
+      session.state.flags.shrineSeen = true;
+      return host.open(new ShrineScreen(host));
     case 'cook': return host.open(new RecipeScreen(host, 'cook', 'The Stove'));
     case 'board': return host.open(new BoardScreen(host));
     case 'chest': return host.open(new ChestScreen(host, what.loc, what.key));

@@ -1,5 +1,5 @@
 import { itemDef } from '../data/items';
-import { DAY_START, dayOfSeason, seasonOf } from './clock';
+import { DAYS_PER_YEAR, DAY_START, seasonOf } from './clock';
 import { CAN_CAPACITY, applyRain, growOvernight, witherOutOfSeason } from './farming';
 import type { NightReport } from './farming';
 import { refreshRequests } from './requests';
@@ -35,11 +35,16 @@ export function weatherFor(seed: number, day: number): Weather {
   return 'sun';
 }
 
+/** The four fairs, by day of the year. Each falls on the last day of its season. */
 export const FESTIVAL_DAYS: Readonly<Record<number, string>> = { 7: 'blossom', 14: 'sunfair', 21: 'harvest', 28: 'lantern' };
+export const FESTIVAL_NAMES: Readonly<Record<string, string>> = { blossom: 'Blossom Fair', sunfair: 'Sun Fair', harvest: 'Harvest Fair', lantern: 'Lantern Festival' };
+
+/** The fair held on this day, if there is one. */
+export function festivalToday(day: number): string | null {
+  return FESTIVAL_DAYS[((day - 1) % DAYS_PER_YEAR) + 1] ?? null;
+}
 export function isFestivalDay(day: number): boolean {
-  const s = seasonOf(day);
-  const d = dayOfSeason(day);
-  return d === 7 && ['spring', 'summer', 'fall', 'winter'].includes(s);
+  return festivalToday(day) !== null;
 }
 
 export interface DaySummary {

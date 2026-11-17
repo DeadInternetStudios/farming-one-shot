@@ -1,8 +1,8 @@
 import { BED_NAMES, TRACK_NAMES } from '../gen/audio';
 import type { BedName, TrackName } from '../gen/audio';
 import type { MapKind } from '../world/mapkit';
-import { DAYS_PER_YEAR, seasonOf } from './clock';
-import { FESTIVAL_DAYS } from './day';
+import { seasonOf } from './clock';
+import { festivalToday } from './day';
 import type { GameState } from './state';
 import type { Season, Weather } from './types';
 
@@ -27,11 +27,6 @@ const FEAST_TO = 23 * 60;
 const LANTERN_FROM = 18 * 60;
 
 const isTrack = (s: string): s is TrackName => (TRACK_NAMES as readonly string[]).includes(s);
-
-/** The kind of festival happening today, if any. */
-export function festivalToday(day: number): string | null {
-  return FESTIVAL_DAYS[((day - 1) % DAYS_PER_YEAR) + 1] ?? null;
-}
 
 /** Which tune belongs here and now. */
 export function trackFor(l: Listening): TrackName {

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { itemDef } from '../data/items';
 import { WEEKDAYS, dayOfSeason, formatTime, seasonOf, weekdayOf } from '../game/clock';
 import { CAN_CAPACITY } from '../game/farming';
+import { nextGoal } from '../game/goals';
 import { HOTBAR_SIZE } from '../game/state';
 import { session } from '../game/session';
 import { PAL } from '../gen/art';
@@ -53,6 +54,12 @@ export class Hud {
   private placeText!: Phaser.GameObjects.BitmapText;
   private placeUntil = 0;
   private placeName = '';
+  private goalBg!: Phaser.GameObjects.NineSlice;
+  private goalIcon!: Phaser.GameObjects.Image;
+  private goalText!: Phaser.GameObjects.BitmapText;
+  private goalShown = '';
+  private goalCheck = 0;
+  private readonly goalRect = new Phaser.Geom.Rectangle();
   private toasts: Toast[] = [];
   private sig = '';
   private clockSig = '';
@@ -99,6 +106,11 @@ export class Hud {
     this.dayText = this.add(label(s, 23, 10, ''));
     this.weather = this.add(s.add.image(91 - 7, 9, 'atlas', 'ui/weather-sun').setOrigin(1, 0));
     this.timeText = this.add(label(s, 9, 22, '', { tint: COL.gold }));
+    this.goalBg = this.add(nine(s, 'dark', 3, 37, 40, 15).setVisible(false));
+    this.goalIcon = this.add(s.add.image(9, 41, 'atlas', 'ui/arrow-right').setOrigin(0, 0).setVisible(false));
+    this.goalText = this.add(label(s, 19, 41, '', { tint: COL.cream, wrap: Math.min(200, l.uiW - 36) }).setVisible(false));
+    this.goalShown = '';
+    this.goalCheck = 0;
 
     // gold and energy, top right
     const gw = 58;
@@ -220,6 +232,33 @@ export class Hud {
     this.hintText.setPosition(cx, y + 4).setVisible(true);
   }
 
+  /** Where the centred pop-ups start. Narrow screens keep them below the goal line. */
+  private topY(): number {
+    return this.l.uiW < 330 ? 54 : 38;
+  }
+
+  /** The one line that says what to do next, under the clock. */
+  private updateGoal(now: number): void {
+    if (now < this.goalCheck) return;
+    this.goalCheck = now + 400;
+    const text = nextGoal(session.state)?.text ?? '';
+    if (text === this.goalShown) return;
+    this.goalShown = text;
+    const on = text !== '';
+    this.goalBg.setVisible(on);
+    this.goalIcon.setVisible(on);
+    this.goalText.setVisible(on);
+    if (!on) {
+      this.goalRect.setTo(0, 0, 0, 0);
+      return;
+    }
+    this.goalText.setText(text);
+    const w = Math.ceil(this.goalText.width) + 24;
+    const h = Math.ceil(this.goalText.height) + 8;
+    this.goalBg.setSize(w, h);
+    this.goalRect.setTo(3, 37, w, h);
+  }
+
   /** The name of the place you just arrived at, shown for a moment near the top. */
   place(name: string): void {
     if (name === this.placeName) return;
@@ -228,8 +267,9 @@ export class Hud {
     const w = Math.ceil(this.placeText.width) + 20;
     this.placeBg.setSize(w, 17);
     const cx = Math.floor(this.l.uiW / 2);
-    this.placeBg.setPosition(cx - Math.floor(w / 2), 40).setVisible(true).setAlpha(1);
-    this.placeText.setPosition(cx, 45).setVisible(true).setAlpha(1);
+    const top = this.topY();
+    this.placeBg.setPosition(cx - Math.floor(w / 2), top + 2).setVisible(true).setAlpha(1);
+    this.placeText.setPosition(cx, top + 7).setVisible(true).setAlpha(1);
     this.placeUntil = this.scene.time.now + 2200;
   }
 
@@ -240,6 +280,7 @@ export class Hud {
     const p = st.player;
     const now = this.scene.time.now;
 
+    this.updateGoal(now);
     const season = seasonOf(st.day);
     const clockSig = `${st.day}|${Math.floor(st.minute / 10)}|${st.weather}`;
     if (clockSig !== this.clockSig) {
@@ -294,7 +335,7 @@ export class Hud {
       }
     }
 
-    let y = this.placeText.visible ? 62 : 38;
+    let y = this.topY() + (this.placeText.visible ? 24 : 0);
     for (let i = this.toasts.length - 1; i >= 0; i--) {
       const t = this.toasts[i] as Toast;
       const age = now - t.born;
@@ -344,6 +385,6 @@ export class Hud {
 
   /** True when a pointer at this interface position is over a solid part of the HUD. */
   covers(x: number, y: number): boolean {
-    return this.hotbarRect.contains(x, y) || (x < 94 && y < 36) || (x > this.l.uiW - 64 && y < 36);
+    return this.hotbarRect.contains(x, y) || (x < 94 && y < 36) || (x > this.l.uiW - 64 && y < 36) || this.goalRect.contains(x, y);
   }
 }

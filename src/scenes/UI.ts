@@ -38,6 +38,7 @@ export class UIScene extends Phaser.Scene {
     subscribe(this, 'ask-sleep', () => this.modals.askSleep(() => session.events.emit('confirm-sleep')));
     subscribe(this, 'day-summary', (s: DaySummary, done: () => void) => this.modals.daySummary(s, done));
     subscribe(this, 'dialog', (text: string) => this.modals.dialog(text));
+    subscribe(this, 'letter', () => this.modals.letter(() => { session.release(); session.events.emit('sfx', 'tick'); }));
     subscribe(this, 'interact', (what: Interact) => interact(this.stack, what, () => window.location.reload()));
 
     this.game.events.on('layout', this.onLayout, this);

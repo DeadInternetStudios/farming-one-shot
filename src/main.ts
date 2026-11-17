@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { installLayout, measure } from './display';
 import { BootScene } from './scenes/Boot';
+import { TitleScene } from './scenes/Title';
 import { UIScene } from './scenes/UI';
 import { WorldScene } from './scenes/World';
 
@@ -24,7 +25,7 @@ const game = new Phaser.Game({
   input: { activePointers: 3 },
   audio: { noAudio: query.has('mute') },
   disableContextMenu: true,
-  scene: [BootScene, WorldScene, UIScene],
+  scene: [BootScene, TitleScene, WorldScene, UIScene],
 });
 
 installLayout(game, parent);

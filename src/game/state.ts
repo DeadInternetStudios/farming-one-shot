@@ -6,6 +6,7 @@ import type { PaceId } from './clock';
 import type { Dir, LocationId, Tier, ToolId, Weather } from './types';
 import type { ObjectKind } from '../world/mapkit';
 import { farmMap } from '../world/maps/farm';
+import { houseMap } from '../world/maps/house';
 import { OBJECT_HP } from '../world/mapkit';
 import { tileKey } from './types';
 import { STARTER_RECIPES } from '../data/recipes';
@@ -124,6 +125,7 @@ export function locationFromMap(objects: { k: ObjectKind; x: number; y: number; 
 
 export function newGame(seed = 1, name = 'Sprout', pace: PaceId = 'standard'): GameState {
   const farm = farmMap(seed);
+  const house = houseMap(seed);
   const slots = emptySlots(START_SLOTS);
   for (const t of ['hoe', 'can', 'axe', 'pick', 'scythe'] as const) addItem(slots, t, 1);
   addItem(slots, 'seed-radish', 12);
@@ -136,7 +138,7 @@ export function newGame(seed = 1, name = 'Sprout', pace: PaceId = 'standard'): G
     minute: DAY_START,
     weather: 'sun',
     player: {
-      name, loc: 'farm', x: (farm.spawn.x + 0.5) * 16, y: (farm.spawn.y + 0.8) * 16, dir: 'down',
+      name, loc: 'house', x: (house.spawn.x + 0.5) * 16, y: (house.spawn.y + 0.8) * 16, dir: 'down',
       energy: 100, maxEnergy: 100, gold: 500,
       tools: { hoe: 'basic', can: 'basic', axe: 'basic', pick: 'basic', scythe: 'basic', rod: 'basic' },
       slots, selected: 0, water: 18,

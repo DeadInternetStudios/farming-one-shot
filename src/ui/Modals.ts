@@ -108,6 +108,55 @@ export class Modals {
     this.btn(open, x + w - 60, y + h - 26, 50, 'Okay', 'leaf', () => this.close());
   }
 
+  // ---------------------------------------------------------------- the letter that starts the story
+
+  letter(done: () => void): void {
+    const name = session.state.player.name;
+    const pages: string[][] = [
+      [
+        `Dear ${name},`,
+        'By the time you read this I will be far down the road. The farm is yours now, just as I always promised.',
+        'The soil is good and the well never runs dry. But the lanterns on the shrine in the village went dark the day I left.',
+      ],
+      [
+        'Light them again with the best the valley grows. Seven lanterns, seven gifts.',
+        'Plant something. Say hello to the neighbours. Go to bed before the owls do.',
+        'With love,\nGrandma Hollis',
+      ],
+    ];
+    const show = (n: number): void => {
+      const last = n === pages.length - 1;
+      const go = (): void => {
+        if (last) {
+          this.close();
+          done();
+        } else {
+          show(n + 1);
+        }
+      };
+      const { open } = this.begin(go);
+      const w = Math.min(214, this.l.uiW - 12);
+      const inner = w - 28;
+      const lines = pages[n] as string[];
+      const heights = lines.map((t) => {
+        const m = label(this.scene, 0, 0, t, { wrap: inner });
+        const hh = Math.ceil(m.height);
+        m.destroy();
+        return hh;
+      });
+      const h = 20 + heights.reduce((a, v) => a + v + 7, 0) + 30;
+      const { x, y } = this.panel(open, w, h);
+      let cy = y + 13;
+      lines.forEach((t, i) => {
+        this.text(open, x + 14, cy, t, { wrap: inner, tint: n === 0 && i === 0 ? COL.berry : COL.ink });
+        cy += (heights[i] as number) + 7;
+      });
+      if (last) open.parts.push(this.scene.add.image(x + 24, y + h - 21, 'title', 'seal').setDepth(this.depth + 2));
+      this.btn(open, x + w - 76, y + h - 26, 64, last ? 'Let us go' : 'Next', 'leaf', go);
+    };
+    show(0);
+  }
+
   // ---------------------------------------------------------------- the day's tally
 
   daySummary(s: DaySummary, done: () => void): void {

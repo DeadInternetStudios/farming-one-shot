@@ -2,7 +2,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AUDIO_FILES, BED_NAMES, SFX_NAMES, TRACK_NAMES } from '../src/gen/audio';
-import { NEXT_TRACKS, bedLevels, festivalToday, musicLevel, trackFor } from '../src/game/soundtrack';
+import { festivalToday } from '../src/game/day';
+import { NEXT_TRACKS, bedLevels, musicLevel, trackFor } from '../src/game/soundtrack';
 import type { Listening } from '../src/game/soundtrack';
 
 const root = join(__dirname, '..');

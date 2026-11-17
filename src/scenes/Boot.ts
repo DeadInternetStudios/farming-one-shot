@@ -5,7 +5,7 @@ import { loadGame } from '../game/save';
 import { session } from '../game/session';
 import { audio, queueFirstAudio } from '../systems/Audio';
 
-/** Loads everything, builds the animations, then hands over to the world and the interface. */
+/** Loads everything, builds the animations, then opens the title screen. */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
@@ -16,6 +16,7 @@ export class BootScene extends Phaser.Scene {
     this.load.atlas('atlas', `${base}atlas.png`, `${base}atlas.json`);
     this.load.atlas('chars', `${base}chars.png`, `${base}chars.json`);
     this.load.atlas('water', `${base}water.png`, `${base}water.json`);
+    this.load.atlas('title', `${base}title.png`, `${base}title.json`);
     for (const s of SEASONS) this.load.image(`tiles-${s}`, `${base}tiles-${s}.png`);
     this.load.image('tiles-interior', `${base}tiles-interior.png`);
     this.load.image('tiles-cave', `${base}tiles-cave.png`);
@@ -45,14 +46,30 @@ export class BootScene extends Phaser.Scene {
       }
     }
 
-    const q = new URLSearchParams(location.search);
-    const saved = q.has('new') ? null : loadGame();
-    if (saved) session.load(saved);
-    else session.reset(Number(q.get('seed')) || 1);
-
     audio.start(this.game);
-    this.scene.start('World');
-    this.scene.launch('UI');
+    const q = new URLSearchParams(location.search);
+    if (q.has('play')) {
+      const saved = q.has('new') ? null : loadGame();
+      if (saved) session.load(saved);
+      else session.reset(Number(q.get('seed')) || 1);
+      session.live = true;
+      if (q.has('skip') && !saved) this.skipStory();
+      this.scene.start('World');
+      this.scene.launch('UI');
+    } else {
+      this.scene.start('Title');
+    }
     document.getElementById('boot')?.classList.add('done');
+  }
+
+  /** For testing: begin on the farm with the letter already read, as the first build did. */
+  private skipStory(): void {
+    const st = session.state;
+    const farm = session.map('farm');
+    st.player.loc = 'farm';
+    st.player.x = (farm.spawn.x + 0.5) * 16;
+    st.player.y = (farm.spawn.y + 0.8) * 16;
+    st.flags.letter = true;
+    st.flags.outside = true;
   }
 }
