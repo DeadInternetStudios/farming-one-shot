@@ -26,7 +26,7 @@ export function farmMap(seed: number): MapDef {
   m.prop({ sprite: 'prop/sign', x: 26, y: 14, solid: true, interact: 'sign', text: 'East: Hollow Green village.\nNorth: Whisper Wood.' });
 
   // doors and roads out
-  m.warp({ x: 11, y: 10, w: 2, h: 1, to: 'house', tx: 6, ty: 10, dir: 'up' });
+  m.warp({ x: 11, y: 10, w: 2, h: 1, to: 'house', tx: 7.5, ty: 9, dir: 'up' });
   m.warp({ x: 55, y: 15, w: 1, h: 2, to: 'village', tx: 1, ty: 15, dir: 'right' });
   m.warp({ x: 27, y: 0, w: 2, h: 1, to: 'forest', tx: 20, ty: 38, dir: 'up' });
   m.spawn = { x: 12, y: 12 };
@@ -55,10 +55,5 @@ export function farmMap(seed: number): MapDef {
   m.scatter('tallgrass', 100, farFromYard, 4);
   m.scatter('flower', 34, farFromYard, 12);
 
-  return {
-    id: m.id, name: m.name, w: m.w, h: m.h, indoors: false,
-    ground: m.ground, overlay: m.overlay, solid: m.solid,
-    buildings: m.buildings, props: m.props, objects: m.objects, warps: m.warps, spawn: m.spawn,
-    tillable: m.tillableFrom((x, y) => x > 1 && y > 1 && x < 54 && y < 38),
-  };
+  return m.toDef(m.tillableFrom((x, y) => x > 1 && y > 1 && x < 54 && y < 38));
 }

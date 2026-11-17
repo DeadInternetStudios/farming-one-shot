@@ -40,35 +40,60 @@ export class ObjectsView {
   readonly lights: LightSpot[] = [];
   readonly glows: Phaser.GameObjects.Image[] = [];
   readonly smokeSpots: { x: number; y: number }[] = [];
+  /** Window panes and the like: frames that fade in over their day frame as night falls. */
+  readonly nightFrames: Phaser.GameObjects.Image[] = [];
   private bin: Phaser.GameObjects.Image | null = null;
   private grassTick = 0;
+  private owned: Phaser.GameObjects.Image[] = [];
 
   constructor(private scene: Phaser.Scene, readonly def: MapDef, private loc: LocationState, private season: Season) {
     for (const b of def.buildings) {
       const ax = (b.x + b.w / 2) * 16;
       const ay = (b.y + b.h) * 16;
-      scene.add.image(ax, ay - 4, 'atlas', 'fx/shadow-l').setDisplaySize(b.w * 16 + 16, 18).setAlpha(0.5).setDepth(DEPTH.ground);
-      scene.add.image(ax, ay, 'atlas', b.sprite).setOrigin(0.5, 1).setDepth(ay);
+      this.img(ax, ay - 4, 'fx/shadow-l').setDisplaySize(b.w * 16 + 16, 18).setAlpha(0.5).setDepth(DEPTH.ground);
+      this.img(ax, ay, b.sprite).setOrigin(0.5, 1).setDepth(ay);
       if (b.glow) {
-        const g = scene.add.image(ax, ay, 'atlas', b.glow).setOrigin(0.5, 1).setDepth(ay + 0.5).setAlpha(0);
+        const g = this.img(ax, ay, b.glow).setOrigin(0.5, 1).setDepth(ay + 0.5).setAlpha(0);
         this.glows.push(g);
       }
       for (const l of b.lights ?? []) this.lights.push({ x: ax + l.x, y: ay + l.y, r: l.r, color: 0xffb457, flicker: false });
       if (b.smoke) this.smokeSpots.push({ x: ax + b.smoke.x, y: ay + b.smoke.y });
     }
     for (const p of def.props) {
-      const ax = p.x * 16 + 8;
-      const ay = (p.y + 1) * 16;
-      scene.add.image(ax, ay - 2, 'atlas', 'fx/shadow-m').setAlpha(0.4).setDepth(DEPTH.ground);
-      const s = scene.add.image(ax, ay, 'atlas', p.sprite).setOrigin(0.5, 1).setDepth(ay);
+      const w = p.w ?? 1;
+      const h = p.h ?? 1;
+      const ax = (p.x + w / 2) * 16;
+      const ay = (p.y + h) * 16;
+      const sy = ay - (p.lift ?? 0);
+      const depth = p.flat ? DEPTH.ground + 1 : ay;
+      if (!p.noShadow && !p.flat) this.img(ax, ay - 2, 'fx/shadow-m').setAlpha(0.4).setDepth(DEPTH.ground);
+      const s = this.img(ax, sy, p.sprite).setOrigin(0.5, 1).setDepth(depth);
       if (p.interact === 'bin') this.bin = s;
+      if (p.nightFrame) this.nightFrames.push(this.img(ax, sy, p.nightFrame).setOrigin(0.5, 1).setDepth(depth + 0.4).setAlpha(0));
       if (p.glow) {
-        const g = scene.add.image(ax, ay, 'atlas', p.glow).setOrigin(0.5, 1).setDepth(ay + 0.5).setAlpha(0);
+        const g = this.img(ax, sy, p.glow).setOrigin(0.5, 1).setDepth(depth + 0.5).setAlpha(0);
         this.glows.push(g);
       }
       if (p.light) this.lights.push({ x: ax + p.light.x, y: ay + p.light.y, r: p.light.r, color: p.light.color ?? 0xffbe66, flicker: true });
     }
     this.syncAll();
+  }
+
+  private img(x: number, y: number, frame: string): Phaser.GameObjects.Image {
+    const i = this.scene.add.image(x, y, 'atlas', frame);
+    this.owned.push(i);
+    return i;
+  }
+
+  destroy(): void {
+    for (const i of this.owned) i.destroy();
+    this.owned = [];
+    this.placed.clear();
+    this.crops.clear();
+    this.grass = [];
+    this.glows.length = 0;
+    this.lights.length = 0;
+    this.nightFrames.length = 0;
   }
 
   setSeason(season: Season): void {
@@ -120,10 +145,10 @@ export class ObjectsView {
         }
         const px = x * 16 + 8;
         const py = (y + 1) * 16;
-        const sprite = this.scene.add.image(px, py, 'atlas', frame).setOrigin(0.5, 1).setDepth(py);
+        const sprite = this.img(px, py, frame).setOrigin(0.5, 1).setDepth(py);
         let shadow: Phaser.GameObjects.Image | undefined;
         const sh = SHADOW[o.k];
-        if (sh) shadow = this.scene.add.image(px, py + sh.dy, 'atlas', sh.frame).setAlpha(sh.alpha).setDepth(DEPTH.ground);
+        if (sh) shadow = this.img(px, py + sh.dy, sh.frame).setAlpha(sh.alpha).setDepth(DEPTH.ground);
         if (o.k === 'tree') shadow?.setDisplaySize(30, 11);
         this.placed.set(key, { sprite, shadow, kind: o.k });
         if (o.k === 'tallgrass') this.grass.push({ sprite, phase: (x * 7 + y * 3) % 4 });
@@ -143,7 +168,7 @@ export class ObjectsView {
       if (cs) cs.setFrame(frame);
       else {
         const py = (y + 1) * 16 - 1;
-        this.crops.set(key, this.scene.add.image(x * 16 + 8, py, 'atlas', frame).setOrigin(0.5, 1).setDepth(py));
+        this.crops.set(key, this.img(x * 16 + 8, py, frame).setOrigin(0.5, 1).setDepth(py));
       }
     }
   }
@@ -164,7 +189,7 @@ export class ObjectsView {
   ghostOf(key: string): Phaser.GameObjects.Image | null {
     const s = this.placed.get(key)?.sprite;
     if (!s) return null;
-    return this.scene.add.image(s.x, s.y, 'atlas', s.frame.name).setOrigin(0.5, 1).setDepth(s.depth);
+    return this.img(s.x, s.y, s.frame.name).setOrigin(0.5, 1).setDepth(s.depth);
   }
 
   openBin(open: boolean): void {
@@ -175,6 +200,7 @@ export class ObjectsView {
     const tick = Math.floor(time / 320);
     if (tick !== this.grassTick) {
       this.grassTick = tick;
+      if (this.owned.length > 600) this.owned = this.owned.filter((i) => i.active);
       for (const g of this.grass) {
         if (g.sprite.active) g.sprite.setFrame(`tallgrass/${this.season}/${(tick + g.phase) % 4}`);
       }

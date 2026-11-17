@@ -40,14 +40,40 @@ export interface Building {
 export interface Prop {
   sprite: string;
   glow?: string;
-  /** Tile the sprite stands on, anchored bottom centre. */
+  /** Top left tile of the footprint. The sprite is anchored at the bottom centre of the footprint. */
   x: number;
   y: number;
+  /** Footprint in tiles. Defaults to 1 x 1. */
+  w?: number;
+  h?: number;
   solid?: boolean;
   light?: { x: number; y: number; r: number; color?: number };
-  interact?: 'bin' | 'sign';
+  /** Makes the footprint something you can use. The kind picks what happens. */
+  interact?: string;
+  id?: string;
+  text?: string;
+  /** Skip the floor shadow, for things that hang on a wall. */
+  noShadow?: boolean;
+  /** Lies on the floor under everything, like a rug. */
+  flat?: boolean;
+  /** Raise the sprite by this many pixels, for things hung high on a wall. */
+  lift?: number;
+  /** A frame that fades in at night over the day frame, such as a window. */
+  nightFrame?: string;
+}
+
+/** A patch of floor you can use with the action key. */
+export interface Hotspot {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  kind: string;
+  id?: string;
   text?: string;
 }
+
+export type MapKind = 'outdoor' | 'interior' | 'cave';
 
 export interface Warp {
   x: number;
@@ -66,6 +92,13 @@ export interface MapDef {
   w: number;
   h: number;
   indoors: boolean;
+  kind: MapKind;
+  /** Music track that plays here. */
+  music: string;
+  /** Interiors paint these tile ids straight from the interior tileset. -1 means empty. */
+  tiles?: Int16Array;
+  overlayTiles?: Int16Array;
+  hotspots: Hotspot[];
   ground: Uint8Array;
   overlay: Uint8Array;
   /** Static solid tiles: building footprints and fixed props. */
@@ -88,9 +121,14 @@ export class MapBuilder {
   readonly buildings: Building[] = [];
   readonly props: Prop[] = [];
   readonly warps: Warp[] = [];
+  readonly hotspots: Hotspot[] = [];
   readonly rand: Rand;
   private taken = new Set<string>();
   spawn = { x: 1, y: 1 };
+  kind: MapKind = 'outdoor';
+  music = 'farm';
+  tiles?: Int16Array;
+  overlayTiles?: Int16Array;
 
   constructor(readonly id: LocationId, readonly name: string, readonly w: number, readonly h: number, readonly seed: number, readonly indoors = false) {
     this.ground = new Uint8Array(w * h);
@@ -169,14 +207,23 @@ export class MapBuilder {
 
   prop(p: Prop): this {
     this.props.push(p);
-    if (p.solid) this.rect(this.solid, p.x, p.y, 1, 1, 1);
-    this.taken.add(tileKey(p.x, p.y));
+    const w = p.w ?? 1, h = p.h ?? 1;
+    if (p.solid) this.rect(this.solid, p.x, p.y, w, h, 1);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.taken.add(tileKey(p.x + i, p.y + j));
+    if (p.interact) this.hotspots.push({ x: p.x, y: p.y, w, h, kind: p.interact, id: p.id, text: p.text });
     return this;
   }
 
+  hotspot(h: Hotspot): this {
+    this.hotspots.push(h);
+    return this;
+  }
+
+  /** A door or road exit. Walking into it moves you. The tiles under it are never solid. */
   warp(w: Warp): this {
     this.warps.push(w);
     this.rect(this.keep, w.x, w.y, w.w, w.h, 1);
+    this.rect(this.solid, w.x, w.y, w.w, w.h, 0);
     return this;
   }
 
@@ -219,5 +266,15 @@ export class MapBuilder {
 
   pickOne<T>(a: readonly T[]): T {
     return pick(this.rand, a);
+  }
+
+  /** Freeze the builder into a map definition. */
+  toDef(tillable: Uint8Array = new Uint8Array(this.w * this.h)): MapDef {
+    return {
+      id: this.id, name: this.name, w: this.w, h: this.h, indoors: this.indoors, kind: this.kind, music: this.music,
+      tiles: this.tiles, overlayTiles: this.overlayTiles, hotspots: this.hotspots,
+      ground: this.ground, overlay: this.overlay, solid: this.solid,
+      buildings: this.buildings, props: this.props, objects: this.objects, warps: this.warps, spawn: this.spawn, tillable,
+    };
   }
 }

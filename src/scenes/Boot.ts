@@ -15,6 +15,7 @@ export class BootScene extends Phaser.Scene {
     this.load.atlas('chars', `${base}chars.png`, `${base}chars.json`);
     this.load.atlas('water', `${base}water.png`, `${base}water.json`);
     for (const s of SEASONS) this.load.image(`tiles-${s}`, `${base}tiles-${s}.png`);
+    this.load.image('tiles-interior', `${base}tiles-interior.png`);
     this.load.bitmapFont('hollow', `${base}font-hollow.png`, `${base}font-hollow.xml`);
     this.load.bitmapFont('hollow-o', `${base}font-hollow-o.png`, `${base}font-hollow-o.xml`);
   }

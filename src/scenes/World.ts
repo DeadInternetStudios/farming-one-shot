@@ -20,9 +20,14 @@ import { Fx } from '../systems/Fx';
 import { Lighting, skyFor } from '../systems/Lighting';
 import { MapView } from '../world/MapView';
 import { ObjectsView } from '../world/ObjectsView';
-import type { MapDef } from '../world/mapkit';
+import type { Hotspot, MapDef, Warp } from '../world/mapkit';
+import { hasMap } from '../world/maps/registry';
 
 const REACH = 2.1;
+
+const HINTS: Readonly<Record<string, string>> = {
+  bed: 'Bed', chest: 'Chest', stove: 'Stove', counter: 'Counter', shelf: 'Bookshelf', bin: 'Shipping bin', sign: 'Sign', text: 'Look',
+};
 
 export class WorldScene extends Phaser.Scene {
   private view!: MapView;
@@ -38,7 +43,9 @@ export class WorldScene extends Phaser.Scene {
   private hoverUntil = 0;
   private smokeTimer = 0;
   private sleeping = false;
-  private lastSeason = seasonOf(1);
+  private travelling = false;
+  private warpLock = 0;
+  private lastHint = '';
 
   constructor() {
     super('World');
@@ -50,15 +57,9 @@ export class WorldScene extends Phaser.Scene {
 
   create(): void {
     const st = session.state;
-    this.def = session.map(st.player.loc);
-    const loc = st.locations[this.def.id];
-    if (!loc) throw new Error('missing location state');
-    this.lastSeason = seasonOf(st.day);
-
-    this.view = new MapView(this, this.def, loc, this.lastSeason);
-    this.objects = new ObjectsView(this, this.def, loc, this.lastSeason);
-    this.player = new Player(this, st.player.x, st.player.y, st.player.dir);
     this.rig = new CameraRig(this.cameras.main);
+    this.buildStage(st.player.loc);
+    this.player = new Player(this, st.player.x, st.player.y, st.player.dir);
     this.fx = new Fx(this, () => ({ x: this.player.x, y: this.player.y }));
     this.lighting = new Lighting(this, this.rig, this.objects.lights);
     this.controls = new Controls(this);
@@ -85,7 +86,63 @@ export class WorldScene extends Phaser.Scene {
     const l = getLayout();
     this.cameras.main.setSize(l.devW, l.devH).setZoom(l.worldZoom);
     this.rig.setMap(this.def.w * 16, this.def.h * 16);
-    this.rig.snapTo(this.player?.x ?? 0, this.player?.y ?? 0);
+    this.rig.snapTo(this.player?.x ?? 0, (this.player?.y ?? 0) - 8);
+  }
+
+  /** Build the ground and everything standing on it for one map, replacing the one before. */
+  private buildStage(id: string): void {
+    const st = session.state;
+    this.def = session.map(id);
+    const loc = session.location(id);
+    st.player.loc = id;
+    this.view?.destroy();
+    this.objects?.destroy();
+    const season = seasonOf(st.day);
+    this.view = new MapView(this, this.def, loc, season);
+    this.objects = new ObjectsView(this, this.def, loc, season);
+    this.lighting?.setSpots(this.objects.lights);
+    this.rig.setMap(this.def.w * 16, this.def.h * 16);
+    session.events.emit('place', this.def.name);
+  }
+
+  /** Walk through a door or down a road: fade, swap the map, fade back in. */
+  private travel(w: Warp): void {
+    if (this.travelling) return;
+    if (!hasMap(w.to)) {
+      this.say('That road is not open yet.');
+      this.warpLock = 1.5;
+      const back = { down: [0, -1], up: [0, 1], left: [1, 0], right: [-1, 0] }[this.player.facing];
+      this.player.teleport(this.player.x + back[0] * 16, this.player.y + back[1] * 16);
+      return;
+    }
+    this.travelling = true;
+    const cam = this.cameras.main;
+    cam.fadeOut(170, 12, 9, 20);
+    cam.once('camerafadeoutcomplete', () => {
+      this.buildStage(w.to);
+      this.player.teleport((w.tx + 0.5) * 16, (w.ty + 0.8) * 16, w.dir);
+      this.syncPlayer();
+      this.rig.snapTo(this.player.x, this.player.y - 8);
+      saveGame(session.state);
+      cam.fadeIn(220, 12, 9, 20);
+      this.travelling = false;
+      this.warpLock = 0.5;
+    });
+  }
+
+  private syncPlayer(): void {
+    const p = session.state.player;
+    p.x = this.player.x;
+    p.y = this.player.y;
+    p.dir = this.player.facing;
+  }
+
+  private warpAt(tx: number, ty: number): Warp | undefined {
+    return this.def.warps.find((w) => tx >= w.x && tx < w.x + w.w && ty >= w.y && ty < w.y + w.h);
+  }
+
+  private hotspotAt(tx: number, ty: number): Hotspot | undefined {
+    return this.def.hotspots.find((h) => tx >= h.x && tx < h.x + h.w && ty >= h.y && ty < h.y + h.h);
   }
 
   private get ctx(): Ctx {
@@ -93,15 +150,13 @@ export class WorldScene extends Phaser.Scene {
     return { state: st, map: this.def, rand: rngFor(st.seed, st.day, Math.floor(st.minute), Math.floor(performance.now() % 9973)) };
   }
 
-  private solid = (tx: number, ty: number): boolean => {
-    const loc = session.state.locations[this.def.id];
-    return !loc || isSolidTile(this.def, loc, tx, ty);
-  };
+  private solid = (tx: number, ty: number): boolean => isSolidTile(this.def, session.location(this.def.id), tx, ty);
 
   override update(time: number, delta: number): void {
     const dt = Math.min(delta / 1000, 0.1);
     const st = session.state;
-    const paused = this.sleeping || session.paused;
+    const paused = this.sleeping || this.travelling || session.paused;
+    this.warpLock = Math.max(0, this.warpLock - dt);
 
     if (!paused) {
       st.minute += dt * minutesPerSecond(st.pace);
@@ -109,9 +164,11 @@ export class WorldScene extends Phaser.Scene {
 
       const mv = this.controls.move;
       this.player.update(dt, mv.x, mv.y, this.controls.sprint, this.solid);
-      st.player.x = this.player.x;
-      st.player.y = this.player.y;
-      st.player.dir = this.player.facing;
+      this.syncPlayer();
+      if (this.warpLock <= 0) {
+        const w = this.warpAt(Math.floor(this.player.x / 16), Math.floor(this.player.y / 16));
+        if (w) this.travel(w);
+      }
 
       const slot = this.controls.slot();
       if (slot !== null) this.selectSlot(slot);
@@ -130,6 +187,8 @@ export class WorldScene extends Phaser.Scene {
     this.rig.update(dt, this.player.x, this.player.y - 8);
     const sky = skyFor(seasonOf(st.day), st.minute, st.weather, this.def.indoors);
     this.lighting.update(sky, time, this.objects.glows);
+    const dark = 1 - Math.min(1, sky.day * 1.3);
+    for (const f of this.objects.nightFrames) f.setAlpha(dark);
     this.chimneySmoke(dt, sky.day);
   }
 
@@ -153,8 +212,14 @@ export class WorldScene extends Phaser.Scene {
     const t = this.targetTile();
     const p = session.state.player;
     const held = p.slots[p.selected];
-    const show = !this.player.swinging && !this.sleeping && !session.paused && !!held;
-    this.cursor.setVisible(show).setPosition(t.x * 16 + 8, t.y * 16 + 8).setAlpha(0.65 + Math.sin(time * 0.008) * 0.25);
+    const idle = !this.player.swinging && !this.sleeping && !this.travelling && !session.paused;
+    const spot = idle ? this.hotspotAt(t.x, t.y) : undefined;
+    this.cursor.setVisible(idle && (!!held || !!spot)).setPosition(t.x * 16 + 8, t.y * 16 + 8).setAlpha(0.65 + Math.sin(time * 0.008) * 0.25);
+    const hint = spot ? (HINTS[spot.kind] ?? '') : '';
+    if (hint !== this.lastHint || time % 1000 < 20) {
+      this.lastHint = hint;
+      session.events.emit('hint', hint);
+    }
   }
 
   private onPointer(p: Phaser.Input.Pointer, press: boolean): void {
@@ -189,16 +254,10 @@ export class WorldScene extends Phaser.Scene {
     const t = at ?? facingTile(this.player.x, this.player.y, this.player.facing);
     const ctx = this.ctx;
 
-    // doors, the bin and signs
-    for (const prop of this.def.props) {
-      if (prop.x === t.x && prop.y === t.y && prop.interact) {
-        if (prop.interact === 'sign') { session.events.emit('dialog', prop.text ?? ''); return; }
-        if (prop.interact === 'bin') return this.useBin();
-      }
-    }
-    for (const w of this.def.warps) {
-      if (t.x >= w.x && t.x < w.x + w.w && t.y >= w.y && t.y < w.y + w.h) return this.useWarp(w.to);
-    }
+    const spot = this.hotspotAt(t.x, t.y);
+    if (spot) return this.useHotspot(spot);
+    const door = this.warpAt(t.x, t.y);
+    if (door) return this.travel(door);
 
     const hand = interactTile(ctx, t.x, t.y);
     if (hand) return this.resolve(hand, null);
@@ -264,7 +323,21 @@ export class WorldScene extends Phaser.Scene {
     this.view.refresh(keys);
   }
 
-  private useBin(): void {
+  private useHotspot(h: Hotspot): void {
+    switch (h.kind) {
+      case 'sign': session.events.emit('dialog', h.text ?? ''); return;
+      case 'bin': this.useBin(h); return;
+      case 'bed': session.events.emit('ask-sleep'); return;
+      case 'text': this.say(h.text ?? ''); return;
+      case 'chest': this.say('A sturdy chest. Storage is coming soon.'); return;
+      case 'counter': this.say('Counter space for cooking. Find a recipe first.'); return;
+      case 'stove': this.say('The stove is warm. Recipes are coming soon.'); return;
+      case 'shelf': this.say('Worn books about weather, soil and seeds.'); return;
+      default: this.say(h.text ?? '...');
+    }
+  }
+
+  private useBin(h: Hotspot): void {
     const st = session.state;
     const held = st.player.slots[st.player.selected];
     if (!held) return this.say('The shipping bin. Hold something to ship it. It sells overnight.');
@@ -275,18 +348,9 @@ export class WorldScene extends Phaser.Scene {
     st.player.slots[st.player.selected] = null;
     this.objects.openBin(true);
     this.time.delayedCall(450, () => this.objects.openBin(false));
-    const bx = this.def.props.find((p) => p.interact === 'bin');
-    if (bx) this.fx.floatText(bx.x * 16 + 8, bx.y * 16 - 4, `${n} ${def.name}  +${def.sell * n}g`);
+    this.fx.floatText(h.x * 16 + 8, h.y * 16 - 4, `${n} ${def.name}  +${def.sell * n}g`);
     session.events.emit('sfx', 'ship');
     this.say(`${def.name} x${n} will sell tonight for ${def.sell * n}g.`);
-  }
-
-  private useWarp(to: string): void {
-    if (to === 'house') {
-      session.events.emit('ask-sleep');
-      return;
-    }
-    this.say('That road is not open yet.');
   }
 
   private eatSelected(): void {
@@ -328,27 +392,18 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.fadeOut(900, 12, 9, 20);
     cam.once('camerafadeoutcomplete', () => {
-      const summary = sleepThrough(session.state, this.def, passedOut);
+      const summary = sleepThrough(session.state, session.map('farm'), passedOut);
       this.afterSleep(summary);
     });
   }
 
+  /** A new morning: you wake beside your bed. */
   private afterSleep(summary: DaySummary): void {
     const st = session.state;
-    const loc = st.locations[this.def.id];
-    if (!loc) return;
-    this.objects.syncAll();
-    this.view.repaintAll();
-    const season = seasonOf(st.day);
-    if (season !== this.lastSeason) {
-      this.lastSeason = season;
-      this.view.setSeason(season);
-      this.objects.setSeason(season);
-    }
+    this.buildStage('house');
     const spawn = this.def.spawn;
     this.player.teleport((spawn.x + 0.5) * 16, (spawn.y + 0.8) * 16, 'down');
-    st.player.x = this.player.x;
-    st.player.y = this.player.y;
+    this.syncPlayer();
     this.rig.snapTo(this.player.x, this.player.y - 8);
     saveGame(st);
     session.events.emit('day-summary', summary, () => {
@@ -372,14 +427,15 @@ export class WorldScene extends Phaser.Scene {
       tile: (x: number, y: number) => ({
         overlay: this.view.overlay.getTileAt(x, y)?.index ?? null,
         land: this.view.land.getTileAt(x, y)?.index ?? null,
-        soil: session.state.locations.farm.soil[tileKey(x, y)] ?? null,
+        soil: session.location(this.def.id).soil[tileKey(x, y)] ?? null,
         visible: this.view.overlay.visible,
         alpha: this.view.overlay.alpha,
       }),
       fps: () => ({ fps: Math.round(this.game.loop.actualFps), delta: Math.round(this.game.loop.delta), objects: this.children.length }),
       state: () => session.state,
       setMinute: (m: number) => { st.minute = m; },
-      setDay: (d: number) => { st.day = d; this.afterSleep({ day: d, earned: 0, sold: [], night: { grew: 0, ripe: 0, thirsty: 0 }, withered: 0, newSeason: null, passedOut: false, lostGold: 0, weather: st.weather }); this.cameras.main.setAlpha(1); },
+      setDay: (d: number) => { st.day = d; this.buildStage(this.def.id); },
+      go: (id: string, tx: number, ty: number, dir: Dir = 'down') => this.travel({ x: 0, y: 0, w: 0, h: 0, to: id, tx, ty, dir }),
       teleport: (tx: number, ty: number, dir?: Dir) => { this.player.teleport((tx + 0.5) * 16, (ty + 0.8) * 16, dir); this.rig.snapTo(this.player.x, this.player.y - 8); },
       sleep: () => this.beginSleep(false),
       act: () => this.act(),

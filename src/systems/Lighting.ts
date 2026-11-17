@@ -28,9 +28,15 @@ export interface SkyState {
   day: number;
 }
 
+const ROOM_DAY = rgb(0xf6e8d2);
+const ROOM_NIGHT = rgb(0x9a8aa6);
+
 export function skyFor(season: Season, minute: number, weather: Weather, indoors: boolean): SkyState {
-  if (indoors) return { ambient: 0xf2e2cc, lamps: 0.6, day: 1 };
   const day = daylight(season, minute);
+  if (indoors) {
+    const t = smooth(0.05, 0.9, day);
+    return { ambient: pack(mix(ROOM_NIGHT, ROOM_DAY, t)), lamps: 0.55 + (1 - t) * 0.45, day };
+  }
   const golden = goldenHour(season, minute);
   let c = mix(NIGHT, DAYC, smooth(0, 1, day));
   c = mix(c, GOLD, golden * 0.85 * smooth(0.05, 0.5, day));
@@ -49,11 +55,16 @@ export class Lighting {
   private h = 0;
 
   constructor(private scene: Phaser.Scene, private rig: CameraRig, private spots: LightSpot[]) {
-    for (const s of spots) {
-      this.halos.push(
-        scene.add.image(s.x, s.y, 'atlas', 'fx/glow-128').setTint(s.color).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.glow).setAlpha(0).setScale(s.r / 64),
-      );
-    }
+    this.setSpots(spots);
+  }
+
+  /** Swap in the lights of a new map. */
+  setSpots(spots: LightSpot[]): void {
+    for (const h of this.halos) h.destroy();
+    this.spots = spots;
+    this.halos = spots.map((s) =>
+      this.scene.add.image(s.x, s.y, 'atlas', 'fx/glow-128').setTint(s.color).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.glow).setAlpha(0).setScale(s.r / 64),
+    );
   }
 
   private ensure(): void {

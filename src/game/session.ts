@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { newGame } from './state';
 import type { GameState } from './state';
-import { farmMap } from '../world/maps/farm';
+import { buildMap } from '../world/maps/registry';
 import type { MapDef } from '../world/mapkit';
+import { locationFromMap } from './state';
+import type { LocationState } from './state';
 
 /** The running game: its state, the current map, and a bus the scenes talk through. */
 class Session {
@@ -31,9 +33,18 @@ class Session {
     return m;
   }
 
+  /** What has changed on a map since the world began. Made the first time anyone looks. */
+  location(id: string): LocationState {
+    let l = this.state.locations[id];
+    if (!l) {
+      l = locationFromMap(this.map(id).objects);
+      this.state.locations[id] = l;
+    }
+    return l;
+  }
+
   private build(id: string): MapDef {
-    if (id === 'farm') return farmMap(this.state.seed);
-    throw new Error('Unknown map ' + id);
+    return buildMap(id, this.state.seed);
   }
 }
 

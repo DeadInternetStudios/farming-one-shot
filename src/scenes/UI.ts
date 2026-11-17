@@ -28,6 +28,8 @@ export class UIScene extends Phaser.Scene {
     subscribe(this, 'toast', (msg: string) => this.hud.toast(msg));
     subscribe(this, 'picked', (item: string, n: number) => this.hud.picked(item, n));
     subscribe(this, 'selected', () => this.hud.showTip());
+    subscribe(this, 'hint', (text: string) => this.hud.hint(text));
+    subscribe(this, 'place', (name: string) => this.hud.place(name));
     subscribe(this, 'ask-sleep', () => this.modals.askSleep(() => session.events.emit('confirm-sleep')));
     subscribe(this, 'day-summary', (s: DaySummary, done: () => void) => this.modals.daySummary(s, done));
     subscribe(this, 'dialog', (text: string) => this.modals.dialog(text));

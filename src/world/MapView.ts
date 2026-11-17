@@ -24,22 +24,30 @@ export class MapView {
   readonly tilemap: Phaser.Tilemaps.Tilemap;
   readonly land: Phaser.Tilemaps.TilemapLayer;
   readonly overlay: Phaser.Tilemaps.TilemapLayer;
-  readonly water: Phaser.GameObjects.TileSprite;
+  readonly water: Phaser.GameObjects.TileSprite | null = null;
   private tileset: Phaser.Tilemaps.Tileset;
   private waterFrame = 0;
+  private waterTimer: Phaser.Time.TimerEvent | null = null;
+  /** Rooms and caves paint ready-made tiles instead of blending grass and water. */
+  private readonly authored: boolean;
 
   constructor(private scene: Phaser.Scene, readonly def: MapDef, private loc: LocationState, season: Season) {
-    this.water = scene.add.tileSprite(0, 0, def.w * 16, def.h * 16, 'water', 'water-0').setOrigin(0, 0).setDepth(DEPTH.water);
-    scene.time.addEvent({
-      delay: 260, loop: true,
-      callback: () => {
-        this.waterFrame = (this.waterFrame + 1) % 6;
-        this.water.setFrame(`water-${this.waterFrame}`);
-      },
-    });
+    this.authored = def.kind !== 'outdoor';
+    if (!this.authored) {
+      const water = scene.add.tileSprite(0, 0, def.w * 16, def.h * 16, 'water', 'water-0').setOrigin(0, 0).setDepth(DEPTH.water);
+      this.water = water;
+      this.waterTimer = scene.time.addEvent({
+        delay: 260, loop: true,
+        callback: () => {
+          this.waterFrame = (this.waterFrame + 1) % 6;
+          water.setFrame(`water-${this.waterFrame}`);
+        },
+      });
+    }
 
     this.tilemap = scene.make.tilemap({ tileWidth: 16, tileHeight: 16, width: def.w, height: def.h });
-    const ts = this.tilemap.addTilesetImage('tiles', `tiles-${season}`, 16, 16, TILESET.margin, TILESET.spacing);
+    const key = this.authored ? `tiles-${def.kind}` : `tiles-${season}`;
+    const ts = this.tilemap.addTilesetImage('tiles', key, 16, 16, TILESET.margin, TILESET.spacing);
     if (!ts) throw new Error('tileset failed to load');
     this.tileset = ts;
     const land = this.tilemap.createBlankLayer('land', ts, 0, 0, def.w, def.h);
@@ -57,8 +65,15 @@ export class MapView {
   }
 
   setSeason(season: Season): void {
+    if (this.authored) return;
     const tex = this.scene.textures.get(`tiles-${season}`);
     this.tileset.setImage(tex);
+  }
+
+  destroy(): void {
+    this.waterTimer?.remove();
+    this.water?.destroy();
+    this.tilemap.destroy();
   }
 
   private mask(x: number, y: number, same: (nx: number, ny: number) => boolean, outside: boolean): number {
@@ -80,6 +95,12 @@ export class MapView {
   }
 
   private paintLand(x: number, y: number): void {
+    if (this.authored) {
+      const id = this.def.tiles?.[y * this.def.w + x] ?? -1;
+      if (id < 0) this.land.removeTileAt(x, y);
+      else this.land.putTileAt(id, x, y);
+      return;
+    }
     const g = this.groundAt(x, y);
     if (g === GROUND.Void) {
       this.land.removeTileAt(x, y);
@@ -94,6 +115,7 @@ export class MapView {
   }
 
   private overlayTile(x: number, y: number): number {
+    if (this.authored) return this.def.overlayTiles?.[y * this.def.w + x] ?? -1;
     const key = tileKey(x, y);
     const soil = this.loc.soil[key];
     if (soil) {

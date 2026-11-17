@@ -46,6 +46,13 @@ export class Hud {
   private tipBg!: Phaser.GameObjects.NineSlice;
   private tipText!: Phaser.GameObjects.BitmapText;
   private tipUntil = 0;
+  private hintBg!: Phaser.GameObjects.NineSlice;
+  private hintText!: Phaser.GameObjects.BitmapText;
+  private hintShown = '';
+  private placeBg!: Phaser.GameObjects.NineSlice;
+  private placeText!: Phaser.GameObjects.BitmapText;
+  private placeUntil = 0;
+  private placeName = '';
   private toasts: Toast[] = [];
   private sig = '';
   private clockSig = '';
@@ -125,6 +132,11 @@ export class Hud {
     this.sel = this.add(s.add.image(x0, y0, 'atlas', 'ui/slot-sel').setOrigin(0, 0));
     this.tipBg = this.add(nine(s, 'dark', 0, 0, 40, 15).setVisible(false));
     this.tipText = this.add(label(s, 0, 0, '', { origin: [0.5, 0] }).setVisible(false));
+    this.hintBg = this.add(nine(s, 'dark', 0, 0, 40, 15).setVisible(false));
+    this.hintText = this.add(label(s, 0, 0, '', { origin: [0.5, 0], tint: COL.gold }).setVisible(false));
+    this.hintShown = '';
+    this.placeBg = this.add(nine(s, 'dark', 0, 0, 40, 17).setVisible(false));
+    this.placeText = this.add(label(s, 0, 0, '', { origin: [0.5, 0] }).setVisible(false));
     this.sig = '';
     for (const o of this.objs) (o as Phaser.GameObjects.GameObject & { setDepth?: (d: number) => unknown }).setDepth?.(10);
   }
@@ -190,6 +202,37 @@ export class Hud {
     this.tipText.setVisible(true).setAlpha(1);
   }
 
+  /** What the character is facing, when it can be used. An empty string clears it. */
+  hint(text: string): void {
+    if (text === this.hintShown) return;
+    this.hintShown = text;
+    if (!text) {
+      this.hintBg.setVisible(false);
+      this.hintText.setVisible(false);
+      return;
+    }
+    this.hintText.setText(text);
+    const w = Math.ceil(this.hintText.width) + 14;
+    this.hintBg.setSize(w, 15);
+    const cx = Math.floor(this.l.uiW / 2);
+    const y = this.hotbarTop - 38;
+    this.hintBg.setPosition(cx - Math.floor(w / 2), y).setVisible(true);
+    this.hintText.setPosition(cx, y + 4).setVisible(true);
+  }
+
+  /** The name of the place you just arrived at, shown for a moment near the top. */
+  place(name: string): void {
+    if (name === this.placeName) return;
+    this.placeName = name;
+    this.placeText.setText(name);
+    const w = Math.ceil(this.placeText.width) + 20;
+    this.placeBg.setSize(w, 17);
+    const cx = Math.floor(this.l.uiW / 2);
+    this.placeBg.setPosition(cx - Math.floor(w / 2), 40).setVisible(true).setAlpha(1);
+    this.placeText.setPosition(cx, 45).setVisible(true).setAlpha(1);
+    this.placeUntil = this.scene.time.now + 2200;
+  }
+
   // ---------------------------------------------------------------- per frame
 
   update(): void {
@@ -240,7 +283,18 @@ export class Hud {
       }
     }
 
-    let y = 38;
+    if (this.placeText.visible && now > this.placeUntil) {
+      const a = 1 - (now - this.placeUntil) / 400;
+      if (a <= 0) {
+        this.placeBg.setVisible(false);
+        this.placeText.setVisible(false);
+      } else {
+        this.placeBg.setAlpha(a);
+        this.placeText.setAlpha(a);
+      }
+    }
+
+    let y = this.placeText.visible ? 62 : 38;
     for (let i = this.toasts.length - 1; i >= 0; i--) {
       const t = this.toasts[i] as Toast;
       const age = now - t.born;
