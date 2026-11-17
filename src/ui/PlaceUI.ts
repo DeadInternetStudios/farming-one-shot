@@ -14,40 +14,45 @@ import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Scre
 import type { Host } from './Screens';
 import { Bag } from './widgets';
 
-const GIFTABLE = (id: string): boolean => {
-  const k = itemDef(id).kind;
-  return k !== 'tool' && k !== 'special' && k !== 'machine';
-};
+export interface PickConfig {
+  title: string;
+  accepts(id: string): boolean;
+  /** The button on each entry, such as Give or Enter. */
+  action: string;
+  /** What to say under an item's name. */
+  lines(id: string): string[];
+  empty: { title: string; lines: string[] };
+  onPick(slot: number): void;
+}
 
-/** Pick something from the bag to hand to a villager. */
-export class GiftScreen extends Screen {
+/** Pick one thing from the bag: a gift for a villager, an entry for a contest. */
+export class PickScreen extends Screen {
   private pane: ListPane | null = null;
 
-  constructor(host: Host, private npcId: string, private onGive: (slot: number) => void) {
+  constructor(host: Host, private cfg: PickConfig) {
     super(host);
   }
 
   private entries(): Entry[] {
     const st = session.state;
-    const name = NPC_BY_ID[this.npcId]?.name ?? 'them';
     const out: Entry[] = [];
     st.player.slots.forEach((s, i) => {
-      if (!s || !GIFTABLE(s.id)) return;
+      if (!s || !this.cfg.accepts(s.id)) return;
       const d = itemDef(s.id);
       out.push({
         row: { text: d.name, icon: iconFor(st, s.id), right: s.n > 1 ? String(s.n) : '' },
         title: d.name,
         icon: iconFor(st, s.id),
-        lines: [d.blurb, `Give one to ${name}.`],
+        lines: this.cfg.lines(s.id),
         actions: [{
-          label: 'Give', kind: 'leaf', run: () => {
-            this.scene.time.delayedCall(0, () => { this.close(); this.onGive(i); });
+          label: this.cfg.action, kind: 'leaf', run: () => {
+            this.scene.time.delayedCall(0, () => { this.close(); this.cfg.onPick(i); });
             return null;
           },
         }],
       });
     });
-    if (out.length === 0) out.push({ row: { text: 'Nothing to give', dim: true }, title: 'Empty hands', lines: ['Pick some flowers, harvest a crop, or cook something first.'] });
+    if (out.length === 0) out.push({ row: { text: this.cfg.empty.title, dim: true }, title: this.cfg.empty.title, lines: this.cfg.empty.lines });
     return out;
   }
 
@@ -60,7 +65,7 @@ export class GiftScreen extends Screen {
     const x = Math.floor((l.uiW - w) / 2);
     const y = Math.floor((l.uiH - h) / 2);
     bag.panel(x, y, w, h);
-    bag.text(x + 12, y + 10, `A gift for ${NPC_BY_ID[this.npcId]?.name ?? ''}`, {});
+    bag.text(x + 12, y + 10, this.cfg.title, {});
     bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
     const body = this.own(new Bag(this.scene, bag.depth));
     this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 28, w: w - 20, h: h - 28 - 10 }, wide, () => this.entries()));

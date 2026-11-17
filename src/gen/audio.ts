@@ -1,6 +1,6 @@
 // Made by tools/audio/build.mjs. Do not edit by hand.
 
-export const SFX_NAMES = ['tick', 'open', 'close', 'nope', 'pickup', 'hoe', 'water', 'water-dry', 'refill', 'plant', 'harvest', 'chop', 'chop-done', 'tree-fall', 'mine', 'mine-break', 'cut', 'eat', 'buy', 'coin', 'give', 'lantern', 'upgrade', 'ship', 'place', 'craft', 'cook', 'fire', 'cast', 'splash', 'bite', 'hook', 'catch', 'fanfare', 'thunder', 'blip', 'door', 'travel', 'sleep', 'morning', 'heart', 'furnace-done', 'gift'] as const;
+export const SFX_NAMES = ['tick', 'open', 'close', 'nope', 'pickup', 'hoe', 'water', 'water-dry', 'refill', 'plant', 'harvest', 'chop', 'chop-done', 'tree-fall', 'mine', 'mine-break', 'cut', 'eat', 'buy', 'coin', 'give', 'lantern', 'upgrade', 'ship', 'place', 'craft', 'cook', 'fire', 'cast', 'splash', 'bite', 'hook', 'catch', 'fanfare', 'thunder', 'blip', 'door', 'travel', 'sleep', 'morning', 'heart', 'furnace-done', 'gift', 'firework'] as const;
 export type SfxName = (typeof SFX_NAMES)[number];
 
 export const BED_NAMES = ['amb-rain', 'amb-wind', 'amb-crickets', 'amb-birds', 'amb-cave', 'amb-water'] as const;
@@ -54,6 +54,7 @@ export const AUDIO_FILES: ReadonlyArray<{ key: string; urls: readonly string[] }
   { key: 'sfx/heart', urls: ['assets/audio/sfx/heart.opus', 'assets/audio/sfx/heart.mp3'] },
   { key: 'sfx/furnace-done', urls: ['assets/audio/sfx/furnace-done.opus', 'assets/audio/sfx/furnace-done.mp3'] },
   { key: 'sfx/gift', urls: ['assets/audio/sfx/gift.opus', 'assets/audio/sfx/gift.mp3'] },
+  { key: 'sfx/firework', urls: ['assets/audio/sfx/firework.opus', 'assets/audio/sfx/firework.mp3'] },
   { key: 'bed/amb-rain', urls: ['assets/audio/bed/amb-rain.opus', 'assets/audio/bed/amb-rain.mp3'] },
   { key: 'bed/amb-wind', urls: ['assets/audio/bed/amb-wind.opus', 'assets/audio/bed/amb-wind.mp3'] },
   { key: 'bed/amb-crickets', urls: ['assets/audio/bed/amb-crickets.opus', 'assets/audio/bed/amb-crickets.mp3'] },

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BUNDLES } from '../src/data/bundles';
 import { NPCS } from '../src/data/npcs';
-import { FESTIVAL_NAMES } from '../src/game/day';
+import { FESTIVAL_NAMES } from '../src/data/festivals';
 import { nextGoal } from '../src/game/goals';
 import type { GameState } from '../src/game/state';
 import { newGame } from '../src/game/state';
@@ -65,6 +65,28 @@ describe('the next goal', () => {
     expect(id(st)).not.toBe('festival-eve');
   });
 
+  it('stops pointing at a fair once you have entered it, and waits for the lanterns at night', () => {
+    const st = fresh();
+    st.flags.outside = true;
+    st.day = 14;
+    st.minute = 12 * 60;
+    expect(id(st)).toBe('festival-today');
+    st.flags['fair-14'] = 'second';
+    expect(id(st)).not.toBe('festival-today');
+
+    st.day = 28;
+    st.minute = 12 * 60;
+    expect(nextGoal(st)?.text).toBe('The Lantern Festival is tonight');
+    st.minute = 19 * 60;
+    expect(nextGoal(st)?.text).toBe('Be at the shrine when the lanterns rise');
+    st.flags.finaleDay = 28;
+    expect(id(st)).not.toBe('festival-today');
+
+    delete st.flags.finaleDay;
+    st.day = 29;
+    expect(id(st)).toBe('finale-late');
+  });
+
   it('keeps going once the basics are done, and finishes with the lanterns', () => {
     const st = fresh();
     st.flags.outside = true;
@@ -93,7 +115,8 @@ describe('the next goal', () => {
     push();
     st.flags.outside = true;
     for (const day of [1, 2, 6, 7, 13, 14, 20, 21, 27, 28]) for (const minute of [8 * 60, 18 * 60]) { st.day = day; st.minute = minute; push(); }
-    for (const name of Object.values(FESTIVAL_NAMES)) samples.push(`${name} is on in the village`, `${name} is tomorrow`);
+    for (const name of Object.values(FESTIVAL_NAMES)) samples.push(`${name} is on in the village`, `${name} opens at 10 in the village`, `${name} is tomorrow`);
+    samples.push('The Lantern Festival is tonight', 'Be at the shrine when the lanterns rise', 'Olwen is waiting at the shrine after dark');
     for (const b of BUNDLES) samples.push(`Fill the ${b.name}`);
     samples.push('Say hello to the villagers (0 of 6)', 'Sleep in your bed to grow the crops', 'Dig a patch of soil with the hoe', 'All lanterns lit! Festival: Winter 7');
     expect(samples.length).toBeGreaterThan(15);

@@ -1,3 +1,4 @@
+import { festivalOpen, festivalSpot, gatherSpot } from '../data/festivals';
 import { NPC_BY_ID, NPCS } from '../data/npcs';
 import type { NpcDef, Stop, Unlock } from '../data/npcs';
 import { itemDef } from '../data/items';
@@ -33,8 +34,10 @@ export function tasteOf(npc: NpcDef, itemId: string): Taste {
 export const isBirthday = (npc: NpcDef, day: number): boolean => seasonOf(day) === npc.birthday.season && dayOfSeason(day) === npc.birthday.day;
 
 /** Where a villager is right now. Null when they are indoors or somewhere you cannot see. */
-export function stopFor(npc: NpcDef, state: GameState): Stop | null {
+export function stopFor(npc: NpcDef, state: GameState, gather = false): Stop | null {
   const m = Math.floor(state.minute);
+  const fair = gather ? gatherSpot(npc.id) : festivalSpot(npc.id, state.day, m);
+  if (fair) return fair;
   const wd = weekdayOf(state.day);
   let best: Stop | null = null;
   for (const s of npc.stops) {
@@ -46,10 +49,10 @@ export function stopFor(npc: NpcDef, state: GameState): Stop | null {
   return best;
 }
 
-export function npcsOnMap(state: GameState, map: string): { npc: NpcDef; stop: Stop }[] {
+export function npcsOnMap(state: GameState, map: string, gather = false): { npc: NpcDef; stop: Stop }[] {
   const out: { npc: NpcDef; stop: Stop }[] = [];
   for (const npc of NPCS) {
-    const stop = stopFor(npc, state);
+    const stop = stopFor(npc, state, gather);
     if (stop && stop.map === map) out.push({ npc, stop });
   }
   return out;
@@ -67,6 +70,8 @@ function pickLine(npc: NpcDef, state: GameState): string {
   const f = friendOf(state, npc.id);
   const h = heartsOf(f.points);
   if (isBirthday(npc, state.day)) return npc.birthdayLine;
+  const fair = festivalOpen(state.day, state.minute)?.talk[npc.id];
+  if (fair) return fair;
   const pool: string[] = [];
   const tier = h >= 6 ? 2 : h >= 2 ? 1 : 0;
   pool.push(...npc.talk[tier]);

@@ -155,6 +155,7 @@ class Actor {
 /** Everyone from the village who is on this map right now, following the day's schedule. */
 export class Npcs {
   private actors = new Map<string, Actor>();
+  private gather = false;
 
   constructor(
     private scene: Phaser.Scene,
@@ -163,9 +164,14 @@ export class Npcs {
     private solidAt: (x: number, y: number) => boolean,
   ) {}
 
+  /** Call the whole valley to the green, or send them back to their day. */
+  setGathered(on: boolean): void {
+    this.gather = on;
+  }
+
   /** Bring the cast in line with the clock. With `instant`, everyone simply appears where they belong. */
   sync(state: GameState, instant: boolean): void {
-    const here = npcsOnMap(state, this.def.id);
+    const here = npcsOnMap(state, this.def.id, this.gather);
     const present = new Set(here.map((h) => h.npc.id));
     for (const { npc, stop } of here) {
       const key = `${stop.from}:${stop.x},${stop.y}`;

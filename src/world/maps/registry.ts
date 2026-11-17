@@ -10,7 +10,7 @@ import { villageMap } from './village';
 const FIXED: Readonly<Record<string, (state: GameState) => MapDef>> = {
   farm: (s) => farmMap(s.seed, s),
   house: (s) => houseMap(s.seed),
-  village: (s) => villageMap(s.seed),
+  village: (s) => villageMap(s.seed, s),
   forest: (s) => forestMap(s.seed),
   lake: (s) => lakeMap(s.seed),
 };

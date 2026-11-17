@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { DaySummary } from '../game/day';
+import type { FinaleReport } from '../game/finale';
 import { session } from '../game/session';
 import { fitUiCamera, getLayout } from '../display';
 import type { Layout } from '../display';
@@ -39,6 +40,8 @@ export class UIScene extends Phaser.Scene {
     subscribe(this, 'day-summary', (s: DaySummary, done: () => void) => this.modals.daySummary(s, done));
     subscribe(this, 'dialog', (text: string) => this.modals.dialog(text));
     subscribe(this, 'letter', () => this.modals.letter(() => { session.release(); session.events.emit('sfx', 'tick'); }));
+    subscribe(this, 'finale', (report: FinaleReport, done: () => void) => this.modals.finale(report, done));
+    subscribe(this, 'cinema', (on: boolean) => this.tweens.add({ targets: this.cameras.main, alpha: on ? 0 : 1, duration: 600 }));
     subscribe(this, 'interact', (what: Interact) => interact(this.stack, what, () => window.location.reload()));
 
     this.game.events.on('layout', this.onLayout, this);

@@ -347,6 +347,7 @@ export const TILE_ID = ${JSON.stringify(tileIds)} as const;
 export const INTERIOR_TILE_ID = ${JSON.stringify(INTERIOR_IDS)} as const;
 export const CAVE_TILE_ID = ${JSON.stringify(CAVE_IDS)} as const;
 export const BLOB_INDEX: readonly number[] = ${JSON.stringify(TR.BLOB_INDEX)};
+export const SHRINE = ${JSON.stringify({ w: 96, h: 80, lanterns: V.shrine(0).lanterns })} as const;
 export const CROP_STAGES: Readonly<Record<string, number>> = ${JSON.stringify(cropFrames)};
 export const ART_COUNTS: Readonly<Record<string, number>> = ${JSON.stringify(manifest.counts)};
 export const FRAME_NAMES: readonly string[] = ${JSON.stringify(manifest.frames)};

@@ -176,6 +176,22 @@ export const SFX = {
   heart: () => layer(0.6, [[bell(F.G5, 0.4, 0.5, 3, 1), 0, 1], [bell(F.B5, 0.5, 0.5, 3, 1), 0.11, 1]]),
   'furnace-done': () => layer(0.9, [[bell(1568, 0.7, 0.55, 3.2, 0.9), 0, 1], [bell(2093, 0.7, 0.45, 3.2, 0.9), 0.14, 1], [glide(0.18, 110, 60, 14, 0.6), 0, 1]]),
   gift: () => layer(0.5, [[burst(0.08, 'hp', 4000, 0.8, 60, 0.3, 46), 0, 1], [pluck(F.G5, 0.4, 0.6), 0.05, 1], [pluck(F.C6, 0.5, 0.6), 0.12, 1]]),
+  // a thin whistle up, a soft thump, then glitter falling
+  firework: () => {
+    const r = rng(61);
+    const crackle = [];
+    for (let k = 0; k < 14; k++) crackle.push([burst(0.03, 'hp', 3200 + r() * 2500, 0.8, 140, 0.16 + r() * 0.1, 70 + k), 0.58 + r() * 0.8, 1]);
+    const dry = layer(1.9, [
+      [glide(0.45, 520, 1900, 7, 0.2), 0, 1],
+      [glide(0.2, 130, 52, 11, 1), 0.46, 1],
+      [burst(0.12, 'bp', 1300, 0.8, 24, 0.45, 60), 0.46, 1],
+      [bell(F.G6, 0.9, 0.16, 3, 1), 0.5, 1],
+      [bell(F.E6, 0.9, 0.12, 3, 1), 0.62, 1],
+      ...crackle,
+    ]);
+    const wet = reverb(dry, 0.75, 0.4);
+    return layer(1.9, [[dry, 0, 0.9], [wet.l, 0, 3], [wet.r, 0, 3]]);
+  },
 };
 
 /** Sound beds that loop. They are long, quiet and steady. */
@@ -292,7 +308,7 @@ export const LEVELS = {
   tick: 0.3, open: 0.35, close: 0.3, nope: 0.5, pickup: 0.55, hoe: 0.8, water: 0.55, 'water-dry': 0.4, refill: 0.5, plant: 0.55, harvest: 0.65,
   chop: 0.8, 'chop-done': 0.85, 'tree-fall': 0.8, mine: 0.65, 'mine-break': 0.75, cut: 0.5, eat: 0.55, buy: 0.6, coin: 0.55, give: 0.6, lantern: 0.7,
   upgrade: 0.7, ship: 0.7, place: 0.65, craft: 0.65, cook: 0.55, fire: 0.45, cast: 0.5, splash: 0.65, bite: 0.6, hook: 0.55, catch: 0.65, fanfare: 0.75,
-  thunder: 0.85, blip: 0.35, door: 0.6, travel: 0.3, sleep: 0.5, morning: 0.6, heart: 0.5, 'furnace-done': 0.6, gift: 0.5,
+  thunder: 0.85, blip: 0.35, door: 0.6, travel: 0.3, sleep: 0.5, morning: 0.6, heart: 0.5, 'furnace-done': 0.6, gift: 0.5, firework: 0.55,
 };
 
 /** Where each sound is rolled off at the top, in Hz, so nothing hisses on headphones. Noisy sounds are rolled off lower. */

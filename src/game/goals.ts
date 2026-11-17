@@ -1,8 +1,10 @@
 import { BUNDLES } from '../data/bundles';
 import { allLit, isComplete } from './bundles';
 import { seasonOf } from './clock';
-import { FESTIVAL_NAMES, festivalToday } from './day';
+import { FESTIVALS, FESTIVAL_NAMES, festivalToday } from '../data/festivals';
+import { enteredToday } from './festival';
 import { isRipe } from './farming';
+import { FINALE_AT, finaleDone } from './finale';
 import { countItem } from './inventory';
 import type { GameState } from './state';
 
@@ -31,9 +33,15 @@ export function nextGoal(st: GameState): Goal | null {
 
   // the festival comes first when it is today, and a nudge the day before
   const today = festivalToday(st.day);
-  if (today && st.minute < 21 * 60) return gift('festival-today', `${FESTIVAL_NAMES[today]} is on in the village`);
+  if (today === 'lantern') {
+    if (!finaleDone(st)) return gift('festival-today', st.minute < FINALE_AT - 120 ? 'The Lantern Festival is tonight' : 'Be at the shrine when the lanterns rise');
+  } else if (today) {
+    const fair = FESTIVALS[today];
+    if (st.minute < fair.to && !enteredToday(st)) return gift('festival-today', st.minute < fair.from ? `${fair.name} opens at 10 in the village` : `${fair.name} is on in the village`);
+  }
   const tomorrow = festivalToday(st.day + 1);
   if (tomorrow && st.minute >= 17 * 60) return gift('festival-eve', `${FESTIVAL_NAMES[tomorrow]} is tomorrow`);
+  if (st.day > 28 && !finaleDone(st)) return gift('finale-late', 'Olwen is waiting at the shrine after dark');
 
   if (!st.flags.outside) return gift('door', 'Step outside');
   if (first) {

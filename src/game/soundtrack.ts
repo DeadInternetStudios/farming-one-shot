@@ -2,7 +2,7 @@ import { BED_NAMES, TRACK_NAMES } from '../gen/audio';
 import type { BedName, TrackName } from '../gen/audio';
 import type { MapKind } from '../world/mapkit';
 import { seasonOf } from './clock';
-import { festivalToday } from './day';
+import { festivalToday } from '../data/festivals';
 import type { GameState } from './state';
 import type { Season, Weather } from './types';
 

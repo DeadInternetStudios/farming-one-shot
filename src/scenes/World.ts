@@ -9,6 +9,7 @@ import { NPC_BY_ID } from '../data/npcs';
 import { rngFor } from '../game/rng';
 import { collectEggs, eggsWaiting, feedHens, henList, pet } from '../game/animals';
 import type { Pet } from '../game/state';
+import { finaleDue, finaleReport, finishFinale } from '../game/finale';
 import { nextGoal } from '../game/goals';
 import { saveGame } from '../game/save';
 import { session } from '../game/session';
@@ -27,6 +28,7 @@ import { subscribe } from '../systems/bus';
 import { Ambient } from '../systems/Ambient';
 import { CameraRig } from '../systems/CameraRig';
 import { Controls } from '../systems/Controls';
+import { Finale } from '../systems/Finale';
 import { Fx } from '../systems/Fx';
 import { Lighting, skyFor } from '../systems/Lighting';
 import { MapView } from '../world/MapView';
@@ -34,12 +36,13 @@ import { ObjectsView } from '../world/ObjectsView';
 import type { LightSpot } from '../world/ObjectsView';
 import type { Hotspot, MapDef, Warp } from '../world/mapkit';
 import { hasMap } from '../world/maps/registry';
+import { SHRINE } from '../gen/art';
 
 const REACH = 2.1;
 
 const HINTS: Readonly<Record<string, string>> = {
   bed: 'Bed', chest: 'Chest', stove: 'Cook', counter: 'Counter', shelf: 'Bookshelf', bin: 'Shipping bin', sign: 'Sign', text: 'Look',
-  shop: 'Go in', shrine: 'Lantern Shrine', board: 'Notice board',
+  shop: 'Go in', shrine: 'Lantern Shrine', board: 'Notice board', festival: 'Judging stall', coop: 'Coop',
 };
 
 const OPPOSITE: Readonly<Record<Dir, Dir>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
@@ -65,6 +68,10 @@ export class WorldScene extends Phaser.Scene {
   private smokeTimer = 0;
   private sleeping = false;
   private travelling = false;
+  private finaleOn = false;
+  private wasPaused = false;
+  /** Where the camera looks instead of at the player, during a cutscene. */
+  private focus: { x: number; y: number } | null = null;
   private warpLock = 0;
   private lastHint = '';
   private furnacesBusy = new Set<string>();
@@ -229,11 +236,15 @@ export class WorldScene extends Phaser.Scene {
     const dt = Math.min(delta / 1000, 0.1);
     const st = session.state;
     const paused = this.sleeping || this.travelling || session.paused;
+    // the key that closed a pop-up must not also act on the world
+    if (this.wasPaused && !paused) this.controls.flush();
+    this.wasPaused = paused;
     this.warpLock = Math.max(0, this.warpLock - dt);
 
     if (!paused) {
       st.minute += dt * minutesPerSecond(st.pace);
       if (st.minute >= DAY_END) this.beginSleep(true);
+      else if (!this.finaleOn && finaleDue(st, this.def.id)) this.beginFinale();
 
       const mv = this.controls.move;
       this.angler.update(dt, Math.hypot(mv.x, mv.y) > 0.25);
@@ -269,7 +280,7 @@ export class WorldScene extends Phaser.Scene {
       this.lastMachineSync = time;
       this.syncMachines();
     }
-    this.rig.update(dt, this.player.x, this.player.y - 8);
+    this.rig.update(dt, this.focus?.x ?? this.player.x, this.focus?.y ?? this.player.y - 8);
     this.ambient.update(dt, { season: seasonOf(st.day), weather: st.weather, minute: st.minute, kind: this.def.kind });
     const sky = skyFor(seasonOf(st.day), st.minute, st.weather, this.def.kind);
     this.lighting.update(sky, time, this.objects.glows, this.torch());
@@ -507,6 +518,7 @@ export class WorldScene extends Phaser.Scene {
       case 'shop': ev({ kind: 'shop', id: h.id }); return;
       case 'shrine': ev({ kind: 'shrine' }); return;
       case 'board': ev({ kind: 'board' }); return;
+      case 'festival': ev({ kind: 'festival' }); return;
       case 'stove': ev({ kind: 'cook' }); return;
       case 'coop': this.useCoop(h); return;
       case 'chest': ev({ kind: 'chest', loc: this.def.id, key: tileKey(h.x, h.y) }); return;
@@ -560,6 +572,63 @@ export class WorldScene extends Phaser.Scene {
         onComplete: () => img.destroy(),
       });
     }
+  }
+
+  // ------------------------------------------------------------- the end of the first year
+
+  /** Where each lantern hangs on the shrine, in world pixels. */
+  private shrineLanterns(): { x: number; y: number }[] {
+    const at = this.def.hotspots.find((h) => h.kind === 'shrine');
+    if (!at) return [];
+    const left = at.x * 16;
+    const top = (at.y + at.h) * 16 - SHRINE.h;
+    return SHRINE.lanterns.map((l) => ({ x: left + l.x, y: top + l.y }));
+  }
+
+  /** Night falls on the green and the whole valley is there: the shrine lights up, then the sky. */
+  private beginFinale(): void {
+    this.finaleOn = true;
+    this.angler.cancel();
+    session.hold();
+    session.events.emit('cinema', true);
+    const cam = this.cameras.main;
+    cam.fadeOut(700, 8, 6, 16);
+    cam.once('camerafadeoutcomplete', () => {
+      const st = session.state;
+      this.buildStage('village');
+      this.npcs.setGathered(true);
+      this.npcs.sync(st, true);
+      this.player.teleport(24.5 * 16, 17.8 * 16, 'up');
+      this.syncPlayer();
+      // pull back and look a little above the green, so the sky is in view for the fireworks
+      cam.setZoom(Math.max(2, Math.round(this.zoomFor() * 0.75)));
+      this.focus = { x: 24 * 16, y: 15 * 16 };
+      this.rig.snapTo(this.focus.x, this.focus.y);
+      this.objects.setLit(0);
+      cam.fadeIn(900, 8, 6, 16);
+      const stage = {
+        lanterns: this.shrineLanterns(),
+        centre: { x: 24 * 16, y: 17 * 16 },
+        sky: { x: this.focus.x, y: this.focus.y - this.rig.viewH * 0.2, spread: this.rig.viewW * 0.3 },
+        setLit: (n: number) => this.objects.setLit(n),
+      };
+      new Finale(this).play(litCount(st), stage, () => this.endFinale());
+    });
+  }
+
+  private endFinale(): void {
+    const st = session.state;
+    session.events.emit('cinema', false);
+    session.events.emit('finale', finaleReport(st), () => {
+      finishFinale(st);
+      this.npcs.setGathered(false);
+      this.focus = null;
+      this.cameras.main.setZoom(this.zoomFor());
+      this.rig.snapTo(this.player.x, this.player.y - 8);
+      this.finaleOn = false;
+      saveGame(st);
+      session.release();
+    });
   }
 
   // ------------------------------------------------------------- the night
@@ -619,8 +688,9 @@ export class WorldScene extends Phaser.Scene {
       go: (id: string, tx: number, ty: number, dir: Dir = 'down') => this.travel({ x: 0, y: 0, w: 0, h: 0, to: id, tx, ty, dir }),
       teleport: (tx: number, ty: number, dir?: Dir) => { this.player.teleport((tx + 0.5) * 16, (ty + 0.8) * 16, dir); this.rig.snapTo(this.player.x, this.player.y - 8); },
       sleep: () => this.beginSleep(false),
+      finale: () => this.beginFinale(),
       act: () => this.act(),
-      info: () => ({ paused: session.paused, sleeping: this.sleeping, swinging: this.player.swinging, facing: this.player.facing, target: this.targetTile(), keyboard: !!this.input.keyboard?.enabled, active: this.input.isActive() }),
+      info: () => ({ paused: session.paused, holds: session.holding, sleeping: this.sleeping, swinging: this.player.swinging, facing: this.player.facing, target: this.targetTile(), keyboard: !!this.input.keyboard?.enabled, active: this.input.isActive() }),
       give: (id: string, n: number) => addItem(session.state.player.slots, id, n),
       weather: (w: Weather) => { session.state.weather = w; },
       ambient: () => this.ambient.count(),

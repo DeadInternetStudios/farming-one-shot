@@ -1,6 +1,9 @@
+import { itemDef } from '../data/items';
 import { NPC_BY_ID } from '../data/npcs';
 import { RECIPES } from '../data/recipes';
 import { SHOPS } from '../data/shops';
+import { enterContest, enteredToday, openContest, placeFor } from '../game/festival';
+import { festivalOpen } from '../data/festivals';
 import { isOpen } from '../game/shop';
 import { session } from '../game/session';
 import { canGift, giveGift, talkTo } from '../game/social';
@@ -9,7 +12,7 @@ import { Dialogue } from './DialogueUI';
 import { FishingScreen } from './FishingUI';
 import type { FishRequest } from './FishingUI';
 import { MenuScreen, RecipeScreen, ShrineScreen } from './MenuUI';
-import { BoardScreen, ChestScreen, FurnaceScreen, GiftScreen } from './PlaceUI';
+import { BoardScreen, ChestScreen, FurnaceScreen, PickScreen } from './PlaceUI';
 import type { Host } from './Screens';
 import { ShopScreen } from './ShopUI';
 
@@ -20,6 +23,7 @@ export type Interact =
   | { kind: 'shrine' }
   | { kind: 'cook' }
   | { kind: 'board' }
+  | { kind: 'festival' }
   | { kind: 'menu'; tab?: 'bag' | 'craft' | 'bundles' | 'friends' | 'options' }
   | { kind: 'chest'; loc: string; key: string }
   | { kind: 'furnace'; loc: string; key: string }
@@ -47,17 +51,25 @@ function startGift(host: Host, id: string): void {
     speak(host, id, [why]);
     return;
   }
-  host.open(new GiftScreen(host, id, (slot) => {
-    const r = giveGift(session.state, id, slot);
-    if (!r.ok) {
-      if (r.note) say(r.note);
-      return;
-    }
-    session.events.emit('sfx', r.taste === 'dislike' ? 'nope' : 'give');
-    session.events.emit('npc-fx', id, r.taste === 'dislike' ? 'sad' : 'heart');
-    session.events.emit('selected');
-    for (const u of r.unlocked) announce(u);
-    speak(host, id, [r.line, ...r.unlocked.map((u) => u.text)]);
+  const name = NPC_BY_ID[id]?.name ?? 'them';
+  host.open(new PickScreen(host, {
+    title: `A gift for ${name}`,
+    accepts: (item) => { const k = itemDef(item).kind; return k !== 'tool' && k !== 'special' && k !== 'machine'; },
+    action: 'Give',
+    lines: (item) => [itemDef(item).blurb, `Give one to ${name}.`],
+    empty: { title: 'Nothing to give', lines: ['Pick some flowers, harvest a crop, or cook something first.'] },
+    onPick: (slot) => {
+      const r = giveGift(session.state, id, slot);
+      if (!r.ok) {
+        if (r.note) say(r.note);
+        return;
+      }
+      session.events.emit('sfx', r.taste === 'dislike' ? 'nope' : 'give');
+      session.events.emit('npc-fx', id, r.taste === 'dislike' ? 'sad' : 'heart');
+      session.events.emit('selected');
+      for (const u of r.unlocked) announce(u);
+      speak(host, id, [r.line, ...r.unlocked.map((u) => u.text)]);
+    },
   }));
 }
 
@@ -71,6 +83,53 @@ function startTalk(host: Host, id: string): void {
   if (shop && isOpen(shop.id, st.minute)) choices.push({ label: 'Shop', fn: () => host.open(new ShopScreen(host, shop.id)) });
   choices.push({ label: 'Goodbye', fn: () => undefined });
   speak(host, id, [...t.pages, ...t.unlocked.map((u) => u.text)], choices);
+}
+
+const PLACE_WORDS = { first: 'Looks like a winner.', second: 'A strong entry.', third: 'A fair entry.', entrant: 'Every entry earns a ribbon.' } as const;
+
+/** The judging stall on the green: Mirren takes your entry, or says why she cannot. */
+function startFestival(host: Host): void {
+  const st = session.state;
+  const open = openContest(st);
+  if (!open) {
+    const fest = festivalOpen(st.day, st.minute);
+    speak(host, 'mirren', [fest ? fest.stall : 'The stall is shut for now. Come back when the bunting is up.']);
+    return;
+  }
+  const done = enteredToday(st);
+  if (done) {
+    speak(host, 'mirren', [done === 'first' ? 'You took first prize today. Do not let it go to your head. Let it go to your hat.' : 'You have entered already. One ribbon a day, or I would be ruined.']);
+    return;
+  }
+  const { contest } = open;
+  const openList = (): void => host.open(new PickScreen(host, {
+    title: contest.title,
+    accepts: (item) => contest.accepts(itemDef(item)),
+    action: 'Enter',
+    lines: (item) => [itemDef(item).blurb, PLACE_WORDS[placeFor(itemDef(item).sell, contest.marks)]],
+    empty: { title: 'Nothing to enter', lines: [contest.ask + '. Come back with something worthy.'] },
+    onPick: (slot) => {
+      const held = st.player.slots[slot];
+      if (!held) return;
+      speak(host, 'mirren', [`The ${itemDef(held.id).name}? There is one entry a fair, so choose well.`], [
+        {
+          label: 'Enter it',
+          fn: () => {
+            const r = enterContest(st, slot);
+            if (!r) return;
+            session.events.emit('sfx', r.place === 'first' ? 'fanfare' : 'coin');
+            session.events.emit('selected');
+            speak(host, 'mirren', r.lines);
+          },
+        },
+        { label: 'Pick another', fn: openList },
+      ]);
+    },
+  }));
+  speak(host, 'mirren', [contest.invite], [
+    { label: 'Enter something', fn: openList },
+    { label: 'Not yet', fn: () => undefined },
+  ]);
 }
 
 function startShop(host: Host, id: string): void {
@@ -92,6 +151,7 @@ export function interact(host: Host, what: Interact, toTitle: () => void): void 
       return host.open(new ShrineScreen(host));
     case 'cook': return host.open(new RecipeScreen(host, 'cook', 'The Stove'));
     case 'board': return host.open(new BoardScreen(host));
+    case 'festival': return startFestival(host);
     case 'chest': return host.open(new ChestScreen(host, what.loc, what.key));
     case 'furnace': return host.open(new FurnaceScreen(host, what.loc, what.key));
     case 'menu': return host.open(new MenuScreen(host, toTitle, what.tab));

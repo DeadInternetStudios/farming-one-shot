@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import { itemDef } from '../data/items';
-import { dayOfSeason, seasonOf } from '../game/clock';
+import { festivalToday } from '../data/festivals';
+import { DAYS_PER_YEAR, dayOfSeason, seasonOf, yearOf } from '../game/clock';
 import type { DaySummary } from '../game/day';
+import { finaleDone } from '../game/finale';
+import type { FinaleReport } from '../game/finale';
 import { session } from '../game/session';
 import { PAL } from '../gen/art';
 import type { Layout } from '../display';
@@ -87,10 +90,11 @@ export class Modals {
     const w = Math.min(156, this.l.uiW - 12);
     const h = 70;
     const { x, y } = this.panel(open, w, h);
-    const hour = session.state.minute;
-    const late = hour >= 20 * 60;
-    this.text(open, x + w / 2, y + 13, late ? 'Ready for bed?' : 'It is still early.', { origin: [0.5, 0] });
-    this.text(open, x + w / 2, y + 26, late ? 'The day ends and your crops grow.' : 'Sleep now and end the day?', { origin: [0.5, 0], tint: COL.dim, wrap: w - 20, align: 'center' });
+    const st = session.state;
+    const late = st.minute >= 20 * 60;
+    const missing = festivalToday(st.day) === 'lantern' && !finaleDone(st);
+    this.text(open, x + w / 2, y + 13, missing ? 'The lanterns rise tonight.' : late ? 'Ready for bed?' : 'It is still early.', { origin: [0.5, 0] });
+    this.text(open, x + w / 2, y + 26, missing ? 'Sleep now and you will miss the festival.' : late ? 'The day ends and your crops grow.' : 'Sleep now and end the day?', { origin: [0.5, 0], tint: COL.dim, wrap: w - 20, align: 'center' });
     this.btn(open, x + 10, y + h - 26, Math.floor((w - 28) / 2), 'Sleep', 'leaf', yes);
     this.btn(open, x + w - 10 - Math.floor((w - 28) / 2), y + h - 26, Math.floor((w - 28) / 2), 'Not yet', 'wood', () => this.close());
   }
@@ -157,6 +161,61 @@ export class Modals {
     show(0);
   }
 
+  // ---------------------------------------------------------------- the end of the first year
+
+  finale(r: FinaleReport, done: () => void): void {
+    const show = (n: number): void => {
+      const last = n === 1;
+      const go = (): void => {
+        if (last) {
+          this.close();
+          done();
+        } else {
+          show(1);
+        }
+      };
+      const { open } = this.begin(go);
+      const w = Math.min(214, this.l.uiW - 12);
+      const pad = 14;
+      const inner = w - pad * 2;
+      const measure = (t: string): number => {
+        const m = label(this.scene, 0, 0, t, { wrap: inner });
+        const hh = Math.ceil(m.height);
+        m.destroy();
+        return hh;
+      };
+      if (n === 0) {
+        const titleH = measure(r.title);
+        const heights = r.lines.map(measure);
+        const h = 16 + 6 + 14 + titleH + heights.reduce((a, v) => a + v + 7, 0) + 34;
+        const { x, y } = this.panel(open, w, h);
+        open.parts.push(this.scene.add.image(x + w / 2, y + 17, 'title', 'seal').setDepth(this.depth + 2));
+        this.text(open, x + w / 2, y + 34, r.title, { origin: [0.5, 0], tint: COL.berry, wrap: inner, align: 'center' });
+        let cy = y + 34 + titleH + 9;
+        r.lines.forEach((t, i) => {
+          this.text(open, x + pad, cy, t, { wrap: inner });
+          cy += (heights[i] as number) + 7;
+        });
+        this.btn(open, x + w - 76, y + h - 26, 64, 'Next', 'leaf', go);
+      } else {
+        const h = 20 + 14 + r.rows.length * 13 + 12 + 34;
+        const { x, y } = this.panel(open, w, h);
+        let cy = y + 11;
+        this.text(open, x + w / 2, cy, `Year ${yearOf(session.state.day)}, in short`, { origin: [0.5, 0], tint: COL.berry });
+        cy += 14;
+        open.parts.push(this.scene.add.rectangle(x + pad, cy, inner, 1, PAL.dirt[2]).setOrigin(0, 0).setDepth(this.depth + 2));
+        cy += 6;
+        for (const [k, v] of r.rows) {
+          this.text(open, x + pad, cy, k, { tint: COL.dim });
+          this.text(open, x + w - pad, cy, v, { origin: [1, 0] });
+          cy += 13;
+        }
+        this.btn(open, x + Math.floor((w - 84) / 2), y + h - 27, 84, 'Keep playing', 'leaf', go);
+      }
+    };
+    show(0);
+  }
+
   // ---------------------------------------------------------------- the day's tally
 
   daySummary(s: DaySummary, done: () => void): void {
@@ -172,7 +231,8 @@ export class Modals {
     const extra = s.sold.length - rows.length;
     const lines: string[] = [];
     if (s.passedOut) lines.push(`You passed out. Someone carried you home. Lost ${s.lostGold}g.`);
-    if (s.newSeason) lines.push(`A new season begins: ${SEASON_NAMES[s.newSeason]}.`);
+    if (s.day % DAYS_PER_YEAR === 0) lines.push(`A new year begins: Year ${yearOf(s.day) + 1}.`);
+    else if (s.newSeason) lines.push(`A new season begins: ${SEASON_NAMES[s.newSeason]}.`);
     if (s.withered > 0) lines.push(`${s.withered} crops withered in the cold turn of the season.`);
     if (s.night.ripe > 0) lines.push(`${s.night.ripe} crops are ripe and ready.`);
     if (s.eggs > 0) lines.push(`${s.eggs === 1 ? 'An egg was' : `${s.eggs} eggs were`} laid in the coop.`);

@@ -1,3 +1,8 @@
+import { festivalToday } from '../../data/festivals';
+import type { FestivalId } from '../../data/festivals';
+import { seasonOf } from '../../game/clock';
+import type { GameState } from '../../game/state';
+import type { Season } from '../../game/types';
 import { GROUND, MapBuilder, OVERLAY } from '../mapkit';
 import type { Building, MapDef } from '../mapkit';
 
@@ -14,7 +19,7 @@ interface Shopfront {
 const shop = (s: Shopfront): Building => ({ sprite: `building/${s.sprite}`, glow: `building/${s.sprite}-glow`, x: s.x, y: s.y, w: s.w, h: s.h, lights: s.lights, smoke: s.smoke });
 
 /** Hollow Green. 48 x 34 tiles: one cobbled street with the shops along it, the shrine and a small plaza. */
-export function villageMap(seed: number): MapDef {
+export function villageMap(seed: number, state?: GameState): MapDef {
   const m = new MapBuilder('village', 'Hollow Green', 48, 34, seed);
   m.fill(m.ground, GROUND.Grass);
   m.music = 'village';
@@ -75,6 +80,9 @@ export function villageMap(seed: number): MapDef {
     tam: { x: 7, y: 27 }, olwen: { x: 37, y: 27 }, wren: { x: 1, y: 12 },
   });
 
+  const fair = state ? festivalToday(state.day) : null;
+  if (state && fair) dressForFair(m, seasonOf(state.day), fair);
+
   m.keepClear(0, 10, 48, 4);
   m.keepClear(14, 13, 20, 12);
   m.forestEdge(3, [{ x: 0, y: 10, w: 3, h: 5 }, { x: 45, y: 10, w: 3, h: 5 }], 0.92);
@@ -85,4 +93,18 @@ export function villageMap(seed: number): MapDef {
   m.scatter('flower', 40, open, 12);
   m.scatter('rock', 4, (x, y) => open(x, y) && y > 25, 3, 2);
   return m.toDef();
+}
+
+const TREAT_STALL: Readonly<Record<FestivalId, string>> = {
+  blossom: 'Petal tea and honey cakes. The cakes are gone. The tea is going fast.',
+  sunfair: 'Lemon ice for the fishermen. By noon everybody is a fisherman.',
+  harvest: 'Roasted chestnuts and cider. One cup each, says the sign. Everyone has had three.',
+  lantern: 'Paper lanterns, three for a coin. Wren has bought nine.',
+};
+
+/** Bunting down the street, the judging stall by the shrine and a treat stall by the fountain. */
+function dressForFair(m: MapBuilder, season: Season, fair: FestivalId): void {
+  for (let x = 0; x < 48; x += 6) m.prop({ sprite: `prop/bunting-${season}`, x, y: 11, w: 6, noShadow: true, lift: 40 });
+  m.prop({ sprite: 'prop/stall-red', x: 16, y: 15, w: 3, h: 2, solid: true, interact: 'festival' });
+  m.prop({ sprite: 'prop/stall-blue', x: 26, y: 19, w: 3, h: 2, solid: true, interact: 'text', text: TREAT_STALL[fair] });
 }

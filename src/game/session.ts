@@ -17,6 +17,9 @@ class Session {
   get paused(): boolean {
     return this.holds > 0;
   }
+  get holding(): number {
+    return this.holds;
+  }
   hold(): void {
     this.holds += 1;
   }
@@ -63,6 +66,7 @@ class Session {
       }
     }
     this.maps.delete('farm');
+    this.maps.delete('village');
   }
 
   private build(id: string): MapDef {

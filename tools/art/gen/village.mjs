@@ -166,8 +166,10 @@ export function shrine(lit) {
   roof(day, { y0: 0, h: 12, rx0: 18, rx1: 77, ex0: 2, ex1: W - 3, ramp: R.red, seed: 8, row: 3 });
   day.rect(14, 12, 68, 5, R.wood[3]); day.hline(14, 12, 68, R.wood[4]); day.hline(14, 16, 68, R.wood[1]);
   const xs = [22, 31, 40, 48, 56, 65, 74];
+  const lanterns = [];
   xs.forEach((x, i) => {
     const drop = 10 + (i % 2) * 6 + (i === 3 ? 4 : 0);
+    lanterns.push({ x, y: 17 + drop + 6 });
     day.vline(x, 17, drop, R.ink[3]);
     const y = 17 + drop;
     day.rect(x - 3, y, 7, 11, R.ink[1]);
@@ -180,7 +182,7 @@ export function shrine(lit) {
     }
   });
   outline(day); glow.outline(() => null);
-  return { day, glow, xs };
+  return { day, glow, xs, lanterns };
 }
 
 // ---------------------------------------------------------------- street furniture
