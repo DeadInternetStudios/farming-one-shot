@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { session } from '../game/session';
 import type { Layout } from '../display';
+import { iconFor } from './kit';
 
 const RADIUS = 22;
 
@@ -9,6 +10,8 @@ export class Touch {
   private objs: Phaser.GameObjects.GameObject[] = [];
   private base: Phaser.GameObjects.Image;
   private knob: Phaser.GameObjects.Image;
+  private icon: Phaser.GameObjects.Image;
+  private shown = '';
   private pointerId = -1;
   private origin = new Phaser.Math.Vector2();
   private onMove: (p: Phaser.Input.Pointer) => void;
@@ -50,17 +53,34 @@ export class Touch {
     scene.input.on('pointerup', this.onUp);
     scene.input.on('pointerupoutside', this.onUp);
 
-    const btn = scene.add.image(l.uiW - 26, l.uiH - 52, 'atlas', 'ui/action-btn').setDepth(5).setInteractive();
+    // the button shows what is in your hand, so you know what a press will do
+    const bx = l.uiW - 26;
+    const by = l.uiH - 52;
+    const btn = scene.add.image(bx, by, 'atlas', 'ui/action-btn').setDepth(5).setInteractive();
+    this.icon = scene.add.image(bx, by, 'atlas', 'ui/hand').setDepth(6);
+    const press = (v: number): void => { btn.setScale(v); this.icon.setScale(v); };
     btn.on('pointerdown', () => {
-      btn.setScale(0.92);
+      press(0.92);
       session.events.emit('virtual-action');
     });
-    btn.on('pointerup', () => btn.setScale(1));
-    btn.on('pointerout', () => btn.setScale(1));
-    this.objs.push(btn);
+    btn.on('pointerup', () => press(1));
+    btn.on('pointerout', () => press(1));
+    this.objs.push(btn, this.icon);
+    scene.events.on('update', this.sync, this);
+    this.sync();
+  }
+
+  private sync(): void {
+    const st = session.state;
+    const held = st.player.slots[st.player.selected];
+    const frame = held ? iconFor(st, held.id) : 'ui/hand';
+    if (frame === this.shown) return;
+    this.shown = frame;
+    this.icon.setFrame(frame);
   }
 
   destroy(): void {
+    this.scene.events.off('update', this.sync, this);
     this.scene.input.off('pointermove', this.onMove);
     this.scene.input.off('pointerup', this.onUp);
     this.scene.input.off('pointerupoutside', this.onUp);

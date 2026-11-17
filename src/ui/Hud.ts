@@ -9,7 +9,8 @@ import { PAL } from '../gen/art';
 import type { Layout } from '../display';
 import { COL, iconFor, label, nine } from './kit';
 
-const PITCH = 19;
+/** Hotbar spacing in interface pixels. Touch screens get 22, which is 44 CSS pixels at the phone interface scale. */
+const pitchFor = (touch: boolean): number => (touch ? 22 : 19);
 
 interface SlotView {
   bg: Phaser.GameObjects.Image;
@@ -125,15 +126,18 @@ export class Hud {
     this.energyFill = this.add(s.add.rectangle(gx + 17, 21 + 5, this.energyW, 4, PAL.leaf[4]).setOrigin(0, 0));
 
     // hotbar, bottom centre
-    this.visible = Math.max(5, Math.min(HOTBAR_SIZE, Math.floor((l.uiW - 8) / PITCH)));
-    const w = this.visible * PITCH + 1;
+    const pitch = pitchFor(l.touch);
+    this.visible = Math.max(5, Math.min(HOTBAR_SIZE, Math.floor((l.uiW - 8) / pitch)));
+    const w = this.visible * pitch + 1;
     const x0 = Math.floor((l.uiW - w) / 2);
     const y0 = l.uiH - 24;
     this.hotbarTop = y0;
     this.hotbarRect.setTo(x0 - 2, y0 - 4, w + 4, 28);
     for (let i = 0; i < this.visible; i++) {
-      const x = x0 + i * PITCH;
-      const bg = this.add(s.add.image(x, y0, 'atlas', 'ui/slot').setOrigin(0, 0).setInteractive({ useHandCursor: true }));
+      const x = x0 + i * pitch;
+      const bg = this.add(s.add.image(x, y0, 'atlas', 'ui/slot').setOrigin(0, 0));
+      // the whole cell is the target, not just the picture, and it reaches up into the margin
+      bg.setInteractive({ hitArea: new Phaser.Geom.Rectangle(-(pitch - 20) / 2, -4, pitch, 28), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
       const icon = this.add(s.add.image(x + 10, y0 + 10, 'atlas', 'item/stone').setVisible(false));
       const water = this.add(s.add.rectangle(x + 3, y0 + 16, 14, 2, PAL.water[3]).setOrigin(0, 0).setVisible(false));
       const num = this.add(label(s, x + 3, y0 + 2, '', { tint: PAL.ink[4] }));
@@ -304,9 +308,10 @@ export class Hud {
     this.energyFill.setSize(Math.max(e > 0 ? 1 : 0, Math.round(this.energyW * e)), 4);
     this.energyFill.setFillStyle(e > 0.5 ? PAL.leaf[4] : e > 0.22 ? PAL.yellow[3] : PAL.red[3]);
 
-    // keep the selected slot inside the visible window
-    if (p.selected < this.offset) this.offset = p.selected;
-    if (p.selected >= this.offset + this.visible) this.offset = p.selected - this.visible + 1;
+    // keep the selected slot inside the visible window; on a narrow bar the edge cells slide it along, so every slot can be reached by touch
+    const margin = this.visible < HOTBAR_SIZE ? 1 : 0;
+    if (p.selected < this.offset + margin) this.offset = Math.max(0, p.selected - margin);
+    if (p.selected > this.offset + this.visible - 1 - margin) this.offset = Math.min(HOTBAR_SIZE - this.visible, p.selected - this.visible + 1 + margin);
     const sig = `${this.offset}|${p.selected}|${p.water}|${p.slots.slice(0, HOTBAR_SIZE).map((s) => (s ? `${s.id}:${s.n}` : '-')).join(',')}`;
     if (sig !== this.sig) {
       this.sig = sig;

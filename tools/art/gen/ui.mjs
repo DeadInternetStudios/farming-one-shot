@@ -176,9 +176,35 @@ export function stickKnob() {
   i.outline(() => R.ink[0]);
   return i;
 }
-export function actionButton(label = 'A') {
+// The touch action button: a cream ring so it stands out on grass, and a green dish for the item in your hand.
+export function actionButton() {
   const i = new Img(36, 36);
   i.disc(18, 18, 17.5, R.ink[0]);
-  i.shaded(18, 18, 16, 16, R.leaf, { light: [-0.4, -0.9] });
+  i.disc(18, 18, 16.5, R.cream[3]);
+  i.disc(18, 18, 15.5, R.cream[1]);
+  i.disc(18, 18, 14.5, R.ink[0]);
+  i.shaded(18, 18, 13.5, 13.5, R.leaf, { light: [-0.4, -0.9] });
   return i;
+}
+
+// A little pointing hand for the action button when nothing is in your hand.
+export function hand() {
+  const i = Img.ascii([
+    '....ss....',
+    '....ss....',
+    '....ss....',
+    '....ssss..',
+    '....ssssss',
+    's...ssssss',
+    'ss.sssssss',
+    'ssssssssss',
+    '.sssssssss',
+    '..ssssssss',
+    '..ssssssss',
+    '...ssssss.',
+  ], { s: R.skin1[4] });
+  for (const [x, y] of [[6, 3], [6, 4], [8, 4], [7, 5], [9, 5]]) i.set(x, y, R.skin1[3]);
+  for (let x = 3; x < 9; x++) i.set(x, 11, R.skin1[2]);
+  i.set(1, 6, R.skin1[3]); i.set(2, 7, R.skin1[3]);
+  return i.pad(1, 1, 1, 1).outline(() => R.ink[0]);
 }
