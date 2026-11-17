@@ -110,6 +110,8 @@ export interface MapDef {
   objects: MapObject[];
   warps: Warp[];
   spawn: { x: number; y: number };
+  /** The tile each villager steps out of when they arrive, usually in front of their door. */
+  homes: Record<string, { x: number; y: number }>;
   /** Tiles where the player may till. */
   tillable: Uint8Array;
 }
@@ -124,6 +126,7 @@ export class MapBuilder {
   readonly props: Prop[] = [];
   readonly warps: Warp[] = [];
   readonly hotspots: Hotspot[] = [];
+  readonly homes: Record<string, { x: number; y: number }> = {};
   readonly rand: Rand;
   private taken = new Set<string>();
   spawn = { x: 1, y: 1 };
@@ -276,7 +279,7 @@ export class MapBuilder {
       id: this.id, name: this.name, w: this.w, h: this.h, indoors: this.indoors, kind: this.kind, music: this.music,
       tiles: this.tiles, overlayTiles: this.overlayTiles, hotspots: this.hotspots,
       ground: this.ground, overlay: this.overlay, solid: this.solid,
-      buildings: this.buildings, props: this.props, objects: this.objects, warps: this.warps, spawn: this.spawn, tillable,
+      buildings: this.buildings, props: this.props, objects: this.objects, warps: this.warps, spawn: this.spawn, homes: this.homes, tillable,
     };
   }
 }

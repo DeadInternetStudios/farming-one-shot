@@ -6,6 +6,9 @@ import type { Layout } from '../display';
 import { subscribe } from '../systems/bus';
 import { Hud } from '../ui/Hud';
 import { Modals } from '../ui/Modals';
+import { interact } from '../ui/Interactions';
+import type { Interact } from '../ui/Interactions';
+import { ScreenStack } from '../ui/Screens';
 import { Touch } from '../ui/Touch';
 
 /** The interface layer: a second camera at a whole-number zoom, drawn over the world. */
@@ -13,6 +16,7 @@ export class UIScene extends Phaser.Scene {
   private hud!: Hud;
   private modals!: Modals;
   private touch: Touch | null = null;
+  private stack!: ScreenStack;
 
   constructor() {
     super('UI');
@@ -23,6 +27,7 @@ export class UIScene extends Phaser.Scene {
     fitUiCamera(this.cameras.main, l);
     this.hud = new Hud(this, l);
     this.modals = new Modals(this, l);
+    this.stack = new ScreenStack(this, l);
     if (l.touch) this.touch = new Touch(this, l);
 
     subscribe(this, 'toast', (msg: string) => this.hud.toast(msg));
@@ -33,6 +38,7 @@ export class UIScene extends Phaser.Scene {
     subscribe(this, 'ask-sleep', () => this.modals.askSleep(() => session.events.emit('confirm-sleep')));
     subscribe(this, 'day-summary', (s: DaySummary, done: () => void) => this.modals.daySummary(s, done));
     subscribe(this, 'dialog', (text: string) => this.modals.dialog(text));
+    subscribe(this, 'interact', (what: Interact) => interact(this.stack, what, () => window.location.reload()));
 
     this.game.events.on('layout', this.onLayout, this);
     this.events.once('shutdown', () => this.game.events.off('layout', this.onLayout, this));
@@ -42,11 +48,13 @@ export class UIScene extends Phaser.Scene {
     fitUiCamera(this.cameras.main, l);
     this.hud.rebuild(l);
     this.modals.setLayout(l);
+    this.stack.setLayout(l);
     this.touch?.destroy();
     this.touch = l.touch ? new Touch(this, l) : null;
   }
 
   override update(): void {
     this.hud.update();
+    this.stack.update();
   }
 }

@@ -68,7 +68,6 @@ const BASE: ItemDef[] = [
   resource('sap', 'Sap', 14, 'Sticky amber from the trees.'),
   { id: 'coin', name: 'Coin', kind: 'special', icon: 'item/coin', sell: 0, stack: 1, blurb: 'Shiny.' },
   { id: 'egg', name: 'Egg', kind: 'goods', icon: 'item/egg', sell: 50, stack: 99, blurb: 'Still warm.', energy: 20 },
-  { id: 'milk', name: 'Milk', kind: 'goods', icon: 'item/milk', sell: 120, stack: 99, blurb: 'Creamy and fresh.', energy: 30 },
   { id: 'loaf', name: 'Country Loaf', kind: 'food', icon: 'item/loaf', sell: 60, stack: 99, blurb: 'Crusty on the outside.', energy: 35, buy: 90 },
   { id: 'mushroom', name: 'Red Cap Mushroom', kind: 'forage', icon: 'item/mushroom', sell: 40, stack: 99, blurb: 'Found where the forest is damp.', energy: 15 },
   { id: 'berry', name: 'Wild Berries', kind: 'forage', icon: 'item/berry', sell: 25, stack: 99, blurb: 'A handful of sweet-sour jewels.', energy: 12 },

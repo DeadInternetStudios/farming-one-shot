@@ -105,6 +105,16 @@ export class Fx {
     });
   }
 
+  /** Three little hearts drift up from a friend. */
+  heart(x: number, y: number): void {
+    for (let k = 0; k < 3; k++) {
+      const h = this.scene.add.image(x + (k - 1) * 8, y, 'atlas', 'fx/heart').setDepth(FX_DEPTH + 2).setAlpha(0).setScale(0.8);
+      this.scene.tweens.add({ targets: h, y: y - 14 - k * 4, scale: 1, duration: 700, delay: k * 110, ease: 'sine.out' });
+      this.scene.tweens.add({ targets: h, alpha: { from: 0, to: 1 }, duration: 120, delay: k * 110 });
+      this.scene.tweens.add({ targets: h, alpha: 0, duration: 300, delay: 480 + k * 110, onComplete: () => h.destroy() });
+    }
+  }
+
   floatText(x: number, y: number, text: string, font = 'hollow-o'): void {
     const t = this.scene.add.bitmapText(Math.round(x), Math.round(y), font, text).setOrigin(0.5, 1).setDepth(FX_DEPTH + 5);
     this.scene.tweens.add({ targets: t, y: y - 10, alpha: { value: 0, delay: 500, duration: 300 }, duration: 800, ease: 'sine.out', onComplete: () => t.destroy() });

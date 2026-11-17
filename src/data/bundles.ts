@@ -49,7 +49,7 @@ export const BUNDLES: readonly BundleDef[] = [
   },
   {
     id: 'hearth', name: 'Hearth and Home', blurb: 'The warm things that make a house a home.',
-    slots: [one('egg', 4), one('milk'), one('loaf', 2), { any: ['dish-soup', 'dish-stew', 'dish-pie', 'dish-salad', 'dish-jam'], n: 2, label: 'Any 2 dishes' }, one('dish-tea')],
+    slots: [one('egg', 4), one('loaf', 2), one('wood', 20), { any: ['dish-soup', 'dish-stew', 'dish-pie', 'dish-salad', 'dish-jam'], n: 2, label: 'Any 2 dishes' }, one('dish-tea')],
     reward: { gold: 800, item: { id: 'seed-pumpkin', n: 4 } },
   },
 ];

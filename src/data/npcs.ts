@@ -111,7 +111,7 @@ export const NPCS: readonly NpcDef[] = [
   {
     id: 'ida', name: 'Ida', role: 'Owns the Cafe',
     birthday: { season: 'summer', day: 20 },
-    loves: ['dish-pie', 'dish-jam', 'strawberry', 'melon'], likes: ['egg', 'milk', 'tomato', 'dish-tea', 'blueberry', 'loaf'], dislikes: ['stone', 'fiber', 'coal'],
+    loves: ['dish-pie', 'dish-jam', 'strawberry', 'melon'], likes: ['egg', 'tomato', 'dish-tea', 'blueberry', 'loaf'], dislikes: ['stone', 'fiber', 'coal'],
     stops: [
       { from: 6 * H, map: null, x: 0, y: 0 },
       { from: 8 * H, map: 'village', x: 15, y: 12, dir: 'down' },
@@ -206,7 +206,7 @@ export const NPCS: readonly NpcDef[] = [
     loves: ['dish-tea', 'sunflower', 'lantern'], likes: ['tulip', 'dish-jam', 'melon', 'blueberry', 'egg'], dislikes: ['weed', 'fiber', 'stone'],
     stops: [
       { from: 6 * H, map: null, x: 0, y: 0 },
-      { from: 8 * H, map: 'village', x: 25, y: 14, dir: 'up' },
+      { from: 8 * H, map: 'village', x: 20, y: 15, dir: 'right' },
       { from: 8 * H, map: null, x: 0, y: 0, weather: rainy },
       { from: 19 * H, map: null, x: 0, y: 0 },
     ],

@@ -5,13 +5,16 @@ import type { Ctx, Outcome } from '../game/actions';
 import { DAY_END, minutesPerSecond, seasonOf } from '../game/clock';
 import { sleepThrough } from '../game/day';
 import type { DaySummary } from '../game/day';
+import { NPC_BY_ID } from '../data/npcs';
 import { rngFor } from '../game/rng';
 import { saveGame } from '../game/save';
 import { session } from '../game/session';
+import { litCount } from '../game/bundles';
 import { addItem } from '../game/inventory';
 import type { Dir, ToolId, Weather } from '../game/types';
 import { tileKey } from '../game/types';
 import { getLayout } from '../display';
+import { Npcs } from '../entities/Npcs';
 import { Player } from '../entities/Player';
 import { subscribe } from '../systems/bus';
 import { CameraRig } from '../systems/CameraRig';
@@ -26,12 +29,17 @@ import { hasMap } from '../world/maps/registry';
 const REACH = 2.1;
 
 const HINTS: Readonly<Record<string, string>> = {
-  bed: 'Bed', chest: 'Chest', stove: 'Stove', counter: 'Counter', shelf: 'Bookshelf', bin: 'Shipping bin', sign: 'Sign', text: 'Look',
+  bed: 'Bed', chest: 'Chest', stove: 'Cook', counter: 'Counter', shelf: 'Bookshelf', bin: 'Shipping bin', sign: 'Sign', text: 'Look',
+  shop: 'Go in', shrine: 'Lantern Shrine', board: 'Notice board',
 };
+
+const OPPOSITE: Readonly<Record<Dir, Dir>> = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
 export class WorldScene extends Phaser.Scene {
   private view!: MapView;
   private objects!: ObjectsView;
+  private npcs!: Npcs;
+  private lastTenth = 0;
   private player!: Player;
   private rig!: CameraRig;
   private lighting!: Lighting;
@@ -77,6 +85,13 @@ export class WorldScene extends Phaser.Scene {
     subscribe(this, 'virtual-move', (x: number, y: number) => { this.controls.virtualMove = { x, y }; });
     subscribe(this, 'virtual-action', () => this.controls.pressAction());
     subscribe(this, 'confirm-sleep', () => this.beginSleep(false));
+    subscribe(this, 'npc-fx', (id: string, kind: 'heart' | 'sad') => {
+      const at = this.npcs.position(id);
+      if (!at) return;
+      if (kind === 'heart') this.fx.heart(at.x, at.y - 36);
+      else this.fx.floatText(at.x, at.y - 34, '...');
+    });
+    subscribe(this, 'lantern', () => this.lightShrine());
 
     this.registerDebug();
     this.cameras.main.fadeIn(500, 26, 20, 35);
@@ -102,6 +117,11 @@ export class WorldScene extends Phaser.Scene {
     this.objects = new ObjectsView(this, this.def, loc, season);
     this.lighting?.setSpots(this.objects.lights);
     this.rig.setMap(this.def.w * 16, this.def.h * 16);
+    this.npcs?.destroy();
+    this.npcs = new Npcs(this, this.def, this.staticSolid);
+    this.npcs.sync(st, true);
+    this.lastTenth = Math.floor(st.minute / 10);
+    this.objects.setLit(litCount(st));
     session.events.emit('place', this.def.name);
   }
 
@@ -150,7 +170,8 @@ export class WorldScene extends Phaser.Scene {
     return { state: st, map: this.def, rand: rngFor(st.seed, st.day, Math.floor(st.minute), Math.floor(performance.now() % 9973)) };
   }
 
-  private solid = (tx: number, ty: number): boolean => isSolidTile(this.def, session.location(this.def.id), tx, ty);
+  private staticSolid = (tx: number, ty: number): boolean => isSolidTile(this.def, session.location(this.def.id), tx, ty);
+  private solid = (tx: number, ty: number): boolean => this.staticSolid(tx, ty) || this.npcs.at(tx, ty) !== null;
 
   override update(time: number, delta: number): void {
     const dt = Math.min(delta / 1000, 0.1);
@@ -165,6 +186,12 @@ export class WorldScene extends Phaser.Scene {
       const mv = this.controls.move;
       this.player.update(dt, mv.x, mv.y, this.controls.sprint, this.solid);
       this.syncPlayer();
+      this.npcs.update(dt, { x: Math.floor(this.player.x / 16), y: Math.floor((this.player.y - 1) / 16) });
+      const tenth = Math.floor(st.minute / 10);
+      if (tenth !== this.lastTenth) {
+        this.lastTenth = tenth;
+        this.npcs.sync(st, false);
+      }
       if (this.warpLock <= 0) {
         const w = this.warpAt(Math.floor(this.player.x / 16), Math.floor(this.player.y / 16));
         if (w) this.travel(w);
@@ -176,7 +203,7 @@ export class WorldScene extends Phaser.Scene {
       if (cyc !== 0) this.selectSlot((st.player.selected + cyc + 10 * 100) % 10);
       if (this.controls.action()) this.act();
       if (this.controls.eat()) this.eatSelected();
-      if (this.controls.menu()) session.events.emit('open-menu');
+      if (this.controls.menu()) session.events.emit('interact', { kind: 'menu' });
     } else {
       this.controls.flush();
       this.player.update(dt, 0, 0, false, this.solid);
@@ -214,8 +241,9 @@ export class WorldScene extends Phaser.Scene {
     const held = p.slots[p.selected];
     const idle = !this.player.swinging && !this.sleeping && !this.travelling && !session.paused;
     const spot = idle ? this.hotspotAt(t.x, t.y) : undefined;
-    this.cursor.setVisible(idle && (!!held || !!spot)).setPosition(t.x * 16 + 8, t.y * 16 + 8).setAlpha(0.65 + Math.sin(time * 0.008) * 0.25);
-    const hint = spot ? (HINTS[spot.kind] ?? '') : '';
+    const who = idle ? this.npcs.at(t.x, t.y) : null;
+    this.cursor.setVisible(idle && (!!held || !!spot || !!who)).setPosition(t.x * 16 + 8, t.y * 16 + 8).setAlpha(0.65 + Math.sin(time * 0.008) * 0.25);
+    const hint = who ? `Talk to ${NPC_BY_ID[who]?.name ?? ''}` : spot ? (HINTS[spot.kind] ?? '') : '';
     if (hint !== this.lastHint || time % 1000 < 20) {
       this.lastHint = hint;
       session.events.emit('hint', hint);
@@ -254,6 +282,8 @@ export class WorldScene extends Phaser.Scene {
     const t = at ?? facingTile(this.player.x, this.player.y, this.player.facing);
     const ctx = this.ctx;
 
+    const who = this.npcs.at(t.x, t.y);
+    if (who) return this.talk(who);
     const spot = this.hotspotAt(t.x, t.y);
     if (spot) return this.useHotspot(spot);
     const door = this.warpAt(t.x, t.y);
@@ -323,15 +353,34 @@ export class WorldScene extends Phaser.Scene {
     this.view.refresh(keys);
   }
 
+  private talk(id: string): void {
+    this.npcs.face(id, OPPOSITE[this.player.facing]);
+    session.events.emit('interact', { kind: 'talk', id });
+  }
+
+  private lightShrine(): void {
+    this.objects.setLit(litCount(session.state));
+    const at = this.def.hotspots.find((h) => h.kind === 'shrine');
+    if (at) {
+      this.fx.sparkle(at.x * 16 + at.w * 8, at.y * 16 - 2);
+      this.fx.sparkle(at.x * 16 + at.w * 8 - 14, at.y * 16 + 6);
+      this.fx.sparkle(at.x * 16 + at.w * 8 + 14, at.y * 16 + 6);
+    }
+  }
+
   private useHotspot(h: Hotspot): void {
+    const ev = (what: unknown): void => { session.events.emit('interact', what); };
     switch (h.kind) {
       case 'sign': session.events.emit('dialog', h.text ?? ''); return;
       case 'bin': this.useBin(h); return;
       case 'bed': session.events.emit('ask-sleep'); return;
       case 'text': this.say(h.text ?? ''); return;
-      case 'chest': this.say('A sturdy chest. Storage is coming soon.'); return;
-      case 'counter': this.say('Counter space for cooking. Find a recipe first.'); return;
-      case 'stove': this.say('The stove is warm. Recipes are coming soon.'); return;
+      case 'shop': ev({ kind: 'shop', id: h.id }); return;
+      case 'shrine': ev({ kind: 'shrine' }); return;
+      case 'board': ev({ kind: 'board' }); return;
+      case 'stove': ev({ kind: 'cook' }); return;
+      case 'chest': ev({ kind: 'chest', loc: this.def.id, key: tileKey(h.x, h.y) }); return;
+      case 'counter': this.say('Counter space. The stove next door does the cooking.'); return;
       case 'shelf': this.say('Worn books about weather, soil and seeds.'); return;
       default: this.say(h.text ?? '...');
     }

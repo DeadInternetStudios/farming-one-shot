@@ -493,8 +493,8 @@ export class ShrineScreen extends Screen {
     const y = Math.floor((l.uiH - h) / 2);
     bag.panel(x, y, w, h);
     bag.text(x + 12, y + 10, 'The Lantern Shrine', {});
-    bag.img(x + w - 50, y + 14, 'item/lantern');
-    this.litText = bag.text(x + w - 42, y + 11, '', { tint: COL.gold });
+    bag.img(x + w - 64, y + 14, 'item/lantern');
+    this.litText = bag.text(x + w - 56, y + 11, '', { tint: COL.gold });
     this.showLit();
     bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
     bag.text(x + 12, y + 25, 'Give what the valley gave you, and a lantern lights.', { tint: COL.dim, wrap: w - 24 });

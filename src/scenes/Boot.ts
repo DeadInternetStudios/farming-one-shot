@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { NPCS } from '../data/npcs';
 import { SEASONS } from '../game/types';
 import { loadGame } from '../game/save';
 import { session } from '../game/session';
@@ -28,6 +29,17 @@ export class BootScene extends Phaser.Scene {
         frameRate: 8,
         repeat: -1,
       });
+    }
+
+    for (const n of NPCS) {
+      for (const dir of ['down', 'up', 'side'] as const) {
+        this.anims.create({
+          key: `npc-${n.id}-walk-${dir}`,
+          frames: [0, 1, 2, 3].map((i) => ({ key: 'chars', frame: `npc/${n.id}/walk-${dir}-${i}` })),
+          frameRate: 5,
+          repeat: -1,
+        });
+      }
     }
 
     const q = new URLSearchParams(location.search);

@@ -70,6 +70,10 @@ export function villageMap(seed: number): MapDef {
   m.warp({ x: 0, y: 11, w: 1, h: 2, to: 'farm', tx: 54, ty: 15.5, dir: 'left' });
   m.warp({ x: 47, y: 11, w: 1, h: 2, to: 'lake', tx: 2, ty: 14, dir: 'right' });
   m.spawn = { x: 3, y: 12 };
+  Object.assign(m.homes, {
+    mirren: { x: 6, y: 11 }, ida: { x: 14, y: 11 }, bram: { x: 36, y: 11 },
+    tam: { x: 7, y: 27 }, olwen: { x: 37, y: 27 }, wren: { x: 1, y: 12 },
+  });
 
   m.keepClear(0, 10, 48, 4);
   m.keepClear(14, 13, 20, 12);

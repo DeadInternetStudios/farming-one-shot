@@ -1,0 +1,270 @@
+import Phaser from 'phaser';
+import { itemDef } from '../data/items';
+import { NPC_BY_ID } from '../data/npcs';
+import { canAdd, addItem, countItem, emptySlots } from '../game/inventory';
+import type { Slots } from '../game/inventory';
+import { deliver } from '../game/requests';
+import { session } from '../game/session';
+import type { ThingState } from '../game/state';
+import { COL, iconFor } from './kit';
+import { ListPane } from './MenuUI';
+import type { Entry } from './MenuUI';
+import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Screens';
+import type { Host } from './Screens';
+import { Bag } from './widgets';
+
+const GIFTABLE = (id: string): boolean => {
+  const k = itemDef(id).kind;
+  return k !== 'tool' && k !== 'special' && k !== 'machine';
+};
+
+/** Pick something from the bag to hand to a villager. */
+export class GiftScreen extends Screen {
+  private pane: ListPane | null = null;
+
+  constructor(host: Host, private npcId: string, private onGive: (slot: number) => void) {
+    super(host);
+  }
+
+  private entries(): Entry[] {
+    const st = session.state;
+    const name = NPC_BY_ID[this.npcId]?.name ?? 'them';
+    const out: Entry[] = [];
+    st.player.slots.forEach((s, i) => {
+      if (!s || !GIFTABLE(s.id)) return;
+      const d = itemDef(s.id);
+      out.push({
+        row: { text: d.name, icon: iconFor(st, s.id), right: s.n > 1 ? String(s.n) : '' },
+        title: d.name,
+        icon: iconFor(st, s.id),
+        lines: [d.blurb, `Give one to ${name}.`],
+        actions: [{
+          label: 'Give', kind: 'leaf', run: () => {
+            this.scene.time.delayedCall(0, () => { this.close(); this.onGive(i); });
+            return null;
+          },
+        }],
+      });
+    });
+    if (out.length === 0) out.push({ row: { text: 'Nothing to give', dim: true }, title: 'Empty hands', lines: ['Pick some flowers, harvest a crop, or cook something first.'] });
+    return out;
+  }
+
+  build(): void {
+    const { l, bag } = this;
+    this.dim(0.5);
+    const wide = l.uiW >= 290;
+    const w = Math.min(l.uiW - 8, 340);
+    const h = Math.min(l.uiH - 8, wide ? 200 : 320);
+    const x = Math.floor((l.uiW - w) / 2);
+    const y = Math.floor((l.uiH - h) / 2);
+    bag.panel(x, y, w, h);
+    bag.text(x + 12, y + 10, `A gift for ${NPC_BY_ID[this.npcId]?.name ?? ''}`, {});
+    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const body = this.own(new Bag(this.scene, bag.depth));
+    this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 28, w: w - 20, h: h - 28 - 10 }, wide, () => this.entries()));
+  }
+
+  override onKey(code: string, ev: KeyboardEvent): void {
+    if (isBack(code)) this.close();
+    else this.pane?.key(code, ev);
+  }
+}
+
+/** The notice board by the shrine: errands for the villagers. */
+export class BoardScreen extends Screen {
+  private pane: ListPane | null = null;
+  private msg: Phaser.GameObjects.BitmapText | null = null;
+
+  private entries(): Entry[] {
+    const st = session.state;
+    const list = [...st.requests].sort((a, b) => a.until - b.until);
+    if (list.length === 0) {
+      return [{ row: { text: 'Nothing posted', dim: true }, title: 'The board is bare', lines: ['New notes go up in the morning, once you have met the neighbours.', 'Say hello to everyone in the village.'] }];
+    }
+    return list.map((q): Entry => {
+      const d = itemDef(q.item);
+      const who = NPC_BY_ID[q.npc]?.name ?? 'Someone';
+      const got = countItem(st.player.slots, q.item);
+      const left = q.until - st.day;
+      return {
+        row: { text: `${q.n} ${d.name}`, icon: iconFor(st, q.item), right: `${q.reward}g` },
+        title: `${who} needs ${q.n} ${d.name}`,
+        icon: iconFor(st, q.item),
+        lines: [
+          { t: `You have ${got} of ${q.n}.`, tint: got >= q.n ? COL.leaf : COL.berry },
+          `Reward: ${q.reward}g and a kind word.`,
+          left <= 0 ? 'Last day to deliver.' : `${left} ${left === 1 ? 'day' : 'days'} left.`,
+        ],
+        actions: [{
+          label: 'Deliver', kind: 'leaf', run: () => {
+            const r = deliver(st, q.id);
+            if (!r.ok) { session.events.emit('sfx', 'nope'); return r.msg; }
+            session.events.emit('sfx', 'coin');
+            session.events.emit('npc-fx', q.npc, 'heart');
+            return `${who} thanks you. +${q.reward}g`;
+          },
+        }],
+      };
+    });
+  }
+
+  build(): void {
+    const { l, bag } = this;
+    this.dim(0.5);
+    const wide = l.uiW >= 290;
+    const w = Math.min(l.uiW - 8, 340);
+    const h = Math.min(l.uiH - 8, wide ? 200 : 300);
+    const x = Math.floor((l.uiW - w) / 2);
+    const y = Math.floor((l.uiH - h) / 2);
+    bag.panel(x, y, w, h);
+    bag.text(x + 12, y + 10, 'Notice Board', {});
+    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const body = this.own(new Bag(this.scene, bag.depth));
+    this.msg = bag.text(x + w / 2, y + h - 12, '', { origin: [0.5, 0] });
+    this.pane = this.own(new ListPane(body, this.scene, { x: x + 10, y: y + 28, w: w - 20, h: h - 28 - 18 }, wide, () => this.entries()));
+    this.pane.say = (m) => this.msg?.setText(m);
+  }
+
+  override onKey(code: string, ev: KeyboardEvent): void {
+    if (isBack(code)) this.close();
+    else this.pane?.key(code, ev);
+  }
+}
+
+// ------------------------------------------------------------------ chests
+
+export const CHEST_SLOTS = 24;
+
+export function chestAt(loc: string, key: string): ThingState {
+  const l = session.location(loc);
+  let t = l.things[key];
+  if (!t) {
+    t = { kind: 'chest', items: emptySlots(CHEST_SLOTS) };
+    l.things[key] = t;
+  }
+  t.items ??= emptySlots(CHEST_SLOTS);
+  return t;
+}
+
+interface Cell {
+  bg: Phaser.GameObjects.Image;
+  icon: Phaser.GameObjects.Image;
+  count: Phaser.GameObjects.BitmapText;
+}
+
+/** A tidy grid of slots. Tapping or pressing confirm hands the stack to `onPick`. */
+class SlotGrid {
+  readonly cells: Cell[] = [];
+  readonly cols: number;
+  sel = 0;
+  private cursor: Phaser.GameObjects.Image;
+
+  constructor(bag: Bag, private x: number, private y: number, cols: number, private slots: () => Slots, private onPick: (i: number) => void) {
+    this.cols = cols;
+    const n = slots().length;
+    for (let i = 0; i < n; i++) {
+      const cx = x + (i % cols) * 21;
+      const cy = y + Math.floor(i / cols) * 21;
+      const bg = bag.img(cx, cy, 'ui/slot', [0, 0], 1);
+      const icon = bag.img(cx + 10, cy + 10, 'item/stone').setVisible(false);
+      const count = bag.text(cx + 18, cy + 12, '', { origin: [1, 0], outline: true, tint: COL.cream });
+      bag.zone(cx, cy, 20, 20, () => { this.sel = i; this.onPick(i); });
+      this.cells.push({ bg, icon, count });
+    }
+    this.cursor = bag.img(0, 0, 'ui/slot-sel', [0, 0], 3);
+  }
+
+  get rows(): number {
+    return Math.ceil(this.cells.length / this.cols);
+  }
+
+  paint(active: boolean): void {
+    const st = session.state;
+    const slots = this.slots();
+    this.cells.forEach((c, i) => {
+      const s = slots[i];
+      if (s) c.icon.setFrame(iconFor(st, s.id)).setVisible(true);
+      else c.icon.setVisible(false);
+      c.count.setText(s && s.n > 1 ? String(s.n) : '');
+    });
+    this.cursor.setVisible(active).setPosition(this.x + (this.sel % this.cols) * 21 - 2, this.y + Math.floor(this.sel / this.cols) * 21 - 2);
+  }
+}
+
+/** Move stacks between a chest and the bag with one tap each. */
+export class ChestScreen extends Screen {
+  private focus: 'chest' | 'bag' = 'chest';
+  private chest!: SlotGrid;
+  private pack!: SlotGrid;
+  private line: Phaser.GameObjects.BitmapText | null = null;
+
+  constructor(host: Host, private loc: string, private key: string) {
+    super(host);
+  }
+
+  private get items(): Slots {
+    return chestAt(this.loc, this.key).items as Slots;
+  }
+
+  build(): void {
+    const { l, bag } = this;
+    this.dim(0.5);
+    const cols = Math.max(6, Math.min(10, Math.floor((l.uiW - 36) / 21)));
+    const w = cols * 21 + 20;
+    const bagRows = Math.ceil(session.state.player.slots.length / cols);
+    const chestRows = Math.ceil(CHEST_SLOTS / cols);
+    const h = 28 + chestRows * 21 + 16 + bagRows * 21 + 26;
+    const x = Math.floor((l.uiW - w) / 2);
+    const y = Math.max(2, Math.floor((l.uiH - h) / 2));
+    bag.panel(x, y, w, h);
+    bag.text(x + 12, y + 10, 'Chest', {});
+    bag.btn(x + w - 26, y + 6, 14, 'x', 'berry', () => this.close(), 14);
+    const body = this.own(new Bag(this.scene, bag.depth));
+    this.chest = new SlotGrid(body, x + 10, y + 26, cols, () => this.items, (i) => { this.focus = 'chest'; this.move('chest', i); });
+    const by = y + 26 + chestRows * 21 + 6;
+    bag.text(x + 12, by - 1, 'Bag', { tint: COL.dim });
+    this.pack = new SlotGrid(body, x + 10, by + 11, cols, () => session.state.player.slots, (i) => { this.focus = 'bag'; this.move('bag', i); });
+    this.line = bag.text(x + w / 2, y + h - 14, 'Tap a stack to move it across.', { origin: [0.5, 0], tint: COL.dim });
+    this.paint();
+  }
+
+  private paint(): void {
+    this.chest.paint(this.focus === 'chest');
+    this.pack.paint(this.focus === 'bag');
+  }
+
+  private move(from: 'chest' | 'bag', i: number): void {
+    const src = from === 'chest' ? this.items : session.state.player.slots;
+    const dst = from === 'chest' ? session.state.player.slots : this.items;
+    const s = src[i];
+    if (!s) { this.paint(); return; }
+    if (!canAdd(dst, s.id, s.n)) {
+      this.line?.setText(from === 'chest' ? 'Your bag is full.' : 'The chest is full.');
+      session.events.emit('sfx', 'nope');
+      return;
+    }
+    addItem(dst, s.id, s.n);
+    src[i] = null;
+    this.line?.setText(`${itemDef(s.id).name} x${s.n}`);
+    session.events.emit('sfx', 'tick');
+    session.events.emit('selected');
+    this.paint();
+  }
+
+  override onKey(code: string): void {
+    if (isBack(code)) { this.close(); return; }
+    const g = this.focus === 'chest' ? this.chest : this.pack;
+    const n = g.cells.length;
+    if (isLeft(code)) g.sel = (g.sel + n - 1) % n;
+    else if (isRight(code)) g.sel = (g.sel + 1) % n;
+    else if (isUp(code)) {
+      if (g.sel - g.cols >= 0) g.sel -= g.cols;
+      else if (this.focus === 'bag') { this.focus = 'chest'; this.chest.sel = Math.min(this.chest.cells.length - 1, (this.chest.rows - 1) * this.chest.cols + (g.sel % g.cols)); }
+    } else if (isDown(code)) {
+      if (g.sel + g.cols < n) g.sel += g.cols;
+      else if (this.focus === 'chest') { this.focus = 'bag'; this.pack.sel = Math.min(this.pack.cells.length - 1, this.chest.sel % this.chest.cols); }
+    } else if (isConfirm(code)) { this.move(this.focus, g.sel); return; }
+    this.paint();
+  }
+}

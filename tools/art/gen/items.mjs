@@ -75,7 +75,6 @@ export const RES = {
   bar(ramp) { return () => { const i = new Img(16, 16); i.rect(3, 6, 10, 6, ramp[3]); i.hline(3, 6, 10, ramp[5] ?? ramp[4]); i.rect(2, 8, 12, 4, ramp[2]); i.hline(2, 8, 12, ramp[4]); i.hline(2, 11, 12, ramp[1]); i.set(5, 7, R.cream[3]); return out(i); }; },
   clay() { const i = new Img(16, 16); ball(i, 8, 9, 5.4, 4, R.dirt); i.hline(5, 8, 6, R.dirt[5]); return out(i); },
   egg() { const i = new Img(16, 16); i.ellipse(8, 9, 4, 5, R.cream[2]); i.ellipse(8, 9, 4, 5, null, (x, y, nx, ny) => (nx < -0.3 ? R.cream[3] : nx > 0.35 ? R.cream[0] : undefined)); return out(i); },
-  milk() { const i = new Img(16, 16); i.rect(5, 5, 6, 9, R.snow[3]); i.rect(5, 5, 6, 3, R.blue[3]); i.hline(5, 4, 6, R.snow[2]); i.vline(5, 8, 6, R.snow[4]); i.hline(5, 13, 6, R.snow[0]); i.rect(6, 2, 4, 2, R.snow[2]); return out(i); },
   coin() { const i = new Img(16, 16); ball(i, 8, 8, 5, 5, R.yellow); i.disc(8, 8, 2.2, R.yellow[2]); i.set(7, 7, R.yellow[4]); return out(i); },
   mushroom() { const i = new Img(16, 16); i.rect(7, 9, 3, 5, R.cream[2]); i.ellipse(8, 8, 5.4, 4, R.red[3]); i.rect(2, 8, 13, 2, null); i.ellipse(8, 8, 5.4, 4, null, (x, y, nx, ny) => (ny > 0.2 ? undefined : nx < -0.3 ? R.red[4] : R.red[3])); for (const [x, y] of [[6, 6], [10, 7], [8, 5]]) i.set(x, y, R.cream[3]); i.hline(3, 9, 10, R.red[1]); return out(i); },
   berry() { const i = new Img(16, 16); for (const [x, y] of [[6, 10], [10, 9], [8, 6]]) { ball(i, x, y, 2.6, 2.6, R.purple); } i.set(8, 3, R.leaf[4]); return out(i); },

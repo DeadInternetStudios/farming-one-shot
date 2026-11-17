@@ -54,7 +54,6 @@ export interface Upgrade {
 export const UPGRADES: readonly Upgrade[] = [
   { id: 'bag-1', name: 'Bigger Bag', blurb: 'Ten more slots to carry things.', price: 1500 },
   { id: 'bag-2', name: 'Biggest Bag', blurb: 'Ten more slots again.', price: 5000, requires: 'bag-1' },
-  { id: 'can-1', name: 'Deep Can', blurb: 'Your watering can holds more.', price: 800, requires: 'forge' },
   { id: 'coop', name: 'Chicken Coop', blurb: 'A cosy coop for up to four chickens. Built overnight.', price: 1200, needs: [{ id: 'wood', n: 40 }, { id: 'stone', n: 20 }] },
   { id: 'chick', name: 'Chicken', blurb: 'One chicken for the coop. Eggs every day.', price: 400, requires: 'coop' },
   { id: 'cat', name: 'Farm Cat', blurb: 'A cat who will supervise.', price: 250 },
