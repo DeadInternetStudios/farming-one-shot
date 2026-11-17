@@ -1,0 +1,73 @@
+// Made by tools/audio/build.mjs. Do not edit by hand.
+
+export const SFX_NAMES = ['tick', 'open', 'close', 'nope', 'pickup', 'hoe', 'water', 'water-dry', 'refill', 'plant', 'harvest', 'chop', 'chop-done', 'tree-fall', 'mine', 'mine-break', 'cut', 'eat', 'buy', 'coin', 'give', 'lantern', 'upgrade', 'ship', 'place', 'craft', 'cook', 'fire', 'cast', 'splash', 'bite', 'hook', 'catch', 'fanfare', 'thunder', 'blip', 'door', 'travel', 'sleep', 'morning', 'heart', 'furnace-done', 'gift'] as const;
+export type SfxName = (typeof SFX_NAMES)[number];
+
+export const BED_NAMES = ['amb-rain', 'amb-wind', 'amb-crickets', 'amb-birds', 'amb-cave', 'amb-water'] as const;
+export type BedName = (typeof BED_NAMES)[number];
+
+export const TRACK_NAMES = ['title', 'farm', 'home', 'village', 'forest', 'lake', 'mine', 'night', 'festival', 'lantern'] as const;
+export type TrackName = (typeof TRACK_NAMES)[number];
+
+/** Each file is listed twice, newest format first; the loader takes the first one the browser can play. */
+export const AUDIO_FILES: ReadonlyArray<{ key: string; urls: readonly string[] }> = [
+  { key: 'sfx/tick', urls: ['assets/audio/sfx/tick.opus', 'assets/audio/sfx/tick.mp3'] },
+  { key: 'sfx/open', urls: ['assets/audio/sfx/open.opus', 'assets/audio/sfx/open.mp3'] },
+  { key: 'sfx/close', urls: ['assets/audio/sfx/close.opus', 'assets/audio/sfx/close.mp3'] },
+  { key: 'sfx/nope', urls: ['assets/audio/sfx/nope.opus', 'assets/audio/sfx/nope.mp3'] },
+  { key: 'sfx/pickup', urls: ['assets/audio/sfx/pickup.opus', 'assets/audio/sfx/pickup.mp3'] },
+  { key: 'sfx/hoe', urls: ['assets/audio/sfx/hoe.opus', 'assets/audio/sfx/hoe.mp3'] },
+  { key: 'sfx/water', urls: ['assets/audio/sfx/water.opus', 'assets/audio/sfx/water.mp3'] },
+  { key: 'sfx/water-dry', urls: ['assets/audio/sfx/water-dry.opus', 'assets/audio/sfx/water-dry.mp3'] },
+  { key: 'sfx/refill', urls: ['assets/audio/sfx/refill.opus', 'assets/audio/sfx/refill.mp3'] },
+  { key: 'sfx/plant', urls: ['assets/audio/sfx/plant.opus', 'assets/audio/sfx/plant.mp3'] },
+  { key: 'sfx/harvest', urls: ['assets/audio/sfx/harvest.opus', 'assets/audio/sfx/harvest.mp3'] },
+  { key: 'sfx/chop', urls: ['assets/audio/sfx/chop.opus', 'assets/audio/sfx/chop.mp3'] },
+  { key: 'sfx/chop-done', urls: ['assets/audio/sfx/chop-done.opus', 'assets/audio/sfx/chop-done.mp3'] },
+  { key: 'sfx/tree-fall', urls: ['assets/audio/sfx/tree-fall.opus', 'assets/audio/sfx/tree-fall.mp3'] },
+  { key: 'sfx/mine', urls: ['assets/audio/sfx/mine.opus', 'assets/audio/sfx/mine.mp3'] },
+  { key: 'sfx/mine-break', urls: ['assets/audio/sfx/mine-break.opus', 'assets/audio/sfx/mine-break.mp3'] },
+  { key: 'sfx/cut', urls: ['assets/audio/sfx/cut.opus', 'assets/audio/sfx/cut.mp3'] },
+  { key: 'sfx/eat', urls: ['assets/audio/sfx/eat.opus', 'assets/audio/sfx/eat.mp3'] },
+  { key: 'sfx/buy', urls: ['assets/audio/sfx/buy.opus', 'assets/audio/sfx/buy.mp3'] },
+  { key: 'sfx/coin', urls: ['assets/audio/sfx/coin.opus', 'assets/audio/sfx/coin.mp3'] },
+  { key: 'sfx/give', urls: ['assets/audio/sfx/give.opus', 'assets/audio/sfx/give.mp3'] },
+  { key: 'sfx/lantern', urls: ['assets/audio/sfx/lantern.opus', 'assets/audio/sfx/lantern.mp3'] },
+  { key: 'sfx/upgrade', urls: ['assets/audio/sfx/upgrade.opus', 'assets/audio/sfx/upgrade.mp3'] },
+  { key: 'sfx/ship', urls: ['assets/audio/sfx/ship.opus', 'assets/audio/sfx/ship.mp3'] },
+  { key: 'sfx/place', urls: ['assets/audio/sfx/place.opus', 'assets/audio/sfx/place.mp3'] },
+  { key: 'sfx/craft', urls: ['assets/audio/sfx/craft.opus', 'assets/audio/sfx/craft.mp3'] },
+  { key: 'sfx/cook', urls: ['assets/audio/sfx/cook.opus', 'assets/audio/sfx/cook.mp3'] },
+  { key: 'sfx/fire', urls: ['assets/audio/sfx/fire.opus', 'assets/audio/sfx/fire.mp3'] },
+  { key: 'sfx/cast', urls: ['assets/audio/sfx/cast.opus', 'assets/audio/sfx/cast.mp3'] },
+  { key: 'sfx/splash', urls: ['assets/audio/sfx/splash.opus', 'assets/audio/sfx/splash.mp3'] },
+  { key: 'sfx/bite', urls: ['assets/audio/sfx/bite.opus', 'assets/audio/sfx/bite.mp3'] },
+  { key: 'sfx/hook', urls: ['assets/audio/sfx/hook.opus', 'assets/audio/sfx/hook.mp3'] },
+  { key: 'sfx/catch', urls: ['assets/audio/sfx/catch.opus', 'assets/audio/sfx/catch.mp3'] },
+  { key: 'sfx/fanfare', urls: ['assets/audio/sfx/fanfare.opus', 'assets/audio/sfx/fanfare.mp3'] },
+  { key: 'sfx/thunder', urls: ['assets/audio/sfx/thunder.opus', 'assets/audio/sfx/thunder.mp3'] },
+  { key: 'sfx/blip', urls: ['assets/audio/sfx/blip.opus', 'assets/audio/sfx/blip.mp3'] },
+  { key: 'sfx/door', urls: ['assets/audio/sfx/door.opus', 'assets/audio/sfx/door.mp3'] },
+  { key: 'sfx/travel', urls: ['assets/audio/sfx/travel.opus', 'assets/audio/sfx/travel.mp3'] },
+  { key: 'sfx/sleep', urls: ['assets/audio/sfx/sleep.opus', 'assets/audio/sfx/sleep.mp3'] },
+  { key: 'sfx/morning', urls: ['assets/audio/sfx/morning.opus', 'assets/audio/sfx/morning.mp3'] },
+  { key: 'sfx/heart', urls: ['assets/audio/sfx/heart.opus', 'assets/audio/sfx/heart.mp3'] },
+  { key: 'sfx/furnace-done', urls: ['assets/audio/sfx/furnace-done.opus', 'assets/audio/sfx/furnace-done.mp3'] },
+  { key: 'sfx/gift', urls: ['assets/audio/sfx/gift.opus', 'assets/audio/sfx/gift.mp3'] },
+  { key: 'bed/amb-rain', urls: ['assets/audio/bed/amb-rain.opus', 'assets/audio/bed/amb-rain.mp3'] },
+  { key: 'bed/amb-wind', urls: ['assets/audio/bed/amb-wind.opus', 'assets/audio/bed/amb-wind.mp3'] },
+  { key: 'bed/amb-crickets', urls: ['assets/audio/bed/amb-crickets.opus', 'assets/audio/bed/amb-crickets.mp3'] },
+  { key: 'bed/amb-birds', urls: ['assets/audio/bed/amb-birds.opus', 'assets/audio/bed/amb-birds.mp3'] },
+  { key: 'bed/amb-cave', urls: ['assets/audio/bed/amb-cave.opus', 'assets/audio/bed/amb-cave.mp3'] },
+  { key: 'bed/amb-water', urls: ['assets/audio/bed/amb-water.opus', 'assets/audio/bed/amb-water.mp3'] },
+  { key: 'music/title', urls: ['assets/audio/music/title.opus', 'assets/audio/music/title.mp3'] },
+  { key: 'music/farm', urls: ['assets/audio/music/farm.opus', 'assets/audio/music/farm.mp3'] },
+  { key: 'music/home', urls: ['assets/audio/music/home.opus', 'assets/audio/music/home.mp3'] },
+  { key: 'music/village', urls: ['assets/audio/music/village.opus', 'assets/audio/music/village.mp3'] },
+  { key: 'music/forest', urls: ['assets/audio/music/forest.opus', 'assets/audio/music/forest.mp3'] },
+  { key: 'music/lake', urls: ['assets/audio/music/lake.opus', 'assets/audio/music/lake.mp3'] },
+  { key: 'music/mine', urls: ['assets/audio/music/mine.opus', 'assets/audio/music/mine.mp3'] },
+  { key: 'music/night', urls: ['assets/audio/music/night.opus', 'assets/audio/music/night.mp3'] },
+  { key: 'music/festival', urls: ['assets/audio/music/festival.opus', 'assets/audio/music/festival.mp3'] },
+  { key: 'music/lantern', urls: ['assets/audio/music/lantern.opus', 'assets/audio/music/lantern.mp3'] },
+];

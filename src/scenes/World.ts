@@ -18,6 +18,7 @@ import { getLayout } from '../display';
 import { Angler } from '../entities/Angler';
 import { Npcs } from '../entities/Npcs';
 import { Player } from '../entities/Player';
+import { audio } from '../systems/Audio';
 import { subscribe } from '../systems/bus';
 import { Ambient } from '../systems/Ambient';
 import { CameraRig } from '../systems/CameraRig';
@@ -61,6 +62,7 @@ export class WorldScene extends Phaser.Scene {
   private travelling = false;
   private warpLock = 0;
   private lastHint = '';
+  private furnacesBusy = new Set<string>();
 
   constructor() {
     super('World');
@@ -73,6 +75,7 @@ export class WorldScene extends Phaser.Scene {
   create(): void {
     const st = session.state;
     this.rig = new CameraRig(this.cameras.main);
+    audio.attach(this.load);
     this.buildStage(st.player.loc);
     this.player = new Player(this, st.player.x, st.player.y, st.player.dir);
     this.fx = new Fx(this, () => ({ x: this.player.x, y: this.player.y }));
@@ -97,8 +100,12 @@ export class WorldScene extends Phaser.Scene {
     subscribe(this, 'npc-fx', (id: string, kind: 'heart' | 'sad') => {
       const at = this.npcs.position(id);
       if (!at) return;
-      if (kind === 'heart') this.fx.heart(at.x, at.y - 36);
-      else this.fx.floatText(at.x, at.y - 34, '...');
+      if (kind === 'heart') {
+        this.fx.heart(at.x, at.y - 36);
+        session.events.emit('sfx', 'heart');
+      } else {
+        this.fx.floatText(at.x, at.y - 34, '...');
+      }
     });
     subscribe(this, 'lantern', () => this.lightShrine());
 
@@ -132,6 +139,7 @@ export class WorldScene extends Phaser.Scene {
     this.npcs.sync(st, true);
     this.lastTenth = Math.floor(st.minute / 10);
     this.objects.setLit(litCount(st));
+    this.furnacesBusy = new Set();
     session.events.emit('place', this.def.name);
   }
 
@@ -146,6 +154,7 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
     this.travelling = true;
+    session.events.emit('sfx', this.def.kind === 'interior' || session.map(w.to).kind === 'interior' ? 'door' : 'travel');
     const cam = this.cameras.main;
     cam.fadeOut(170, 12, 9, 20);
     cam.once('camerafadeoutcomplete', () => {
@@ -401,6 +410,8 @@ export class WorldScene extends Phaser.Scene {
     const busy = new Set<string>();
     const l = session.location(this.def.id);
     for (const [key, t] of Object.entries(l.things)) if (t.kind === 'furnace' && furnaceState(session.state, t) === 'working') busy.add(key);
+    for (const key of this.furnacesBusy) if (!busy.has(key)) session.events.emit('sfx', 'furnace-done');
+    this.furnacesBusy = busy;
     this.objects.syncMachines(busy);
   }
 
@@ -541,6 +552,8 @@ export class WorldScene extends Phaser.Scene {
       ambient: () => this.ambient.count(),
       fish: (bite = false, rig?: { item: string; difficulty: number }) => this.angler.debug(bite, rig),
       water: (x: number, y: number) => isWater(this.def, x, y),
+      audio: () => audio.debug(),
+      sfx: (name: string) => session.events.emit('sfx', name),
     };
     (window as unknown as { __lh: unknown }).__lh = api;
   }

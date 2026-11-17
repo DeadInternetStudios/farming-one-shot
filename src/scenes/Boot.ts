@@ -3,6 +3,7 @@ import { NPCS } from '../data/npcs';
 import { SEASONS } from '../game/types';
 import { loadGame } from '../game/save';
 import { session } from '../game/session';
+import { audio, queueFirstAudio } from '../systems/Audio';
 
 /** Loads everything, builds the animations, then hands over to the world and the interface. */
 export class BootScene extends Phaser.Scene {
@@ -20,6 +21,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('tiles-cave', `${base}tiles-cave.png`);
     this.load.bitmapFont('hollow', `${base}font-hollow.png`, `${base}font-hollow.xml`);
     this.load.bitmapFont('hollow-o', `${base}font-hollow-o.png`, `${base}font-hollow-o.xml`);
+    queueFirstAudio(this.load);
   }
 
   create(): void {
@@ -48,6 +50,7 @@ export class BootScene extends Phaser.Scene {
     if (saved) session.load(saved);
     else session.reset(Number(q.get('seed')) || 1);
 
+    audio.start(this.game);
     this.scene.start('World');
     this.scene.launch('UI');
     document.getElementById('boot')?.classList.add('done');

@@ -80,6 +80,7 @@ export class ScreenStack implements Host {
 
   open(s: Screen): void {
     session.hold();
+    if (this.stack.length === 0) session.events.emit('sfx', 'open');
     this.stack.push(s);
     s.build();
   }
@@ -88,6 +89,7 @@ export class ScreenStack implements Host {
     const i = this.stack.indexOf(s);
     if (i < 0) return;
     this.stack.splice(i, 1);
+    if (this.stack.length === 0) session.events.emit('sfx', 'close');
     s.teardown();
     this.scene.time.delayedCall(80, () => session.release());
   }

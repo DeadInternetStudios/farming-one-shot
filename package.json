@@ -13,7 +13,8 @@
     "art": "node tools/art/build.mjs",
     "audio": "node tools/audio/build.mjs",
     "assets": "npm run art && npm run audio",
-    "sim": "node tools/sim/economy.mjs"
+    "sim": "node tools/sim/economy.mjs",
+    "audio:check": "node tools/audio/check.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

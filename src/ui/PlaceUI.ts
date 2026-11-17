@@ -331,7 +331,7 @@ export class FurnaceScreen extends Screen {
         actions: [{
           label: 'Smelt', kind: 'leaf', run: () => {
             const r = startSmelt(st, t, s);
-            session.events.emit('sfx', r.ok ? 'craft' : 'nope');
+            session.events.emit('sfx', r.ok ? 'fire' : 'nope');
             if (r.ok) session.events.emit('selected');
             return r.msg;
           },
