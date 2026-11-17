@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PAL } from '../gen/art';
 import { itemDef } from '../data/items';
+import { minutesPerSecond } from '../game/clock';
 import { FishFight } from '../game/fishing';
 import { mulberry32 } from '../game/rng';
 import { session } from '../game/session';
@@ -94,6 +95,9 @@ export class FishingScreen extends Screen {
     if (this.over) return;
     const dt = Math.min(0.05, this.scene.game.loop.delta / 1000);
     this.clock += dt;
+    // the day does not stop for a fish: it takes the time it takes
+    const st = session.state;
+    st.minute += dt * minutesPerSecond(st.pace);
     this.fight.step(dt, this.holding);
     const inside = this.fight.inside;
     if (inside !== this.lastInside) {

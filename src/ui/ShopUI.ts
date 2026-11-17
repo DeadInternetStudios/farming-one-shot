@@ -1,11 +1,11 @@
 import { cropOfSeed, itemDef } from '../data/items';
-import { CAFE_STOCK, SHOPS, SMITHY_STOCK, TOOL_UPGRADES, UPGRADES, storeStock } from '../data/shops';
+import { CAFE_STOCK, SHOPS, SMITHY_STOCK, TOOL_UPGRADES, storeStock } from '../data/shops';
 import { seasonOf } from '../game/clock';
 import { plantAdvice } from '../game/farming';
-import { addItem, countItem, removeItem } from '../game/inventory';
+import { countItem } from '../game/inventory';
 import { session } from '../game/session';
-import { buy, buyPrice, canSellHere, sell, sellPrice } from '../game/shop';
-import type { ToolId, Tier } from '../game/types';
+import { NEXT_TIER, availableUpgrades, buy, buyPrice, buyUpgrade, canSellHere, collectForge, sell, sellPrice, startForge } from '../game/shop';
+import type { ToolId } from '../game/types';
 import { COL, iconFor } from './kit';
 import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Screens';
 import { Bag, ListView } from './widgets';
@@ -32,7 +32,7 @@ interface Tab {
 }
 
 const TOOL_NAMES: Record<ToolId, string> = { hoe: 'Hoe', can: 'Watering Can', axe: 'Axe', pick: 'Pickaxe', scythe: 'Scythe', rod: 'Fishing Rod' };
-const NEXT: Partial<Record<Tier, Tier>> = { basic: 'copper', copper: 'silver', silver: 'gold' };
+const NEXT = NEXT_TIER;
 
 /** A shop window: tabs along the top, a list, and a card about whatever is selected. */
 export class ShopScreen extends Screen {
@@ -109,13 +109,7 @@ export class ShopScreen extends Screen {
     };
 
     if (id === 'store') {
-      const upgrades = (): typeof UPGRADES[number][] =>
-        UPGRADES.filter((u) => {
-          if (st.upgrades.includes(u.id)) return false;
-          if (u.requires && !st.upgrades.includes(u.requires) && !st.flags[u.requires]) return false;
-          if (u.id === 'chick' && st.pets.filter((p) => p.kind === 'chicken').length >= 4) return false;
-          return true;
-        });
+      const upgrades = (): ReturnType<typeof availableUpgrades> => availableUpgrades(st);
       const upTab: Tab = {
         name: 'Farm',
         rows: () => upgrades().map((u) => ({ text: u.name, right: `${u.price}g`, dim: st.player.gold < u.price })),
@@ -130,12 +124,9 @@ export class ShopScreen extends Screen {
           if (!u) return [];
           return [{
             label: 'Buy', kind: 'leaf', run: () => {
-              if (st.player.gold < u.price) { session.events.emit('sfx', 'nope'); return `You need ${u.price}g for that.`; }
-              for (const n of u.needs ?? []) if (countItem(st.player.slots, n.id) < n.n) { session.events.emit('sfx', 'nope'); return `You need ${n.n} ${itemDef(n.id).name}.`; }
-              st.player.gold -= u.price;
-              for (const n of u.needs ?? []) removeItem(st.player.slots, n.id, n.n);
-              session.events.emit('sfx', 'buy');
-              return this.applyUpgrade(u.id);
+              const r = buyUpgrade(st, u.id);
+              session.events.emit('sfx', r.ok ? 'buy' : 'nope');
+              return r.msg;
             },
           }];
         },
@@ -174,27 +165,17 @@ export class ShopScreen extends Screen {
         if (r.kind === 'job') {
           return [{
             label: 'Collect', kind: 'leaf', run: () => {
-              if (!st.forge || st.forge.readyDay > st.day) return 'Not done yet. Come back later.';
-              st.player.tools[st.forge.tool] = st.forge.tier;
-              addItem(st.player.slots, st.forge.tool, 1);
-              st.forge = null;
-              session.events.emit('sfx', 'upgrade');
-              return 'Good as new. Better, actually.';
+              const res = collectForge(st);
+              if (res.ok) session.events.emit('sfx', 'upgrade');
+              return res.msg;
             },
           }];
         }
         return [{
           label: 'Forge', kind: 'leaf', run: () => {
-            if (st.forge) return 'The anvil is busy. Collect the other tool first.';
-            const c = TOOL_UPGRADES[r.next as keyof typeof TOOL_UPGRADES];
-            if (st.player.gold < c.gold) return `You need ${c.gold}g.`;
-            if (countItem(st.player.slots, c.bar) < c.n) return `You need ${c.n} ${itemDef(c.bar).name}.`;
-            removeItem(st.player.slots, c.bar, c.n);
-            removeItem(st.player.slots, r.tool as string, 1);
-            st.player.gold -= c.gold;
-            st.forge = { tool: r.tool as ToolId, tier: r.next as Tier, readyDay: st.day + 2 };
-            session.events.emit('sfx', 'buy');
-            return `Done. Back in two days, ready on day ${st.forge.readyDay}.`;
+            const res = startForge(st, r.tool as ToolId);
+            if (res.ok) session.events.emit('sfx', 'buy');
+            return res.msg;
           },
         }];
       },
@@ -221,30 +202,6 @@ export class ShopScreen extends Screen {
       out.push({ kind: 'up', tool: t, tier, next });
     }
     return out;
-  }
-
-  private applyUpgrade(id: string): string {
-    const st = session.state;
-    st.upgrades.push(id);
-    if (id === 'bag-1' || id === 'bag-2') {
-      for (let i = 0; i < 10; i++) st.player.slots.push(null);
-      return 'A roomier bag. You have ten more slots.';
-    }
-    if (id === 'coop') {
-      st.flags['coopDay'] = st.day;
-      return 'Mirren will have the coop built by tomorrow morning.';
-    }
-    if (id === 'chick') {
-      st.upgrades.pop();
-      const n = st.pets.filter((p) => p.kind === 'chicken').length;
-      st.pets.push({ id: `hen-${n + 1}`, kind: 'chicken', name: ['Clover', 'Pepper', 'Biscuit', 'Daisy'][n] ?? 'Hen', fedDay: 0, happy: 50, since: st.day });
-      return 'A chicken follows you home. It will be in the coop tomorrow.';
-    }
-    if (id === 'cat') {
-      st.pets.push({ id: 'cat', kind: 'cat', name: 'Marmalade', fedDay: 0, happy: 50, since: st.day });
-      return 'A farm cat will be waiting on your porch.';
-    }
-    return '';
   }
 
   // ------------------------------------------------------------------ drawing

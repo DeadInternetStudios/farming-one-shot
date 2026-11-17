@@ -1,7 +1,9 @@
 import { itemDef } from '../data/items';
-import { SHOPS } from '../data/shops';
-import { addItem, canAdd, removeItem } from './inventory';
+import { SHOPS, TOOL_UPGRADES, UPGRADES } from '../data/shops';
+import type { Upgrade } from '../data/shops';
+import { addItem, canAdd, countItem, removeItem } from './inventory';
 import type { GameState } from './state';
+import type { Tier, ToolId } from './types';
 
 export const buyPrice = (id: string): number => {
   const d = itemDef(id);
@@ -57,3 +59,79 @@ export const isOpen = (shop: string, minute: number): boolean => {
 };
 
 export { removeItem };
+
+// ---------------------------------------------------------------- farm upgrades
+
+export const MAX_HENS_BOUGHT = 4;
+
+/** What Mirren still has to sell for the farm, cheapest first: each upgrade once, and chickens until the coop is full. */
+export function availableUpgrades(st: GameState): Upgrade[] {
+  return UPGRADES.filter((u) => {
+    if (st.upgrades.includes(u.id)) return false;
+    if (u.requires && !st.upgrades.includes(u.requires) && !st.flags[u.requires]) return false;
+    if (u.id === 'chick' && st.pets.filter((p) => p.kind === 'chicken').length >= MAX_HENS_BOUGHT) return false;
+    return true;
+  }).sort((a, b) => a.price - b.price);
+}
+
+function applyUpgrade(st: GameState, id: string): string {
+  if (id === 'chick') {
+    const n = st.pets.filter((p) => p.kind === 'chicken').length;
+    st.pets.push({ id: `hen-${n + 1}`, kind: 'chicken', name: ['Clover', 'Pepper', 'Biscuit', 'Daisy'][n] ?? 'Hen', fedDay: 0, happy: 50, since: st.day });
+    return 'A chicken follows you home. It will be in the coop tomorrow.';
+  }
+  st.upgrades.push(id);
+  if (id === 'bag-1' || id === 'bag-2') {
+    for (let i = 0; i < 10; i++) st.player.slots.push(null);
+    return 'A roomier bag. You have ten more slots.';
+  }
+  if (id === 'coop') {
+    st.flags['coopDay'] = st.day;
+    return 'Mirren will have the coop built by tomorrow morning.';
+  }
+  if (id === 'cat') {
+    st.pets.push({ id: 'cat', kind: 'cat', name: 'Marmalade', fedDay: 0, happy: 50, since: st.day });
+    return 'A farm cat will be waiting on your porch.';
+  }
+  return '';
+}
+
+/** Pay for a farm upgrade. Nothing changes unless the gold and every material are there. */
+export function buyUpgrade(st: GameState, id: string): { ok: boolean; msg: string } {
+  const u = availableUpgrades(st).find((q) => q.id === id);
+  if (!u) return { ok: false, msg: 'That is not for sale.' };
+  if (st.player.gold < u.price) return { ok: false, msg: `You need ${u.price}g for that.` };
+  for (const n of u.needs ?? []) if (countItem(st.player.slots, n.id) < n.n) return { ok: false, msg: `You need ${n.n} ${itemDef(n.id).name}.` };
+  st.player.gold -= u.price;
+  for (const n of u.needs ?? []) removeItem(st.player.slots, n.id, n.n);
+  return { ok: true, msg: applyUpgrade(st, u.id) };
+}
+
+// ---------------------------------------------------------------- the forge
+
+export const NEXT_TIER: Readonly<Partial<Record<Tier, Tier>>> = { basic: 'copper', copper: 'silver', silver: 'gold' };
+
+/** Hand a tool to Bram for the next tier. The bars and gold go now and the tool comes back two days later. */
+export function startForge(st: GameState, tool: ToolId): { ok: boolean; msg: string } {
+  if (st.forge) return { ok: false, msg: 'The anvil is busy. Collect the other tool first.' };
+  const next = NEXT_TIER[st.player.tools[tool]];
+  if (!next) return { ok: false, msg: 'That is as good as it gets.' };
+  if (!st.player.slots.some((s) => s?.id === tool)) return { ok: false, msg: 'You need to bring the tool.' };
+  const c = TOOL_UPGRADES[next as keyof typeof TOOL_UPGRADES];
+  if (st.player.gold < c.gold) return { ok: false, msg: `You need ${c.gold}g.` };
+  if (countItem(st.player.slots, c.bar) < c.n) return { ok: false, msg: `You need ${c.n} ${itemDef(c.bar).name}.` };
+  removeItem(st.player.slots, c.bar, c.n);
+  removeItem(st.player.slots, tool, 1);
+  st.player.gold -= c.gold;
+  st.forge = { tool, tier: next, readyDay: st.day + 2 };
+  return { ok: true, msg: `Done. Back in two days, ready on day ${st.forge.readyDay}.` };
+}
+
+export function collectForge(st: GameState): { ok: boolean; msg: string } {
+  if (!st.forge || st.forge.readyDay > st.day) return { ok: false, msg: 'Not done yet. Come back later.' };
+  if (!canAdd(st.player.slots, st.forge.tool, 1)) return { ok: false, msg: 'Your bag is full.' };
+  st.player.tools[st.forge.tool] = st.forge.tier;
+  addItem(st.player.slots, st.forge.tool, 1);
+  st.forge = null;
+  return { ok: true, msg: 'Good as new. Better, actually.' };
+}

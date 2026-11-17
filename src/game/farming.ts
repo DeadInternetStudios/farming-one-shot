@@ -66,13 +66,32 @@ export function lastGoodDay(cropId: string, day: number): number {
 /** Whether a crop planted today, and watered every day, is ripe before its season is over. */
 export const ripensInTime = (cropId: string, day: number): boolean => day + cropDef(cropId).days <= lastGoodDay(cropId, day);
 
-/** One line telling the player how long they have to get a seed in the ground. */
+/** One potato in five comes up as two. */
+const POTATO_DOUBLE = 0.2;
+
+/**
+ * What one tile earns from a crop planted on `day` and watered every day: every harvest that fits
+ * in the seasons the crop likes, less the seed. Minus infinity when it cannot ripen in time.
+ */
+export function cropProfit(cropId: string, day: number): number {
+  const def = cropDef(cropId);
+  if (!def.seasons.includes(seasonOf(day)) || !ripensInTime(cropId, day)) return -Infinity;
+  const first = day + def.days;
+  const harvests = def.regrow > 0 ? 1 + Math.floor((lastGoodDay(cropId, day) - first) / def.regrow) : 1;
+  const yieldEach = def.yield + (cropId === 'potato' ? POTATO_DOUBLE : 0);
+  return harvests * yieldEach * def.sell - def.seed;
+}
+
+/** One line telling the player how long they have to get a seed in the ground, and whether it will pay. */
 export function plantAdvice(cropId: string, day: number): string {
   const last = lastGoodDay(cropId, day) - cropDef(cropId).days;
   if (last < day) return 'Too late to plant it this season.';
-  if (last === day) return 'Plant it today to see it ripen.';
-  const name = seasonOf(last);
-  return `Plant by ${name.charAt(0).toUpperCase()}${name.slice(1)} ${dayOfSeason(last)}.`;
+  let best = -1;
+  for (let d = day; d <= last; d++) if (cropProfit(cropId, d) > 0) best = d;
+  if (best < day) return 'Planted now, it will not earn back its seed.';
+  if (best === day) return 'Plant it today to turn a profit.';
+  const name = seasonOf(best);
+  return `Plant by ${name.charAt(0).toUpperCase()}${name.slice(1)} ${dayOfSeason(best)}.`;
 }
 
 export function plant(soils: SoilMap, key: string, cropId: string): void {
@@ -93,7 +112,7 @@ export function harvest(soils: SoilMap, key: string, rand: Rand): Harvest | null
   if (!s || !c || !isRipe(c)) return null;
   const def = cropDef(c.id);
   let n = def.yield;
-  if (c.id === 'potato' && rand() < 0.2) n += 1;
+  if (c.id === 'potato' && rand() < POTATO_DOUBLE) n += 1;
   if (def.regrow > 0) {
     c.age = def.days - def.regrow;
     c.regrowing = true;

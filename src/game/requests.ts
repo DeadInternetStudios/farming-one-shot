@@ -14,10 +14,11 @@ interface Want {
   n: [number, number];
 }
 
-const crop = (state: GameState, r: Rand): string => {
+/** A crop that grows right now. In winter nothing does, so nobody asks for one. */
+const crop = (state: GameState, r: Rand): string | null => {
   const season = seasonOf(state.day);
   const options = CROP_LIST.filter((c) => c.seasons.includes(season) && c.sell < 200);
-  return pick(r, options).id;
+  return options.length > 0 ? pick(r, options).id : null;
 };
 
 const known = (state: GameState, recipe: string, id: string): string | null => (state.recipes.includes(recipe) ? id : null);
