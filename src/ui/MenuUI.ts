@@ -7,6 +7,7 @@ import { RECIPES } from '../data/recipes';
 import type { Recipe } from '../data/recipes';
 import { getLayout } from '../display';
 import { BACKUP_ON, backupToFile, restoreFromFile } from '../features/backup/backup';
+import { POSTCARD_ON } from '../features/postcard/layout';
 import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offline';
 import { PACE_REAL_MINUTES, dayOfSeason, seasonOf } from '../game/clock';
 import type { PaceId } from '../game/clock';
@@ -54,6 +55,8 @@ export class ListPane {
   private entries: Entry[] = [];
   private wide: boolean;
   private card: Area;
+  /** Set when the screen is torn down, which an action can do (taking a postcard closes the menu), so nothing paints after it. */
+  private closed = false;
   say: (m: string) => void = () => undefined;
 
   constructor(bag: Bag, private scene: Phaser.Scene, a: Area, wide: boolean, private get: () => Entry[], private onChange: () => void = () => undefined) {
@@ -67,11 +70,13 @@ export class ListPane {
   }
 
   destroy(): void {
+    this.closed = true;
     this.list.destroy();
     this.info.destroy();
   }
 
   refresh(reset = false): void {
+    if (this.closed) return;
     this.entries = this.get();
     this.list.setRows(this.entries.map((e) => e.row), !reset);
     this.paint();
@@ -81,13 +86,15 @@ export class ListPane {
     const a = this.entries[i]?.actions?.[which];
     if (!a) return;
     const m = a.run();
+    if (this.closed) return;
     if (typeof m === 'string') this.say(m);
-    else if (m) void m.then((late) => { if (late) this.say(late); this.refresh(); });
+    else if (m) void m.then((late) => { if (this.closed) return; if (late) this.say(late); this.refresh(); });
     this.onChange();
     this.refresh();
   }
 
   private paint(): void {
+    if (this.closed) return;
     const b = this.info;
     b.destroy();
     const e = this.entries[this.list.sel];
@@ -240,6 +247,16 @@ function accessEntries(): Entry[] {
   return out;
 }
 
+/** A photo of the valley, made into a card. The menu closes first so it is the valley and not the menu in the picture. */
+function postcardEntry(closeMenu: () => void): Entry {
+  return {
+    row: { text: 'Take a postcard' },
+    title: 'Take a postcard',
+    lines: ['Takes a picture of where you are standing and makes it into a postcard you can keep or send.', 'On a keyboard you can also press P.'],
+    actions: [{ label: 'Take it', kind: 'leaf', run: () => { closeMenu(); session.events.emit('postcard'); return null; } }],
+  };
+}
+
 /** Installing the game, and carrying a save from one device to another. */
 function appEntries(st: GameState): Entry[] {
   const out: Entry[] = [];
@@ -273,7 +290,7 @@ function appEntries(st: GameState): Entry[] {
 const PACES: PaceId[] = ['relaxed', 'standard', 'brisk'];
 const PACE_NAMES: Record<PaceId, string> = { relaxed: 'Relaxed', standard: 'Standard', brisk: 'Brisk' };
 
-export function optionEntries(toTitle: () => void): Entry[] {
+export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry[] {
   const st = session.state;
   const pct = (v: number): string => `${Math.round(v * 10)}/10`;
   const slider = (name: string, key: 'music' | 'sfx', hint: string): Entry => ({
@@ -304,6 +321,7 @@ export function optionEntries(toTitle: () => void): Entry[] {
       actions: [{ label: 'Toggle', kind: 'leaf', run: () => { settings.shake = !settings.shake; saveSettings(); return null; } }],
     },
     ...accessEntries(),
+    ...(POSTCARD_ON ? [postcardEntry(closeMenu)] : []),
     ...appEntries(st),
     {
       row: { text: 'Save game' },
@@ -491,7 +509,7 @@ export class MenuScreen extends Screen {
     else if (this.tab === 'craft') this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => recipeEntries('craft')));
     else if (this.tab === 'bundles') this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => bundleEntries(false)));
     else if (this.tab === 'friends') this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => friendEntries()));
-    else this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => optionEntries(() => { this.close(); this.toTitle(); })));
+    else this.pane = this.own(new ListPane(this.body, this.scene, area, wide, () => optionEntries(() => { this.close(); this.toTitle(); }, () => this.close())));
     if (this.pane) this.pane.say = say;
   }
 

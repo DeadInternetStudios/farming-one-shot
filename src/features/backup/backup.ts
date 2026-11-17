@@ -6,6 +6,7 @@ import { ITEMS } from '../../data/items';
 import { replaceSave } from '../../game/save';
 import { SAVE_VERSION } from '../../game/state';
 import type { GameState } from '../../game/state';
+import { downloadBlob } from '../../systems/files';
 import { OBJECT_HP } from '../../world/mapkit';
 
 export const BACKUP_ON = true;
@@ -73,17 +74,6 @@ export function unpackSave(text: string): Unpacked {
 
 // ---------------------------------------------------------------- the browser end
 
-function downloadText(filename: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-}
-
 /** Opens the file picker. Resolves with the file's text, a reason it was refused, or null when nothing was chosen. */
 function chooseTextFile(): Promise<{ text: string } | { msg: string } | null> {
   return new Promise((resolve) => {
@@ -106,7 +96,7 @@ function chooseTextFile(): Promise<{ text: string } | { msg: string } | null> {
 
 export function backupToFile(state: GameState): string {
   const { filename, text } = packSave(state);
-  downloadText(filename, text);
+  downloadBlob(filename, new Blob([text], { type: 'application/json' }));
   return `Saved ${filename}.`;
 }
 

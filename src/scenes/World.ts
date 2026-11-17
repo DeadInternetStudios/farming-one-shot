@@ -21,6 +21,7 @@ import { addItem } from '../game/inventory';
 import type { Dir, ToolId, Weather } from '../game/types';
 import { tileKey } from '../game/types';
 import { getLayout } from '../display';
+import { POSTCARD_ON } from '../features/postcard/layout';
 import { Angler } from '../entities/Angler';
 import { Critters } from '../entities/Critters';
 import { Npcs } from '../entities/Npcs';
@@ -273,6 +274,7 @@ export class WorldScene extends Phaser.Scene {
       if (this.controls.action()) this.act();
       if (this.controls.eat()) this.eatSelected();
       if (this.controls.menu()) session.events.emit('interact', { kind: 'menu' });
+      if (POSTCARD_ON && this.controls.postcard() && !this.finaleOn) session.events.emit('postcard');
     } else {
       this.controls.flush();
       this.player.update(dt, 0, 0, false, this.solid);
@@ -283,6 +285,7 @@ export class WorldScene extends Phaser.Scene {
     if (time - this.lastMachineSync > 700) {
       this.lastMachineSync = time;
       this.syncMachines();
+      this.postcardNudge();
     }
     this.rig.update(dt, this.focus?.x ?? this.player.x, this.focus?.y ?? this.player.y - 8);
     this.ambient.update(dt, { season: seasonOf(st.day), weather: st.weather, minute: st.minute, kind: this.def.kind });
@@ -291,6 +294,15 @@ export class WorldScene extends Phaser.Scene {
     const dark = 1 - Math.min(1, sky.day * 1.3);
     for (const f of this.objects.nightFrames) f.setAlpha(dark);
     this.chimneySmoke(dt, sky.day);
+  }
+
+  /** The first evening the farm has lanterns lit, say once that a postcard can be taken. */
+  private postcardNudge(): void {
+    const st = session.state;
+    if (!POSTCARD_ON || st.flags.postcardNudged || this.def.id !== 'farm' || st.minute < 19 * 60 || st.minute > 24 * 60) return;
+    if (!Object.values(st.locations.farm?.objects ?? {}).some((o) => o.k === 'decor')) return;
+    st.flags.postcardNudged = true;
+    session.events.emit('toast', getLayout().touch ? 'The farm looks lovely lit up. Try Take a postcard in Options.' : 'The farm looks lovely lit up. Press P for a postcard.');
   }
 
   /** In the mine you carry a little light of your own. */

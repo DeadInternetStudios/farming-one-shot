@@ -15,6 +15,7 @@ export class Controls {
   private queuedCycle = 0;
   private queuedEat = false;
   private queuedMenu = false;
+  private queuedPostcard = false;
 
   constructor(scene: Phaser.Scene) {
     const kb = scene.input.keyboard;
@@ -34,6 +35,7 @@ export class Controls {
     const c = ev.code;
     if (c === 'Space' || c === 'Enter' || c === 'KeyE') this.queuedAction = true;
     else if (c === 'KeyF') this.queuedEat = true;
+    else if (c === 'KeyP') this.queuedPostcard = true;
     else if (c === 'Tab' || c === 'Escape') this.queuedMenu = true;
     else if (c === 'KeyQ') this.queuedCycle -= 1;
     else if (c === 'KeyR') this.queuedCycle += 1;
@@ -83,6 +85,7 @@ export class Controls {
     this.queuedCycle = 0;
     this.queuedEat = false;
     this.queuedMenu = false;
+    this.queuedPostcard = false;
   }
 
   /** True once per press of Space, E or Enter, or the on-screen action button. */
@@ -101,6 +104,12 @@ export class Controls {
   menu(): boolean {
     const v = this.queuedMenu;
     this.queuedMenu = false;
+    return v;
+  }
+
+  postcard(): boolean {
+    const v = this.queuedPostcard;
+    this.queuedPostcard = false;
     return v;
   }
 

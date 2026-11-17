@@ -63,6 +63,13 @@ export const SFX = {
   tick: () => make(0.03, (t) => (Math.sin(TAU * 1900 * t) * 0.8 + noiseFn(4)() * 0.15) * expo(t, 160)),
   open: () => layer(0.2, [[glide(0.12, 500, 900, 22, 0.7), 0, 1], [burst(0.1, 'bp', 3000, 1, 40, 0.25, 8), 0, 1]]),
   close: () => layer(0.2, [[glide(0.12, 900, 480, 22, 0.7), 0, 1]]),
+  shutter: () => layer(0.6, [
+    [burst(0.03, 'bp', 3400, 1.3, 140, 0.9, 31), 0, 1],
+    [glide(0.05, 1500, 650, 80, 0.5), 0, 1],
+    [burst(0.05, 'bp', 2000, 1.2, 90, 0.7, 32), 0.075, 1],
+    [glide(0.06, 900, 480, 60, 0.4), 0.075, 1],
+    [bell(1568, 0.4, 0.5, 3, 0.8), 0.14, 0.45],
+  ]),
   nope: () => layer(0.3, [[glide(0.12, 240, 190, 14, 0.9, 'tri'), 0, 1], [glide(0.16, 190, 140, 11, 0.9, 'tri'), 0.1, 1]]),
   pickup: () => layer(0.3, [[bell(880, 0.25, 0.6, 2.4, 0.9), 0, 1], [bell(1320, 0.3, 0.6, 2.4, 0.9), 0.06, 1]]),
   hoe: () => layer(0.3, [[glide(0.12, 130, 60, 26, 1), 0, 1], [burst(0.1, 'lp', 1400, 0.7, 30, 0.7, 3), 0, 1], [burst(0.12, 'bp', 2600, 1.2, 40, 0.28, 5), 0.05, 1]]),
@@ -308,7 +315,7 @@ export const LEVELS = {
   tick: 0.3, open: 0.35, close: 0.3, nope: 0.5, pickup: 0.55, hoe: 0.8, water: 0.55, 'water-dry': 0.4, refill: 0.5, plant: 0.55, harvest: 0.65,
   chop: 0.8, 'chop-done': 0.85, 'tree-fall': 0.8, mine: 0.65, 'mine-break': 0.75, cut: 0.5, eat: 0.55, buy: 0.6, coin: 0.55, give: 0.6, lantern: 0.7,
   upgrade: 0.7, ship: 0.7, place: 0.65, craft: 0.65, cook: 0.55, fire: 0.45, cast: 0.5, splash: 0.65, bite: 0.6, hook: 0.55, catch: 0.65, fanfare: 0.75,
-  thunder: 0.85, blip: 0.35, door: 0.6, travel: 0.3, sleep: 0.5, morning: 0.6, heart: 0.5, 'furnace-done': 0.6, gift: 0.5, firework: 0.55,
+  thunder: 0.85, shutter: 0.7, blip: 0.35, door: 0.6, travel: 0.3, sleep: 0.5, morning: 0.6, heart: 0.5, 'furnace-done': 0.6, gift: 0.5, firework: 0.55,
 };
 
 /** Where each sound is rolled off at the top, in Hz, so nothing hisses on headphones. Noisy sounds are rolled off lower. */

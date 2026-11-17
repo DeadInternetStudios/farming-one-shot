@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 
 /**
  * The canvas is measured in device pixels (CSS size x pixel ratio) and shown at 1/ratio, so one
@@ -52,8 +52,10 @@ export function installLayout(game: Phaser.Game, parent: HTMLElement): void {
     const same = next.devW === current.devW && next.devH === current.devH && next.dpr === current.dpr;
     current = next;
     if (!same) {
-      game.scale.setZoom(1 / next.dpr);
+      // size first, then zoom: with no scale mode Phaser only writes the canvas's CSS size when the zoom is set,
+      // and where the pixel ratio is 1 `resize` never writes it, so zooming first left the canvas at its old size
       game.scale.resize(next.devW, next.devH);
+      game.scale.setZoom(1 / next.dpr);
     }
     game.events.emit('layout', next);
   };
