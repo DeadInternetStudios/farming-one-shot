@@ -4,6 +4,10 @@ A cozy pixel-art farming game for the browser, made with Phaser 4. Grow a wild p
 
 Every sprite, tile, font, sound effect and tune is drawn or synthesised by the scripts in `tools/`. Nothing is downloaded at run time.
 
+## The prompt that started this
+
+> /100x create a full game form scratch. a cozy farming simulator in phaser 4. you are making all the assets. take it to a full MVP that is a 1 hour of gameplay at least and very fun.
+
 ## Run it
 
 You need Node 22.12 or newer (it is built and tested on Node 26) and npm.
@@ -15,7 +19,9 @@ npm run dev
 
 Open the address Vite prints.
 
-Play it online: https://deadinternetstudios.github.io/farming-one-shot/ Keyboard: arrows or WASD to move, E or Space to act, Tab or Escape for the menu, number keys to pick a tool. On a phone the controls are on screen.
+Play it online: https://deadinternetstudios.github.io/farming-one-shot/
+
+Keyboard: arrows or WASD to move, E or Space to act, Tab or Escape for the menu, number keys to pick a tool. On a phone the controls are on screen.
 
 ## Commands
 
