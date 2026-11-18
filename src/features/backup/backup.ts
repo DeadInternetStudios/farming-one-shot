@@ -30,11 +30,11 @@ export function unpackSave(text: string): Unpacked {
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { ok: false, msg: 'That file is not a Lantern Hollow save.' };
+    return { ok: false, msg: 'That file is not a Cozy Farming Simulator MVP save.' };
   }
   let save = parsed;
   if (isObj(parsed) && 'game' in parsed) {
-    if (parsed.game !== GAME) return { ok: false, msg: 'That file is not a Lantern Hollow save.' };
+    if (parsed.game !== GAME) return { ok: false, msg: 'That file is not a Cozy Farming Simulator MVP save.' };
     if (parsed.format !== FORMAT) return { ok: false, msg: 'A newer version of the game made that backup.' };
     save = parsed.save;
   }

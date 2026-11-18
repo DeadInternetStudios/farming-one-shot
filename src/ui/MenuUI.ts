@@ -398,7 +398,7 @@ function appEntries(st: GameState): Entry[] {
     out.push({
       row: { text: 'Install the game' },
       title: 'Install the game',
-      lines: ['Put Lantern Hollow on your home screen. It opens full screen and plays with no connection.'],
+      lines: ['Put Cozy Farming Simulator MVP on your home screen. It opens full screen and plays with no connection.'],
       actions: [{ label: 'Install', kind: 'leaf', run: () => install().then((ok) => (ok ? 'Installed. Look for the lantern.' : 'Maybe another time.')) }],
     });
   }

@@ -10,7 +10,7 @@ export default async ({ page, wait, log }) => {
     viewport: document.querySelector('meta[name=viewport]')?.getAttribute('content') ?? '',
   }));
   log('[probe] canvas role', seen.role, '| controls listed', seen.controls.length, '| spoken', JSON.stringify(seen.live));
-  if (seen.role !== 'img' || !/Lantern Hollow/.test(seen.label)) throw new Error('the canvas has no name');
+  if (seen.role !== 'img' || !/Cozy Farming Simulator MVP/.test(seen.label)) throw new Error('the canvas has no name');
   if (seen.controls.length < 4) throw new Error('the controls are not listed in the page');
   if (!/^Next: /.test(seen.live)) throw new Error(`the goal is not spoken: ${JSON.stringify(seen.live)}`);
   if (/user-scalable=no|maximum-scale/.test(seen.viewport)) throw new Error('zooming is switched off');

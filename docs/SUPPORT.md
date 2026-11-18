@@ -1,4 +1,4 @@
-# Lantern Hollow: help
+# Cozy Farming Simulator MVP: help
 
 > Owner: before you publish this page, put your support address under "Still stuck?". The game prints it too if you build with `VITE_SUPPORT=you@example.com npm run pack`.
 

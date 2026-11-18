@@ -111,12 +111,12 @@ export default async ({ lh, page, press, wait, shot, state, log }) => {
     await press('Enter', 200);
     await waitFor(() => page.evaluate(() => Boolean(window.__shared)), 'the share sheet');
     sent = await page.evaluate(() => window.__shared);
-    expect(sent && sent.n === 1 && sent.type === 'image/png' && sent.title === 'Lantern Hollow', `the share sheet got ${sent && `${sent.n} ${sent.type} ${sent.name}`}`);
+    expect(sent && sent.n === 1 && sent.type === 'image/png' && sent.title === 'Cozy Farming Simulator MVP', `the share sheet got ${sent && `${sent.n} ${sent.type} ${sent.name}`}`);
     if (sent) writeFileSync(file, Buffer.from(sent.b64, 'base64'));
   } else {
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), press('Enter', 100)]);
     await download.saveAs(file);
-    expect(download.suggestedFilename() === 'lantern-hollow-spring-5.png', `the file is called ${download.suggestedFilename()}`);
+    expect(download.suggestedFilename() === 'cozy-farming-simulator-mvp-spring-5.png', `the file is called ${download.suggestedFilename()}`);
   }
   const info = png(file);
   expect(info && info.w >= 700 && info.w <= 1250 && info.h >= 600, `a real picture: ${JSON.stringify(info)}`);

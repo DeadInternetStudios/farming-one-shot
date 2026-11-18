@@ -359,8 +359,11 @@ export class TitleScene extends Phaser.Scene {
     const glow = this.add.image(x, top + 38, 'atlas', 'fx/glow-128').setTint(0xffb457).setBlendMode(Phaser.BlendModes.ADD).setScale(2.4, 1.1).setAlpha(0.28).setDepth(D.ui - 2);
     this.tweens.add({ targets: glow, alpha: 0.42, duration: 2600, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     const logo = this.add.image(x, top, 'title', 'logo').setOrigin(0.5, 0).setDepth(D.ui - 1);
+    // the name is long: shrink the logo to the screen rather than let its ends run off a narrow phone
+    const fit = Math.min(1, (uiW - 16) / logo.width);
+    if (fit < 1) logo.setScale(fit);
     this.tweens.add({ targets: logo, y: top + 2, duration: 2400, yoyo: true, repeat: -1, ease: 'sine.inOut' });
-    if (!short) label(this, x, top + 80, 'A cozy farming tale', { tint: PAL.cream[1], origin: [0.5, 0], outline: true }).setDepth(D.ui);
+    if (!short) label(this, x, top + Math.round(logo.displayHeight) + 4, 'A cozy farming tale', { tint: PAL.cream[1], origin: [0.5, 0], outline: true }).setDepth(D.ui);
   }
 
   private menu(short: boolean): void {
@@ -466,7 +469,7 @@ export class TitleScene extends Phaser.Scene {
 
   /** Two tabs on one farm would overwrite each other's days, so a second one has to say it means it. */
   private confirmTakeover(fresh: boolean): void {
-    this.ask('Already open', 'Lantern Hollow is open in another tab. Playing here stops it saving.', 'Play here', 'Cancel', () => this.start(fresh, true));
+    this.ask('Already open', 'Cozy Farming Simulator MVP is open in another tab. Playing here stops it saving.', 'Play here', 'Cancel', () => this.start(fresh, true));
   }
 
   /** A small question over the title with a way out and a way on. */

@@ -1,4 +1,4 @@
-# Lantern Hollow
+# Cozy Farming Simulator MVP
 
 A cozy pixel-art farming game for the browser, made with Phaser 4. Grow a wild plot into a lantern-lit valley over one 28-day year, then keep farming in free play.
 
@@ -55,4 +55,4 @@ In the browser's own storage, under `lantern-hollow:save:v1`. It saves every few
 
 ## Licence
 
-None yet. Until the owner picks one, all rights are reserved.
+MIT. See [LICENSE](LICENSE).

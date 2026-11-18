@@ -28,7 +28,7 @@ const manifest = await page.evaluate(async () => {
   const res = await fetch(href);
   return res.ok ? res.json() : null;
 });
-check(!!manifest && manifest.name === 'Lantern Hollow', 'the manifest loads');
+check(!!manifest && manifest.name === 'Cozy Farming Simulator MVP', 'the manifest loads');
 for (const icon of manifest?.icons ?? []) {
   const res = await page.request.get(new URL(icon.src, base).href);
   check(res.ok(), `icon ${icon.src} (${icon.sizes}) loads`);

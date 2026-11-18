@@ -4,7 +4,7 @@ A draft for the page that sells the game. The numbers come from the game's own d
 
 ## Name and one line
 
-**Lantern Hollow: a cozy farming tale**
+**Cozy Farming Simulator MVP**
 
 Turn a wild plot into a lantern-lit valley in one 28-day year, then keep farming as long as you like.
 
@@ -49,7 +49,7 @@ No accounts, no analytics, and no network requests once it has loaded. The farm 
 
 These are yours to decide or do. None of them can be done from the repository.
 
-- Pick a licence. The README says all rights are reserved until you do.
+- The licence is MIT (see LICENSE in the repo).
 - Set a price. The last review's read, from played fragments and no full playthrough, was that about $4 feels fair for a small tale and $10 would feel mis-sold.
 - Put your support address on the support page.
 - Listen to the game once (`LISTEN.md`).

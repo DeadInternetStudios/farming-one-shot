@@ -109,5 +109,5 @@ export const STAMP_LANTERNS = ['gold', 'pink', 'red'] as const;
 export const stampLantern = (day: number): (typeof STAMP_LANTERNS)[number] => STAMP_LANTERNS[day % STAMP_LANTERNS.length] ?? 'gold';
 
 export function postcardName(day: number): string {
-  return `lantern-hollow-${seasonOf(day)}-${dayOfSeason(day)}.png`;
+  return `cozy-farming-simulator-mvp-${seasonOf(day)}-${dayOfSeason(day)}.png`;
 }

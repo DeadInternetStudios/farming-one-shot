@@ -15,7 +15,7 @@ export default async ({ lh, page, press, wait, shot, log }) => {
 
   const mustRead = [
     ['Controls', ['Drag on the left', 'Drag past the ring to hurry', 'The big button uses', 'The bag button opens', 'Tap a slot', 'Tap a tile', 'tap Eat']],
-    ['Help and about', ['Lantern Hollow v', 'this browser only', 'Back up your farm', 'say which version']],
+    ['Help and about', ['Cozy Farming Simulator MVP v', 'this browser only', 'Back up your farm', 'say which version']],
   ];
   for (const [row, phrases] of mustRead) {
     const rows = await lh('options');

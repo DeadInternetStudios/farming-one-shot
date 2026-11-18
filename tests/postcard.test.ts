@@ -112,8 +112,8 @@ describe('the words', () => {
   });
 
   it('names the file after the day, so cards do not overwrite each other', () => {
-    expect(postcardName(5)).toBe('lantern-hollow-spring-5.png');
-    expect(postcardName(22)).toBe('lantern-hollow-winter-1.png');
+    expect(postcardName(5)).toBe('cozy-farming-simulator-mvp-spring-5.png');
+    expect(postcardName(22)).toBe('cozy-farming-simulator-mvp-winter-1.png');
     expect(new Set([1, 2, 3, 4, 5, 6, 7].map(postcardName)).size).toBe(7);
   });
 

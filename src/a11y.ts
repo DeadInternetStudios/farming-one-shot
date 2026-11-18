@@ -16,7 +16,7 @@ export function installA11y(game: Phaser.Game): void {
 
 function name(canvas: HTMLCanvasElement): void {
   canvas.setAttribute('role', 'img');
-  canvas.setAttribute('aria-label', 'Lantern Hollow, a cozy pixel-art farming game. The goal and what happens are read out in the live region below the game.');
+  canvas.setAttribute('aria-label', 'Cozy Farming Simulator MVP, a cozy pixel-art farming game. The goal and what happens are read out in the live region below the game.');
 }
 
 function speak(): void {

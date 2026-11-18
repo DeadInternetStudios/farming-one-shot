@@ -4,7 +4,7 @@
  */
 export function helpLines(version: string, support: string): string[] {
   return [
-    `Lantern Hollow ${version}.`,
+    `Cozy Farming Simulator MVP ${version}.`,
     'Your farm is kept in this browser only.',
     'There is no account, and nothing is sent anywhere.',
     'Clearing site data or changing browser can lose it.',

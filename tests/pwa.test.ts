@@ -20,7 +20,7 @@ describe('the installable app', () => {
   };
 
   it('has a manifest browsers will accept', () => {
-    expect(manifest.name).toBe('Lantern Hollow');
+    expect(manifest.name).toBe('Cozy Farming Simulator MVP');
     expect(manifest.start_url).toBe('./');
     expect(manifest.scope).toBe('./');
     expect(['standalone', 'fullscreen']).toContain(manifest.display);

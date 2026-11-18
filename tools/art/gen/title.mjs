@@ -165,7 +165,7 @@ export function seal() {
   return img;
 }
 
-// The logo: LANTERN over HOLLOW in the game's own letters, enlarged, with a lit gradient,
+// The logo: COZY FARMING over SIMULATOR MVP in the game's own letters, enlarged, with a lit gradient,
 // a dark outline and a soft drop shadow. Returns one image.
 const SCALE = 4;
 function wordMask(word) {
@@ -182,7 +182,7 @@ function wordMask(word) {
 }
 
 export function logo() {
-  const lines = [wordMask('LANTERN'), wordMask('HOLLOW')];
+  const lines = [wordMask('COZY FARMING'), wordMask('SIMULATOR MVP')];
   const gap = 4;
   const pad = 6;
   const W = Math.max(...lines.map((l) => l.w)) + pad * 2;

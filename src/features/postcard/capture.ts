@@ -68,7 +68,7 @@ export function toFile(t: Taken): Promise<File | null> {
 export async function sendPostcard(file: File, share: boolean): Promise<string | null> {
   if (share && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'Lantern Hollow' });
+      await navigator.share({ files: [file], title: 'Cozy Farming Simulator MVP' });
       return 'Shared.';
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return null;

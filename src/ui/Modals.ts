@@ -150,7 +150,7 @@ export class Modals {
 
   /** Another tab has taken this farm. This page has stopped saving, and the only way on is to load it again. */
   locked(): void {
-    const text = 'Lantern Hollow is open in another tab, so this one has stopped saving. Reload to play here instead.';
+    const text = 'Cozy Farming Simulator MVP is open in another tab, so this one has stopped saving. Reload to play here instead.';
     this.present(() => {
       const { open } = this.begin(() => window.location.reload());
       const w = Math.min(196, this.l.uiW - 12);

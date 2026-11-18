@@ -29,7 +29,7 @@ function cannotDraw(): void {
   boot.classList.add('stuck');
   const why = document.createElement('div');
   why.className = 'why';
-  why.textContent = 'This browser cannot draw the game. Lantern Hollow needs WebGL, and it is switched off or missing here. Try an up-to-date Chrome, Firefox, Safari or Edge, or turn on hardware acceleration in the browser settings.';
+  why.textContent = 'This browser cannot draw the game. Cozy Farming Simulator MVP needs WebGL, and it is switched off or missing here. Try an up-to-date Chrome, Firefox, Safari or Edge, or turn on hardware acceleration in the browser settings.';
   boot.appendChild(why);
 }
 

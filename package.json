@@ -2,6 +2,7 @@
   "name": "lantern-hollow",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "A cozy pixel-art farming game for the browser, built with Phaser 4. Every sprite, font, sound and tune is made from code.",
   "engines": {
