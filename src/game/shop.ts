@@ -27,14 +27,20 @@ export const canSellHere = (id: string, shop: string | null): boolean => {
   return true;
 };
 
-export function buy(state: GameState, id: string, n = 1): { ok: boolean; msg: string } {
+/** Why this purchase cannot happen right now, or null when it can. */
+export function buyBlock(state: GameState, id: string, n = 1): string | null {
   const price = buyPrice(id) * n;
-  const d = itemDef(id);
-  if (state.player.gold < price) return { ok: false, msg: `You need ${price}g for that.` };
-  if (!canAdd(state.player.slots, id, n)) return { ok: false, msg: 'Your bag is full.' };
-  state.player.gold -= price;
+  if (state.player.gold < price) return `You need ${price}g for that.`;
+  if (!canAdd(state.player.slots, id, n)) return 'Your bag is full.';
+  return null;
+}
+
+export function buy(state: GameState, id: string, n = 1): { ok: boolean; msg: string } {
+  const why = buyBlock(state, id, n);
+  if (why) return { ok: false, msg: why };
+  state.player.gold -= buyPrice(id) * n;
   addItem(state.player.slots, id, n);
-  return { ok: true, msg: `Bought ${n} ${d.name}.` };
+  return { ok: true, msg: `Bought ${n} ${itemDef(id).name}.` };
 }
 
 export function sell(state: GameState, slot: number, n: number, shop: string | null): { ok: boolean; gold: number; msg: string } {
@@ -96,12 +102,20 @@ function applyUpgrade(st: GameState, id: string): string {
   return '';
 }
 
+/** Why this upgrade cannot be bought right now, or null when it can. */
+export function upgradeBlock(st: GameState, id: string): string | null {
+  const u = availableUpgrades(st).find((q) => q.id === id);
+  if (!u) return 'That is not for sale.';
+  if (st.player.gold < u.price) return `You need ${u.price}g for that.`;
+  for (const n of u.needs ?? []) if (countItem(st.player.slots, n.id) < n.n) return `You need ${n.n} ${itemDef(n.id).name}.`;
+  return null;
+}
+
 /** Pay for a farm upgrade. Nothing changes unless the gold and every material are there. */
 export function buyUpgrade(st: GameState, id: string): { ok: boolean; msg: string } {
+  const why = upgradeBlock(st, id);
   const u = availableUpgrades(st).find((q) => q.id === id);
-  if (!u) return { ok: false, msg: 'That is not for sale.' };
-  if (st.player.gold < u.price) return { ok: false, msg: `You need ${u.price}g for that.` };
-  for (const n of u.needs ?? []) if (countItem(st.player.slots, n.id) < n.n) return { ok: false, msg: `You need ${n.n} ${itemDef(n.id).name}.` };
+  if (why || !u) return { ok: false, msg: why ?? 'That is not for sale.' };
   st.player.gold -= u.price;
   for (const n of u.needs ?? []) removeItem(st.player.slots, n.id, n.n);
   return { ok: true, msg: applyUpgrade(st, u.id) };
@@ -111,15 +125,24 @@ export function buyUpgrade(st: GameState, id: string): { ok: boolean; msg: strin
 
 export const NEXT_TIER: Readonly<Partial<Record<Tier, Tier>>> = { basic: 'copper', copper: 'silver', silver: 'gold' };
 
+/** Why this tool cannot go to the anvil right now, or null when it can. */
+export function forgeBlock(st: GameState, tool: ToolId): string | null {
+  if (st.forge) return 'The anvil is busy. Collect the other tool first.';
+  const next = NEXT_TIER[st.player.tools[tool]];
+  if (!next) return 'That is as good as it gets.';
+  if (!st.player.slots.some((s) => s?.id === tool)) return 'You need to bring the tool.';
+  const c = TOOL_UPGRADES[next as keyof typeof TOOL_UPGRADES];
+  if (st.player.gold < c.gold) return `You need ${c.gold}g.`;
+  if (countItem(st.player.slots, c.bar) < c.n) return `You need ${c.n} ${itemDef(c.bar).name}.`;
+  return null;
+}
+
 /** Hand a tool to Bram for the next tier. The bars and gold go now and the tool comes back two days later. */
 export function startForge(st: GameState, tool: ToolId): { ok: boolean; msg: string } {
-  if (st.forge) return { ok: false, msg: 'The anvil is busy. Collect the other tool first.' };
+  const why = forgeBlock(st, tool);
   const next = NEXT_TIER[st.player.tools[tool]];
-  if (!next) return { ok: false, msg: 'That is as good as it gets.' };
-  if (!st.player.slots.some((s) => s?.id === tool)) return { ok: false, msg: 'You need to bring the tool.' };
+  if (why || !next) return { ok: false, msg: why ?? 'That is as good as it gets.' };
   const c = TOOL_UPGRADES[next as keyof typeof TOOL_UPGRADES];
-  if (st.player.gold < c.gold) return { ok: false, msg: `You need ${c.gold}g.` };
-  if (countItem(st.player.slots, c.bar) < c.n) return { ok: false, msg: `You need ${c.n} ${itemDef(c.bar).name}.` };
   removeItem(st.player.slots, c.bar, c.n);
   removeItem(st.player.slots, tool, 1);
   st.player.gold -= c.gold;

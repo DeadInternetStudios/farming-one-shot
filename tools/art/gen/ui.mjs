@@ -70,11 +70,11 @@ export function button(kind = 'leaf', state = 'up') {
   return img;
 }
 
+// Switched off: a flat plate that sits into the parchment, with none of the colour or shine of a live button.
 export function disabledButton() {
   const img = new Img(16, 16);
-  rounded(img, 0, 0, 16, 16, 5, R.ink[1]);
-  rounded(img, 1, 1, 14, 14, 4, R.ink[2]);
-  rounded(img, 1, 1, 14, 13, 4, R.ink[3]);
+  rounded(img, 0, 0, 16, 16, 5, 0xb9a889);
+  rounded(img, 1, 1, 14, 14, 4, R.cream[0]);
   return img;
 }
 
@@ -157,6 +157,14 @@ export function weatherIcon(kind) {
   else if (kind === 'rain') { cloud(R.stone); for (const [x, y] of [[4, 10], [7, 11], [10, 10]]) { i.set(x, y, R.water[4]); i.set(x - 1, y + 1, R.water[3]); } }
   else if (kind === 'storm') { cloud(R.ink); i.poly([[7, 7], [4, 11], [6, 11], [5, 12], [9, 8], [7, 8]], R.yellow[4]); }
   else if (kind === 'snow') { cloud(R.snow); for (const [x, y] of [[4, 10], [7, 11], [10, 10]]) i.set(x, y, R.cream[3]); }
+  else if (kind === 'moon') {
+    // a crescent with one star beside it
+    i.disc(5.5, 6, 5, R.yellow[4]);
+    i.disc(8.4, 4.6, 4.3, null);
+    for (const [x, y] of [[2, 7], [3, 9], [4, 10]]) i.set(x, y, R.yellow[3]);
+    i.set(2, 4, R.cream[3]);
+    for (const [x, y] of [[11, 7], [10, 7], [12, 7], [11, 6], [11, 8]]) i.set(x, y, R.cream[3]);
+  }
   i.outline((c) => outlineOf(c));
   return i;
 }
@@ -225,20 +233,6 @@ const TAB_MAPS = {
     '.kddddddddk.',
     '..kkkkkkkk..',
   ],
-  craft: [
-    '............',
-    '.kkkkkkkkkk.',
-    'kSssssssssdk',
-    'kSssssssssdk',
-    '.kkkkWWkkkk.',
-    '....kwwk....',
-    '....kwwk....',
-    '....kwwk....',
-    '....kwwk....',
-    '....kwwk....',
-    '....kddk....',
-    '.....kk.....',
-  ],
   lantern: [
     '.....kk.....',
     '....kccek...',
@@ -271,6 +265,16 @@ const TAB_MAPS = {
 
 export function tabIcon(kind) {
   const i = new Img(12, 12);
+  if (kind === 'craft') {
+    // a hammer on the slant: a stone head across the top of a wooden handle
+    for (let x = 2; x <= 7; x++) i.set(x, 12 - x, R.wood[3]);
+    for (let x = 3; x <= 8; x++) i.set(x, 13 - x, R.wood[4]);
+    for (const [x, y] of [[6, 3], [7, 4], [8, 5], [9, 6]]) i.set(x, y, R.stone[3]);
+    for (const [x, y] of [[6, 2], [7, 3], [8, 4], [9, 5], [10, 6]]) i.set(x, y, R.stone[5]);
+    for (const [x, y] of [[7, 2], [8, 3], [9, 4], [10, 5]]) i.set(x, y, R.stone[6]);
+    i.outline(() => R.ink[0]);
+    return i;
+  }
   if (kind === 'options') {
     // a cog: a ring with eight teeth and a hole
     const c = 5.5;
@@ -289,7 +293,6 @@ export function tabIcon(kind) {
   };
   if (kind === 'friends') { colors.R = R.red[3]; colors.H = R.pink[4]; }
   if (kind === 'lantern') { colors.R = R.orange[3]; colors.H = R.orange[4]; colors.r = R.orange[4]; colors.y = R.yellow[4]; colors.d = R.red[3]; }
-  if (kind === 'craft') colors.d = R.stone[3];
   TAB_MAPS[kind].forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') i.set(x, y, colors[ch] ?? R.ink[0]); }));
   return i;
 }

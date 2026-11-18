@@ -6,10 +6,11 @@ import { NPCS } from '../data/npcs';
 import { RECIPES } from '../data/recipes';
 import type { Recipe } from '../data/recipes';
 import { getLayout, slotPitch, tapH } from '../display';
+import type { Layout } from '../display';
 import { BACKUP_ON, backupToFile, restoreFromFile } from '../features/backup/backup';
 import { POSTCARD_ON } from '../features/postcard/layout';
 import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offline';
-import { PACE_REAL_MINUTES, dayOfSeason, seasonOf } from '../game/clock';
+import { PACE_REAL_MINUTES } from '../game/clock';
 import type { PaceId } from '../game/clock';
 import { available, donate, isComplete, progressOf, slotDone } from '../game/bundles';
 import { have, make, plan } from '../game/crafting';
@@ -21,8 +22,8 @@ import { session } from '../game/session';
 import { settings, saveSettings } from '../game/settings';
 import { friendOf, heartsOf } from '../game/social';
 import type { GameState } from '../game/state';
-import { LINE, bodyOf, cardHeight, chip, drawCard, footer, paragraph, popup, tabStrip } from './chrome';
-import type { Area, CardSpec, Chip } from './chrome';
+import { LINE, bodyOf, cardHeight, cardStyle, chip, drawCard, footer, frameOf, paragraph, planTabs, popup, tabStrip } from './chrome';
+import type { Area, CardSpec, CardStyle, Chip, Pop } from './chrome';
 import { COL, WEATHER_NAMES, iconFor, wrapText } from './kit';
 import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Screens';
 import { PAL } from '../gen/art';
@@ -32,6 +33,7 @@ import type { Row } from './widgets';
 export interface Line {
   t: string;
   tint?: number;
+  need?: { icon: string; have: number; n: number };
 }
 
 export interface Entry {
@@ -39,10 +41,35 @@ export interface Entry {
   title: string;
   icon?: string;
   lines: (string | Line)[];
-  /** What a button does. It may answer later, as the file pickers do; the answer is what gets said. */
-  actions?: { label: string; kind: 'leaf' | 'wood' | 'berry' | 'sky'; run: () => string | null | Promise<string | null> }[];
+  /** What a button does. It may answer later, as the file pickers do; the answer is what gets said. A button that is `off` looks switched off but still answers. */
+  actions?: { label: string; kind: 'leaf' | 'wood' | 'berry' | 'sky'; off?: boolean; run: () => string | null | Promise<string | null> }[];
   adjust?: (d: number) => void;
   extra?: (bag: Bag, x: number, y: number, w: number) => number;
+}
+
+/** How a page is split between a list and the card about its selection, and how tall the page has to be to show both. */
+export interface ListPlan {
+  listW: number;
+  listH: number;
+  card: Area;
+  need: number;
+}
+
+export function planList(scene: Phaser.Scene, a: Area, wide: boolean, entries: readonly Entry[], rowH: number, style: CardStyle): ListPlan {
+  const listW = wide ? Math.floor(a.w * 0.5) - 4 : a.w;
+  const cardW = wide ? a.w - listW - 10 : a.w;
+  const cardH = Math.max(0, ...entries.map((e) => cardHeight(scene, cardW, e, rowH, style)));
+  if (wide) {
+    // side by side: the page is as tall as the longer of the two
+    const need = Math.min(a.h, Math.max(Math.min(entries.length, Math.floor(a.h / rowH)) * rowH, cardH));
+    const listH = Math.max(1, Math.floor(need / rowH)) * rowH;
+    return { listW, listH, card: { x: a.x + listW + 10, y: a.y, w: cardW, h: need }, need };
+  }
+  // stacked: as many rows as there are entries, if the card still fits under them
+  const rows = Math.max(1, Math.min(entries.length, Math.max(2, Math.floor((a.h - 8 - cardH) / rowH))));
+  const listH = rows * rowH;
+  const need = Math.min(a.h, listH + 8 + cardH);
+  return { listW, listH, card: { x: a.x, y: a.y + listH + 8, w: a.w, h: Math.min(a.h - listH - 8, cardH) }, need };
 }
 
 /** A list on one side and a card about the selected entry on the other. Shared by the menu pages. */
@@ -55,15 +82,10 @@ export class ListPane {
   private closed = false;
   say: (m: string) => void = () => undefined;
 
-  constructor(bag: Bag, scene: Phaser.Scene, a: Area, wide: boolean, private get: () => Entry[], private onChange: () => void = () => undefined, private rowH = 17) {
-    const listW = wide ? Math.floor(a.w * 0.5) - 4 : a.w;
-    // stacked, the card is as tall as its tallest entry needs, so it never jumps, and the list gets the rest
-    const entries = this.get();
-    const cardH = wide ? 0 : Math.max(0, ...entries.map((e) => cardHeight(scene, a.w, e, rowH)));
-    const rows = Math.max(3, Math.floor((a.h - 8 - cardH) / rowH));
-    const listH = wide ? a.h : Math.max(1, Math.min(rows, entries.length)) * rowH;
-    this.list = new ListView(bag, a.x, a.y, listW, listH, rowH, (i) => this.pick(i, 0), () => this.paint(), false);
-    this.card = wide ? { x: a.x + listW + 10, y: a.y, w: a.w - listW - 10, h: a.h } : { x: a.x, y: a.y + listH + 8, w: a.w, h: Math.min(a.h - listH - 8, cardH) };
+  constructor(bag: Bag, scene: Phaser.Scene, a: Area, wide: boolean, private get: () => Entry[], private onChange: () => void = () => undefined, private rowH = 17, private style: CardStyle = { compact: true, pictures: true }) {
+    const plan = planList(scene, a, wide, this.get(), rowH, style);
+    this.list = new ListView(bag, a.x, a.y, plan.listW, plan.listH, rowH, (i) => this.pick(i, 0), () => this.paint(), false);
+    this.card = plan.card;
     this.info = new Bag(scene, bag.depth);
     this.refresh(true);
   }
@@ -97,7 +119,7 @@ export class ListPane {
     const b = this.info;
     b.destroy();
     const e = this.entries[this.list.sel];
-    if (e) drawCard(b, this.card, e, this.rowH, (i) => this.pick(this.list.sel, i));
+    if (e) drawCard(b, this.card, e, this.rowH, this.style, (i) => this.pick(this.list.sel, i));
   }
 
   key(code: string, ev: KeyboardEvent): boolean {
@@ -113,29 +135,38 @@ export class ListPane {
 
 // ------------------------------------------------------------------ entries
 
+/** What a recipe still wants, in a sentence: "3 berries", "a crisp vegetable", "20 Wood". */
+function needed(i: Recipe['ingredients'][number]): string {
+  const first = i.of.split('|')[0] as string;
+  if (!i.label) return `${i.n} ${itemDef(first).name}`;
+  return i.label.startsWith('Any ') ? `${i.n} ${i.label.slice(4)}` : `${i.label.charAt(0).toLowerCase()}${i.label.slice(1)}`;
+}
+
 export function recipeEntries(kind: Recipe['kind']): Entry[] {
   const st = session.state;
   const list = RECIPES.filter((r) => r.kind === kind && st.recipes.includes(r.id));
   return list.map((r): Entry => {
-    const ok = r.ingredients.every((i) => plan(st.player.slots, i) !== null);
+    const missing = r.ingredients.find((i) => plan(st.player.slots, i) === null);
+    const ok = !missing;
+    const made = itemDef(r.makes);
     return {
-      row: { text: itemDef(r.makes).name, icon: iconFor(st, r.makes), dim: !ok, right: ok ? '' : '...' },
+      row: { text: made.name, icon: iconFor(st, r.makes), dim: !ok },
       title: r.name,
       icon: iconFor(st, r.makes),
       lines: [
         r.blurb,
         ...r.ingredients.map((i): Line => {
-          const n = have(st.player.slots, i);
-          return { t: `${i.label ?? itemDef(i.of.split('|')[0] as string).name}: ${Math.min(n, i.n)}/${i.n}`, tint: n >= i.n ? COL.leaf : COL.berry };
+          const first = i.of.split('|')[0] as string;
+          return { t: i.label ?? itemDef(first).name, need: { icon: iconFor(st, first), have: have(st.player.slots, i), n: i.n } };
         }),
-        ...(itemDef(r.makes).energy ? [`Restores ${itemDef(r.makes).energy} energy. Sells for ${itemDef(r.makes).sell}g.`] : []),
+        ...(made.energy ? [`Restores ${made.energy} energy. Sells for ${made.sell}g.`] : []),
       ],
       actions: [{
-        label: kind === 'cook' ? 'Cook' : 'Make', kind: 'leaf', run: () => {
-          if (!ok) { session.events.emit('sfx', 'nope'); return 'Something is missing.'; }
+        label: kind === 'cook' ? 'Cook' : 'Make', kind: 'leaf', off: !ok, run: () => {
+          if (missing) { session.events.emit('sfx', 'nope'); return `You need ${needed(missing)}.`; }
           if (!make(st, r)) { session.events.emit('sfx', 'nope'); return 'Your bag is full.'; }
           session.events.emit('sfx', kind === 'cook' ? 'cook' : 'craft');
-          return `Made ${itemDef(r.makes).name}.`;
+          return `Made ${made.name}.`;
         },
       }],
     };
@@ -153,15 +184,14 @@ export function bundleEntries(canGive: boolean): Entry[] {
       title: b.name,
       lines: [
         b.blurb,
-        ...b.slots.map((s, i): Line => {
-          const names = s.label || itemDef(s.any[0] as string).name;
-          const d = slotDone(st, b, i);
-          return { t: `${d ? '[x]' : '[ ]'} ${names} ${Math.min(prog[i] ?? 0, s.n)}/${s.n}`, tint: d ? COL.leaf : available(st, s) ? COL.gold : COL.dim };
-        }),
+        ...b.slots.map((s, i): Line => ({
+          t: s.label || itemDef(s.any[0] as string).name,
+          need: { icon: iconFor(st, s.any[0] as string), have: Math.min(prog[i] ?? 0, s.n), n: s.n },
+        })),
         `Reward: ${b.reward.gold}g${b.reward.item ? ` and ${b.reward.item.n} ${itemDef(b.reward.item.id).name}` : ''}.`,
       ],
       actions: canGive && !done ? [{
-        label: 'Give what fits', kind: 'leaf', run: () => {
+        label: 'Give what fits', kind: 'leaf', off: !b.slots.some((sl, i) => !slotDone(st, b, i) && available(st, sl)), run: () => {
           let any = false;
           let finished: BundleDef['reward'] | null = null;
           b.slots.forEach((_, i) => {
@@ -187,19 +217,27 @@ const SEASON_NAMES = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter:
 
 export function friendEntries(): Entry[] {
   const st = session.state;
-  return NPCS.map((n): Entry => {
+  const names = (ids: readonly string[]): string => ids.map((i) => (i === 'weed' ? 'Weeds' : itemDef(i).name)).join(', ');
+  const met = NPCS.filter((n) => friendOf(st, n.id).met);
+  const out = met.map((n): Entry => {
     const f = friendOf(st, n.id);
     const h = heartsOf(f.points);
-    const names = (ids: readonly string[]): string => ids.map((i) => (i === 'weed' ? 'Weeds' : itemDef(i).name)).join(', ');
     return {
-      row: { text: f.met ? n.name : '???', right: f.met ? `${h}/10` : '', dim: !f.met },
-      title: f.met ? n.name : 'Someone new',
-      lines: f.met
-        ? [n.role, `Birthday: ${SEASON_NAMES[n.birthday.season]} ${n.birthday.day}`, { t: `Loves: ${names(n.loves)}`, tint: COL.berry }, { t: `Likes: ${names(n.likes)}`, tint: COL.leaf }, f.talkedDay === st.day ? 'You have talked today.' : 'Talk once a day to grow closer.']
-        : ['You have not met yet. Look around the village.'],
-      extra: f.met ? (b, x, y) => { hearts(b, x, y, h); return y + 12; } : undefined,
+      row: { text: n.name, right: `${h}/10` },
+      title: n.name,
+      lines: [n.role, `Birthday: ${SEASON_NAMES[n.birthday.season]} ${n.birthday.day}`, { t: `Loves: ${names(n.loves)}`, tint: COL.berry }, { t: `Likes: ${names(n.likes)}`, tint: COL.leaf }, f.talkedDay === st.day ? 'You have talked today.' : 'Talk once a day to grow closer.'],
+      extra: (b, x, y) => { hearts(b, x, y, h); return y + 12; },
     };
   });
+  const unmet = NPCS.length - met.length;
+  if (unmet > 0) {
+    out.push({
+      row: { text: met.length === 0 ? 'Say hello' : unmet === 1 ? 'One more to meet' : `${unmet} more to meet`, dim: true },
+      title: met.length === 0 ? 'You are new here' : 'Someone new',
+      lines: [met.length === 0 ? 'Nobody knows your name yet. Walk into the village and say hello to the first person you see.' : `${unmet === 1 ? 'One neighbour is' : `${unmet} neighbours are`} still waiting to meet you. Look around the village.`],
+    });
+  }
+  return out;
 }
 
 /** Settings that make the game easier on the eyes and hands. */
@@ -278,8 +316,8 @@ export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry
     lines: [hint, getLayout().touch ? 'Tap - or + to change it.' : 'Press left or right to change it.'],
     adjust: (d) => { settings[key] = Math.max(0, Math.min(1, Math.round((settings[key] + d * 0.1) * 10) / 10)); saveSettings(); session.events.emit('settings'); },
     actions: [
-      { label: '-', kind: 'wood', run: () => { settings[key] = Math.max(0, Math.round((settings[key] - 0.1) * 10) / 10); saveSettings(); session.events.emit('settings'); return null; } },
-      { label: '+', kind: 'leaf', run: () => { settings[key] = Math.min(1, Math.round((settings[key] + 0.1) * 10) / 10); saveSettings(); session.events.emit('settings'); return null; } },
+      { label: '-', kind: 'wood', off: settings[key] <= 0, run: () => { settings[key] = Math.max(0, Math.round((settings[key] - 0.1) * 10) / 10); saveSettings(); session.events.emit('settings'); return null; } },
+      { label: '+', kind: 'wood', off: settings[key] >= 1, run: () => { settings[key] = Math.min(1, Math.round((settings[key] + 0.1) * 10) / 10); saveSettings(); session.events.emit('settings'); return null; } },
     ],
   });
   return [
@@ -319,6 +357,16 @@ export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry
 
 // ------------------------------------------------------------------ the bag
 
+/** What the card says about a stack, or an empty slot. */
+function bagCard(s: { id: string; n: number } | null): CardSpec {
+  if (!s) return { title: 'An empty slot', lines: ['Nothing here yet.'] };
+  const d = itemDef(s.id);
+  const crop = cropOfSeed(s.id);
+  return { title: d.name, lines: [crop ? `${d.blurb} ${plantAdvice(crop.id, session.state.day)}` : d.blurb], actions: d.energy ? [{ label: 'Eat', kind: 'leaf' }] : [] };
+}
+
+const SWAP_HINT = 'Tap a stack, then another slot to swap them.';
+
 class BagView {
   private sel = 0;
   private carry = -1;
@@ -331,7 +379,19 @@ class BagView {
   /** Where the card about the selected stack goes: under the grid, or beside it when the page is too short for that. */
   private box: Area;
 
-  constructor(bag: Bag, scene: Phaser.Scene, a: Area, private say: (m: string) => void, private pitch: number, private btnH: number) {
+  /** How tall the bag page is with the card under the grid: the grid, the tallest card, and the two lines about today. */
+  static need(scene: Phaser.Scene, w: number, pitch: number, btnH: number, style: CardStyle): number {
+    const st = session.state;
+    const slots = st.player.slots;
+    const goal = nextGoal(st);
+    const next = wrapText(scene, goal ? `Next: ${goal.text}` : 'Nothing is pressing. Enjoy the valley.', w - 18).split('\n').slice(0, 2);
+    const todayH = next.length * LINE + 5 + LINE;
+    const cols = Math.max(5, Math.min(10, Math.floor((w - 4) / pitch)));
+    const card = Math.max(...slots.map((s) => cardHeight(scene, w, bagCard(s), btnH, style)), cardHeight(scene, w, bagCard(null), btnH, style));
+    return 2 + Math.ceil(slots.length / cols) * pitch + 4 + card + 10 + todayH;
+  }
+
+  constructor(bag: Bag, scene: Phaser.Scene, a: Area, private say: (m: string) => void, private pitch: number, private btnH: number, private style: CardStyle) {
     const slots = session.state.player.slots;
     const st = session.state;
     const goal = nextGoal(st);
@@ -351,7 +411,7 @@ class BagView {
     } else {
       // on a tall page the card is only as tall as its tallest stack needs, and the today lines follow it
       const top = this.oy + gridH + 4;
-      const need = Math.max(...slots.map((s) => cardHeight(scene, a.w, this.cardOf(s), btnH)), cardHeight(scene, a.w, this.cardOf(null), btnH));
+      const need = Math.max(...slots.map((s) => cardHeight(scene, a.w, bagCard(s), btnH, style)), cardHeight(scene, a.w, bagCard(null), btnH, style));
       const h = Math.min(todayTop - 5 - top, need);
       this.box = { x: a.x, y: top, w: a.w, h };
       todayTop = top + h + 10;
@@ -369,6 +429,7 @@ class BagView {
     this.drawToday(bag, a, todayTop, next);
     this.info = new Bag(scene, bag.depth);
     this.paint();
+    say(SWAP_HINT);
   }
 
   /** What to do next and what the weather does tomorrow: the two things worth a glance before closing the bag. */
@@ -397,7 +458,7 @@ class BagView {
   private act(): void {
     const slots = session.state.player.slots;
     if (this.carry < 0) {
-      if (slots[this.sel]) this.carry = this.sel;
+      if (slots[this.sel]) { this.carry = this.sel; this.say('Now tap where it goes.'); }
     } else {
       const a = this.carry;
       const b = this.sel;
@@ -408,6 +469,7 @@ class BagView {
         session.events.emit('sfx', 'tick');
       }
       this.carry = -1;
+      this.say(SWAP_HINT);
     }
     this.paint();
   }
@@ -441,16 +503,7 @@ class BagView {
     const b = this.info;
     b.destroy();
     const s = slots[this.sel];
-    drawCard(b, this.box, this.cardOf(s ?? null), this.btnH, () => this.eat());
-  }
-
-  /** What the card says about a stack (or an empty slot). */
-  private cardOf(s: { id: string; n: number } | null): CardSpec {
-    if (!s) return { title: 'An empty slot', lines: [this.carry >= 0 ? 'Choose where it goes.' : 'Nothing here yet.'] };
-    const d = itemDef(s.id);
-    const crop = cropOfSeed(s.id);
-    const hint = this.carry >= 0 ? 'Choose where it goes.' : 'Select a stack, then another slot to swap.';
-    return { title: d.name, lines: [crop ? `${d.blurb} ${plantAdvice(crop.id, session.state.day)}` : d.blurb, hint], actions: d.energy ? [{ label: 'Eat', kind: 'leaf' }] : [] };
+    drawCard(b, this.box, bagCard(s ?? null), this.btnH, this.style, () => this.eat());
   }
 
   key(code: string): boolean {
@@ -474,6 +527,8 @@ const TAB_NAMES: Record<TabId, string> = { bag: 'Bag', craft: 'Craft', bundles: 
 const TAB_ICONS: Record<TabId, string> = { bag: 'ui/tab-bag', craft: 'ui/tab-craft', bundles: 'ui/tab-lantern', friends: 'ui/tab-friends', options: 'ui/tab-options' };
 const TABS = (Object.keys(TAB_NAMES) as TabId[]).map((id) => ({ id, label: TAB_NAMES[id], icon: TAB_ICONS[id] }));
 
+const MENU_FRAME = { wideH: 270, tallH: 480, maxW: 360 } as const;
+
 export class MenuScreen extends Screen {
   private tab: TabId = 'bag';
   private body!: Bag;
@@ -488,23 +543,34 @@ export class MenuScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const st = session.state;
-    const p = popup(bag, l, { title: '', wideH: 232, tallH: 340, maxW: 360, close: () => this.close() });
-    chip(bag, p, 'ui/coin', 10, COL.berry, `${st.player.gold}g`);
-    const strip = tabStrip(bag, l, p, p.top + 2, TABS, this.tab, (id) => this.setTab(id));
-    // with room for every name the title tells the date; with icons alone it names the page
-    p.title.setText(strip.labelled ? `${SEASON_NAMES[seasonOf(st.day)]} ${dayOfSeason(st.day)}` : TAB_NAMES[this.tab]);
+    const f = frameOf(l, MENU_FRAME);
+    const tabs = planTabs(this.scene, l, f.inner, TABS);
+    const row = tapH(l);
+    const style = cardStyle(l, f.wide);
+    // each page is as tall as its content; the frame hangs from the top the tallest page would give it, so the tabs never move
+    const room: Area = { x: 0, y: 0, w: f.inner, h: f.maxBody - 2 - tabs.h - 5 };
+    const need = (e: Entry[]): number => planList(this.scene, room, f.wide, e, row, style).need;
+    const pages: Record<TabId, number> = {
+      bag: BagView.need(this.scene, room.w, slotPitch(l), row, style),
+      craft: need(recipeEntries('craft')),
+      bundles: need(bundleEntries(false)),
+      friends: need(friendEntries()),
+      options: need(optionEntries(() => undefined, () => undefined)),
+    };
+    const chrome = 2 + tabs.h + 5;
+    const p = popup(bag, l, { title: TAB_NAMES[this.tab], ...MENU_FRAME, body: chrome + Math.min(room.h, pages[this.tab]), hold: chrome + Math.min(room.h, Math.max(...Object.values(pages))), close: () => this.close() });
+    const strip = tabStrip(bag, p, p.top + 2, tabs, TABS, this.tab, (id) => this.setTab(id));
     const area = bodyOf(p, strip.bottom + 5);
     const say = footer(bag, p);
-    const row = tapH(l);
     this.body = this.own(new Bag(this.scene, bag.depth));
     this.pane = null;
     this.bagView = null;
-    if (this.tab === 'bag') this.bagView = this.own(new BagView(this.body, this.scene, area, say, slotPitch(l), row));
-    else if (this.tab === 'craft') this.pane = this.own(new ListPane(this.body, this.scene, area, p.wide, () => recipeEntries('craft'), undefined, row));
-    else if (this.tab === 'bundles') this.pane = this.own(new ListPane(this.body, this.scene, area, p.wide, () => bundleEntries(false), undefined, row));
-    else if (this.tab === 'friends') this.pane = this.own(new ListPane(this.body, this.scene, area, p.wide, () => friendEntries(), undefined, row));
-    else this.pane = this.own(new ListPane(this.body, this.scene, area, p.wide, () => optionEntries(() => { this.close(); this.toTitle(); }, () => this.close()), undefined, row));
+    const pane = (get: () => Entry[]): ListPane => this.own(new ListPane(this.body, this.scene, area, p.wide, get, undefined, row, style));
+    if (this.tab === 'bag') this.bagView = this.own(new BagView(this.body, this.scene, area, say, slotPitch(l), row, style));
+    else if (this.tab === 'craft') this.pane = pane(() => recipeEntries('craft'));
+    else if (this.tab === 'bundles') this.pane = pane(() => bundleEntries(false));
+    else if (this.tab === 'friends') this.pane = pane(() => friendEntries());
+    else this.pane = pane(() => optionEntries(() => { this.close(); this.toTitle(); }, () => this.close()));
     if (this.pane) this.pane.say = say;
   }
 
@@ -523,6 +589,19 @@ export class MenuScreen extends Screen {
   }
 }
 
+const LIST_FRAME = { wideH: 250, tallH: 480 } as const;
+
+/** A frame sized to its list: as many rows as there are entries, and the tallest card. */
+export function listPage(l: Layout, bag: Bag, title: string, frame: { wideH: number; tallH: number }, above: number, entries: Entry[], close: () => void, speaks = true): { p: Pop; row: number; style: CardStyle; area: Area } {
+  const f = frameOf(l, { ...frame, speaks });
+  const row = tapH(l);
+  const style = cardStyle(l, f.wide);
+  const room: Area = { x: 0, y: 0, w: f.inner, h: f.maxBody - above - 5 };
+  const need = planList(bag.scene, room, f.wide, entries, row, style).need;
+  const p = popup(bag, l, { title, ...frame, speaks, body: above + 5 + need, close });
+  return { p, row, style, area: bodyOf(p, p.top + above + 5, speaks) };
+}
+
 export class RecipeScreen extends Screen {
   private pane: ListPane | null = null;
 
@@ -533,9 +612,9 @@ export class RecipeScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.45);
-    const p = popup(bag, l, { title: this.title, wideH: 200, tallH: 300, close: () => this.close() });
+    const { p, row, style, area } = listPage(l, bag, this.title, LIST_FRAME, 0, recipeEntries(this.kind), () => this.close());
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, p.top + 5), p.wide, () => recipeEntries(this.kind), undefined, tapH(l)));
+    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => recipeEntries(this.kind), undefined, row, style));
     this.pane.say = footer(bag, p);
   }
 
@@ -545,6 +624,8 @@ export class RecipeScreen extends Screen {
   }
 }
 
+const SHRINE_TEXT = 'Give what the valley gave you, and a lantern lights.';
+
 export class ShrineScreen extends Screen {
   private pane: ListPane | null = null;
   private lit: Chip | null = null;
@@ -552,12 +633,17 @@ export class ShrineScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const p = popup(bag, l, { title: 'Lantern Shrine', wideH: 220, tallH: 320, close: () => this.close() });
+    const frame = { wideH: 270, tallH: 480 };
+    const f = frameOf(l, frame);
+    // on a short screen the card about the lantern matters more than the line of flavour above the list
+    const lines = f.maxBody >= 250 ? Math.min(2, wrapText(this.scene, SHRINE_TEXT, f.w - 24).split('\n').length) : 0;
+    const above = lines > 0 ? 2 + lines * LINE : 0;
+    const { p, row, style, area } = listPage(l, bag, 'Lantern Shrine', frame, above, bundleEntries(true), () => this.close());
     this.lit = chip(bag, p, 'item/lantern', 14, COL.ink, '');
     this.showLit();
-    const end = paragraph(bag, p.x + 12, p.top + 2, p.w - 24, 2 * LINE, 'Give what the valley gave you, and a lantern lights.');
+    if (lines > 0) paragraph(bag, p.x + 12, p.top + 2, p.w - 24, lines * LINE, SHRINE_TEXT);
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, end + 5), p.wide, () => bundleEntries(true), () => this.showLit(), tapH(l)));
+    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => bundleEntries(true), () => this.showLit(), row, style));
     this.pane.say = footer(bag, p);
   }
 
@@ -571,4 +657,3 @@ export class ShrineScreen extends Screen {
     else this.pane?.key(code, ev);
   }
 }
-

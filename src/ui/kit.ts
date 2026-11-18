@@ -13,6 +13,8 @@ export const COL = {
   leaf: PAL.leaf[4],
   berry: PAL.red[3],
   water: PAL.water[3],
+  /** A label on a button that cannot be used right now: parchment-brown, quieter than the text around it. */
+  off: 0x8b7a62,
 } as const;
 
 export const WEATHER_NAMES = { sun: 'Sunny', cloud: 'Cloudy', rain: 'Rainy', storm: 'Stormy', snow: 'Snowy' } as const;
@@ -51,8 +53,11 @@ export interface Button {
   destroy(): void;
 }
 
-/** A rounded nine-slice button with a label and a hit zone. With an icon and no text the icon sits in the middle; with both they are centred as a pair. */
-export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', onClick: () => void, icon?: string): Button {
+/**
+ * A rounded nine-slice button with a label and a hit zone. With an icon and no text the icon sits in the middle; with both they are centred as a pair.
+ * A button that is `off` looks switched off (it cannot do what it says) but still answers a press, so the screen can say why.
+ */
+export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', onClick: () => void, icon?: string, off = false): Button {
   const frame = (s: string): string => `ui/btn-${kind}-${s}`;
   const ns = scene.add.nineslice(x, y, 'atlas', frame('up'), w, h, 6, 6, 6, 6).setOrigin(0, 0);
   const tx = label(scene, x + w / 2, y + h / 2 + 1, text, { outline: true, origin: [0.5, 0.5] });
@@ -67,9 +72,13 @@ export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: 
     pic.setX(Math.round(x + w / 2));
   }
   let enabled = true;
+  const dead = (): boolean => !enabled || off;
   const set = (s: string): void => {
-    const push = s === 'down' && enabled ? 1 : 0;
-    ns.setTexture('atlas', enabled ? frame(s) : 'ui/btn-disabled');
+    const push = s === 'down' && !dead() ? 1 : 0;
+    ns.setTexture('atlas', dead() ? 'ui/btn-disabled' : frame(s));
+    // a switched-off label drops its dark outline: it sits on a pale plate, not a coloured one
+    tx.setFont(dead() ? 'hollow' : 'hollow-o').setTint(dead() ? COL.off : COL.cream);
+    pic?.setAlpha(dead() ? 0.6 : 1);
     tx.setY(Math.round(y + h / 2 + 1 + push));
     pic?.setY(Math.round(y + h / 2 + push));
   };

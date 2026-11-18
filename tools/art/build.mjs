@@ -282,7 +282,7 @@ for (const c of crops) {
   add('ui/arrow-down', U.arrowDown()); add('ui/arrow-right', U.arrowRight()); add('ui/check', U.check());
   for (const k of ['bag', 'craft', 'lantern', 'friends', 'options']) add(`ui/tab-${k}`, U.tabIcon(k));
   for (const s of SEASONS) add(`ui/season-${s}`, U.seasonIcon(s));
-  for (const w of ['sun', 'cloud', 'rain', 'storm', 'snow']) add(`ui/weather-${w}`, U.weatherIcon(w));
+  for (const w of ['sun', 'moon', 'cloud', 'rain', 'storm', 'snow']) add(`ui/weather-${w}`, U.weatherIcon(w));
   add('ui/stick-base', U.stickBase()); add('ui/stick-knob', U.stickKnob()); add('ui/action-btn', U.actionButton()); add('ui/hand', U.hand());
 }
 

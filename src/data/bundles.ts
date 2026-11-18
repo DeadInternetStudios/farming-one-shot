@@ -44,12 +44,12 @@ export const BUNDLES: readonly BundleDef[] = [
   },
   {
     id: 'miner', name: "Miner's Satchel", blurb: 'What is hidden in the old quarry.',
-    slots: [one('copperBar', 2), one('ironBar'), one('coal', 5), { any: ['gem-amethyst', 'gem-topaz', 'gem-aquamarine', 'gem-ruby'], n: 2, label: 'Any 2 gems' }],
+    slots: [one('copperBar', 2), one('ironBar'), one('coal', 5), { any: ['gem-amethyst', 'gem-topaz', 'gem-aquamarine', 'gem-ruby'], n: 2, label: 'Any gems' }],
     reward: { gold: 900, item: { id: 'goldBar', n: 1 } },
   },
   {
     id: 'hearth', name: 'Hearth and Home', blurb: 'The warm things that make a house a home.',
-    slots: [one('egg', 4), one('loaf', 2), one('wood', 20), { any: ['dish-soup', 'dish-stew', 'dish-pie', 'dish-salad', 'dish-jam'], n: 2, label: 'Any 2 dishes' }, one('dish-tea')],
+    slots: [one('egg', 4), one('loaf', 2), one('wood', 20), { any: ['dish-soup', 'dish-stew', 'dish-pie', 'dish-salad', 'dish-jam'], n: 2, label: 'Any dishes' }, one('dish-tea')],
     reward: { gold: 800, item: { id: 'seed-pumpkin', n: 4 } },
   },
 ];

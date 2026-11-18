@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { itemDef } from '../data/items';
-import { WEEKDAYS, dayOfSeason, formatTime, seasonOf, weekdayOf } from '../game/clock';
+import { WEEKDAYS, dayOfSeason, daylight, formatTime, seasonOf, weekdayOf } from '../game/clock';
 import { CAN_CAPACITY } from '../game/farming';
 import { nextGoal } from '../game/goals';
 import { HOTBAR_SIZE } from '../game/state';
@@ -291,7 +291,9 @@ export class Hud {
       this.clockSig = clockSig;
       const names = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' } as const;
       this.season.setFrame(`ui/season-${season}`);
-      this.weather.setFrame(`ui/weather-${st.weather}`);
+      // a clear sky after dark is a moon, not a sun
+      const dark = st.weather === 'sun' && daylight(season, st.minute) < 0.35;
+      this.weather.setFrame(dark ? 'ui/weather-moon' : `ui/weather-${st.weather}`);
       this.dayText.setText(`${names[season]} ${dayOfSeason(st.day)}`);
       this.timeText.setText(`${WEEKDAYS[weekdayOf(st.day)]}  ${formatTime(st.minute)}`);
     }

@@ -35,8 +35,8 @@ export class Bag {
     return this.add(nine(this.scene, kind, x, y, w, h), bump);
   }
 
-  btn(x: number, y: number, w: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', fn: () => void, h = 17, icon?: string): Button {
-    const b = button(this.scene, x, y, w, h, text, kind, fn, icon);
+  btn(x: number, y: number, w: number, text: string, kind: 'leaf' | 'wood' | 'berry' | 'sky', fn: () => void, h = 17, icon?: string, off = false): Button {
+    const b = button(this.scene, x, y, w, h, text, kind, fn, icon, off);
     for (const p of b.parts) (p as unknown as Depthed).setDepth(this.depth + 4);
     this.buttons.push(b);
     return b;
@@ -178,7 +178,8 @@ export class ListView {
 
   setRows(rows: Row[], keepSel = true): void {
     this.rows = rows;
-    if (!keepSel) { this.sel = 0; this.offset = 0; }
+    // a fresh list starts on the first thing that can be done, not on something greyed out
+    if (!keepSel) { this.sel = Math.max(0, rows.findIndex((r) => !r.dim)); this.offset = 0; }
     this.sel = Math.max(0, Math.min(rows.length - 1, this.sel));
     this.fit();
     this.paint();

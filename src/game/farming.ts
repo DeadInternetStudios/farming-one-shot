@@ -82,17 +82,19 @@ export function cropProfit(cropId: string, day: number): number {
   return harvests * yieldEach * def.sell - def.seed;
 }
 
-/** One line telling the player how long they have to get a seed in the ground, and whether it will pay. */
-export function plantAdvice(cropId: string, day: number): string {
+/** One line telling the player how long they have to get a seed in the ground, and whether it will pay. `warn` is set when planting now is a mistake. */
+export function plantAdviceFor(cropId: string, day: number): { text: string; warn: boolean } {
   const last = lastGoodDay(cropId, day) - cropDef(cropId).days;
-  if (last < day) return 'Too late to plant it this season.';
+  if (last < day) return { text: 'Too late to plant this season.', warn: true };
   let best = -1;
   for (let d = day; d <= last; d++) if (cropProfit(cropId, d) > 0) best = d;
-  if (best < day) return 'Planted now, it will not earn back its seed.';
-  if (best === day) return 'Plant it today to turn a profit.';
+  if (best < day) return { text: 'Planted now, it will not repay its seed.', warn: true };
+  if (best === day) return { text: 'Plant it today to turn a profit.', warn: false };
   const name = seasonOf(best);
-  return `Plant by ${name.charAt(0).toUpperCase()}${name.slice(1)} ${dayOfSeason(best)}.`;
+  return { text: `Plant by ${name.charAt(0).toUpperCase()}${name.slice(1)} ${dayOfSeason(best)}.`, warn: false };
 }
+
+export const plantAdvice = (cropId: string, day: number): string => plantAdviceFor(cropId, day).text;
 
 export function plant(soils: SoilMap, key: string, cropId: string): void {
   const s = soils[key];

@@ -7,10 +7,10 @@ import type { Slots } from '../game/inventory';
 import { deliver } from '../game/requests';
 import { session } from '../game/session';
 import type { ThingState } from '../game/state';
-import { tapH, slotPitch } from '../display';
-import { bodyOf, footer, popup } from './chrome';
+import { slotPitch, tapH } from '../display';
+import { footer, popup } from './chrome';
 import { COL, iconFor } from './kit';
-import { ListPane } from './MenuUI';
+import { ListPane, listPage } from './MenuUI';
 import type { Entry } from './MenuUI';
 import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Screens';
 import type { Host } from './Screens';
@@ -61,9 +61,9 @@ export class PickScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const p = popup(bag, l, { title: this.cfg.title, wideH: 200, tallH: 320, close: () => this.close() });
+    const { p, row, style, area } = listPage(l, bag, this.cfg.title, { wideH: 250, tallH: 480 }, 0, this.entries(), () => this.close(), false);
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, p.top + 5, false), p.wide, () => this.entries(), undefined, tapH(l)));
+    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => this.entries(), undefined, row, style));
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {
@@ -91,12 +91,12 @@ export class BoardScreen extends Screen {
         title: `${who} needs ${q.n} ${d.name}`,
         icon: iconFor(st, q.item),
         lines: [
-          { t: `You have ${got} of ${q.n}.`, tint: got >= q.n ? COL.leaf : COL.berry },
+          { t: d.name, need: { icon: iconFor(st, q.item), have: got, n: q.n } },
           `Reward: ${q.reward}g and a kind word.`,
           left <= 0 ? 'Last day to deliver.' : `${left} ${left === 1 ? 'day' : 'days'} left.`,
         ],
         actions: [{
-          label: 'Deliver', kind: 'leaf', run: () => {
+          label: 'Deliver', kind: 'leaf', off: got < q.n, run: () => {
             const r = deliver(st, q.id);
             if (!r.ok) { session.events.emit('sfx', 'nope'); return r.msg; }
             session.events.emit('sfx', 'coin');
@@ -111,9 +111,9 @@ export class BoardScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const p = popup(bag, l, { title: 'Notice Board', wideH: 200, tallH: 300, close: () => this.close() });
+    const { p, row, style, area } = listPage(l, bag, 'Notice Board', { wideH: 250, tallH: 480 }, 0, this.entries(), () => this.close());
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, p.top + 5), p.wide, () => this.entries(), undefined, tapH(l)));
+    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => this.entries(), undefined, row, style));
     this.pane.say = footer(bag, p);
   }
 
@@ -189,6 +189,8 @@ export class ChestScreen extends Screen {
   private chest!: SlotGrid;
   private pack!: SlotGrid;
   private line: Phaser.GameObjects.BitmapText | null = null;
+  /** What the last move did. Cleared as soon as the cursor goes somewhere else. */
+  private moved = '';
 
   constructor(host: Host, private loc: string, private key: string) {
     super(host);
@@ -219,28 +221,41 @@ export class ChestScreen extends Screen {
     const by = y + 26 + lift + chestRows * pitch + 6;
     bag.text(x + 12, by - 1, 'Bag', { tint: COL.dim });
     this.pack = new SlotGrid(body, x + 10, by + 11, cols, pitch, () => session.state.player.slots, (i) => { this.focus = 'bag'; this.move('bag', i); });
-    this.line = bag.text(p.x + p.w / 2, p.y + p.h - 14, 'Tap a stack to move it across.', { origin: [0.5, 0], tint: COL.dim });
+    this.line = bag.text(p.x + p.w / 2, p.y + p.h - 14, '', { origin: [0.5, 0], tint: COL.dim });
+    // start on something, not on a hole
+    const first = (slots: Slots): number => Math.max(0, slots.findIndex((s) => s !== null));
+    this.chest.sel = first(this.items);
+    this.pack.sel = first(session.state.player.slots);
+    if (this.items.every((s) => s === null) && session.state.player.slots.some((s) => s !== null)) this.focus = 'bag';
     this.paint();
   }
 
   private paint(): void {
     this.chest.paint(this.focus === 'chest');
     this.pack.paint(this.focus === 'bag');
+    const g = this.focus === 'chest' ? this.chest : this.pack;
+    const s = (this.focus === 'chest' ? this.items : session.state.player.slots)[g.sel];
+    const where = this.focus === 'chest' ? 'Chest' : 'Bag';
+    if (this.moved) this.line?.setText(this.moved).setTint(COL.ink);
+    else if (s) this.line?.setText(`${itemDef(s.id).name} x${s.n}. ${this.focus === 'chest' ? 'Tap to take it.' : 'Tap to store it.'}`).setTint(COL.ink);
+    else this.line?.setText(`${where}: an empty slot.`).setTint(COL.dim);
   }
 
   private move(from: 'chest' | 'bag', i: number): void {
     const src = from === 'chest' ? this.items : session.state.player.slots;
     const dst = from === 'chest' ? session.state.player.slots : this.items;
     const s = src[i];
+    this.moved = '';
     if (!s) { this.paint(); return; }
     if (!canAdd(dst, s.id, s.n)) {
-      this.line?.setText(from === 'chest' ? 'Your bag is full.' : 'The chest is full.');
+      this.moved = from === 'chest' ? 'Your bag is full.' : 'The chest is full.';
       session.events.emit('sfx', 'nope');
+      this.paint();
       return;
     }
     addItem(dst, s.id, s.n);
     src[i] = null;
-    this.line?.setText(`${itemDef(s.id).name} x${s.n}`);
+    this.moved = `${itemDef(s.id).name} x${s.n} to the ${from === 'chest' ? 'bag' : 'chest'}.`;
     session.events.emit('sfx', 'tick');
     session.events.emit('selected');
     this.paint();
@@ -250,6 +265,7 @@ export class ChestScreen extends Screen {
     if (isBack(code)) { this.close(); return; }
     const g = this.focus === 'chest' ? this.chest : this.pack;
     const n = g.cells.length;
+    if (!isConfirm(code)) this.moved = '';
     if (isLeft(code)) g.sel = (g.sel + n - 1) % n;
     else if (isRight(code)) g.sel = (g.sel + 1) % n;
     else if (isUp(code)) {
@@ -316,12 +332,12 @@ export class FurnaceScreen extends Screen {
         icon: iconFor(st, s.bar),
         lines: [
           `${s.need} ${itemDef(s.ore).name} and 1 Coal make one bar.`,
-          { t: `${itemDef(s.ore).name}: ${ore}`, tint: ore >= s.need ? COL.leaf : COL.berry },
-          { t: `Coal: ${coal}`, tint: coal >= 1 ? COL.leaf : COL.berry },
+          { t: itemDef(s.ore).name, need: { icon: iconFor(st, s.ore), have: ore, n: s.need } },
+          { t: 'Coal', need: { icon: iconFor(st, 'coal'), have: coal, n: 1 } },
           n > 0 ? `Up to ${MAX_BATCH} at once. ${n} now takes ${clockText(n * s.minutes)}.` : 'Not enough yet.',
         ],
         actions: [{
-          label: 'Smelt', kind: 'leaf', run: () => {
+          label: 'Smelt', kind: 'leaf', off: n === 0, run: () => {
             const r = startSmelt(st, t, s);
             session.events.emit('sfx', r.ok ? 'fire' : 'nope');
             if (r.ok) session.events.emit('selected');
@@ -335,9 +351,9 @@ export class FurnaceScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const p = popup(bag, l, { title: 'Furnace', wideH: 190, tallH: 300, close: () => this.close() });
+    const { p, row, style, area } = listPage(l, bag, 'Furnace', { wideH: 250, tallH: 480 }, 0, this.entries(), () => this.close());
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, p.top + 5), p.wide, () => this.entries(), undefined, tapH(l)));
+    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => this.entries(), undefined, row, style));
     this.pane.say = footer(bag, p);
   }
 
