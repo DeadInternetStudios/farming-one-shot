@@ -60,6 +60,12 @@ export function sunClock(season: Season, minute: number): SunClock {
   return t >= (rise + set) / 2 ? { evening: true, m: t - set } : { evening: false, m: t - rise };
 }
 
+/** True from the minute the sun clears the horizon in the morning to the minute it touches it in the evening: when the clock shows a sun and not a moon. */
+export function sunIsUp(season: Season, minute: number): boolean {
+  const s = sunClock(season, minute);
+  return s.evening ? s.m < 0 : s.m >= 0;
+}
+
 /** The evening runs from the first gold to full night over three hours of game time: about half a minute of real time at the standard pace. */
 export const EVENING = { from: -80, to: 110 } as const;
 

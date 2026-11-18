@@ -35,7 +35,7 @@ import { Finale } from '../systems/Finale';
 import { Fx } from '../systems/Fx';
 import { lightLanterns } from '../systems/Ceremony';
 import { Lighting } from '../systems/Lighting';
-import { lampOn, skyFor } from '../systems/sky';
+import { hushed, lampOn, skyFor } from '../systems/sky';
 import { MapView } from '../world/MapView';
 import { ObjectsView } from '../world/ObjectsView';
 import type { LightSpot } from '../world/ObjectsView';
@@ -80,6 +80,8 @@ export class WorldScene extends Phaser.Scene {
   private focus: { x: number; y: number } | null = null;
   /** How many shrine lanterns were lit before the pop-up that is lighting more of them opened. */
   private lanternFrom: number | null = null;
+  /** How far a lantern ceremony has pulled the evening over the valley. */
+  private hush = 0;
   private warpLock = 0;
   private lastHint = '';
   private furnacesBusy = new Set<string>();
@@ -299,8 +301,10 @@ export class WorldScene extends Phaser.Scene {
       this.postcardNudge();
     }
     this.rig.update(dt, this.focus?.x ?? this.player.x, this.focus?.y ?? this.player.y - 8);
-    const sky = skyFor(seasonOf(st.day), st.minute, st.weather, this.def.kind);
+    const sky = hushed(skyFor(seasonOf(st.day), st.minute, st.weather, this.def.kind), this.hush);
     this.ambient.update(dt, { season: seasonOf(st.day), weather: st.weather, minute: st.minute, kind: this.def.kind, day: sky.day });
+    if (this.objects.lightsDirty) this.useLights();
+    this.objects.setSun(sky.low, sky.side);
     this.lighting.update(sky, time, this.objects.glows, this.torch());
     for (const f of this.objects.nightFrames) f.setAlpha(lampOn(sky.lamps, f.x, f.y));
     this.chimneySmoke(dt, sky.day);
@@ -544,6 +548,7 @@ export class WorldScene extends Phaser.Scene {
       centre: at ? { x: at.x * 16 + at.w * 8, y: at.y * 16 + at.h * 8 } : { x: this.player.x, y: this.player.y },
       setLit: (n) => this.objects.setLit(n),
       look: (to) => { this.focus = to; },
+      dusk: (k) => { this.hush = k; },
     }, from, litCount(session.state));
   }
 

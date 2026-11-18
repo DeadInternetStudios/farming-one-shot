@@ -18,11 +18,13 @@ type RGB = [number, number, number];
 /** What the evening does to the colours of the valley, by minutes past sunset: white, the first gold, the sun on the horizon, rose, violet, blue, night. */
 const EVENING_SKY: readonly (readonly [number, RGB])[] = [
   [-80, [255, 255, 255]],
-  [-40, [255, 240, 214]],
-  [0, [255, 205, 150]],
-  [25, [222, 186, 168]],
-  [50, [150, 138, 176]],
-  [80, [86, 96, 166]],
+  [-45, [255, 236, 200]],
+  [-15, [255, 200, 145]],
+  [0, [255, 180, 122]],
+  [15, [232, 158, 156]],
+  [35, [184, 138, 182]],
+  [55, [132, 120, 184]],
+  [80, [84, 96, 168]],
   [110, [46, 60, 122]],
 ];
 
@@ -71,10 +73,11 @@ export function lampOn(lamps: number, x: number, y: number): number {
  */
 const EVENING_GLOW: readonly (readonly [number, RGB])[] = [
   [-75, [0, 0, 0]],
-  [-8, [34, 17, 4]],
-  [20, [28, 9, 14]],
-  [42, [12, 5, 20]],
-  [70, [0, 0, 0]],
+  [-8, [44, 21, 4]],
+  [15, [44, 12, 22]],
+  [38, [26, 8, 36]],
+  [64, [10, 4, 28]],
+  [88, [0, 0, 0]],
 ];
 
 /** And a shorter, thinner one before the sun is up. */
@@ -94,6 +97,12 @@ function glowOf(sun: SunClock, weather: Weather, season: Season): number {
   return pack([c[0] * k, c[1] * k, c[2] * k]);
 }
 
+/** How low the sun hangs, by minutes either side of the horizon: it comes down for an hour and a half, rests on the edge, and is gone soon after it sets. */
+function lowOf(sun: SunClock, weather: Weather, season: Season): number {
+  const k = GLOW_WEATHER[weather] * (season === 'winter' ? 0.7 : 1);
+  return k * (sun.evening ? smooth(-90, -20, sun.m) * (1 - smooth(0, 45, sun.m)) : smooth(-40, 0, sun.m) * (1 - smooth(10, 70, sun.m)));
+}
+
 export interface SkyState {
   /** Multiply colour for the whole scene. */
   ambient: number;
@@ -104,6 +113,31 @@ export interface SkyState {
   day: number;
   /** How much blue is added back into the shadows: 0 by day and indoors. */
   lift: number;
+  /** How low the sun hangs, 0 when it is high or gone and 1 on the horizon: how far the shadows run and how hard the sunlight washes in from the side. */
+  low: number;
+  /** Which edge of the screen the sun is behind: -1 the left (west, in the evening), 1 the right (east, in the morning). */
+  side: -1 | 1;
+}
+
+const HUSH = rgb(0x6c6aa0);
+
+/**
+ * The valley holds its breath: a lantern lighting pulls the evening over the shrine for a moment, whatever the hour, so the light has a
+ * dark to be seen in, and lets it go again. A sky that is already darker than that is left as it is.
+ */
+export function hushed(sky: SkyState, k: number): SkyState {
+  if (k <= 0) return sky;
+  const [r, g, b] = rgb(sky.ambient);
+  const toward = (c: number, h: number): number => c + (Math.min(c, h) - c) * k;
+  const [gr, gg, gb] = rgb(sky.glow);
+  return {
+    ...sky,
+    ambient: pack([toward(r, HUSH[0]), toward(g, HUSH[1]), toward(b, HUSH[2])]),
+    glow: pack([gr * (1 - k), gg * (1 - k), gb * (1 - k)]),
+    lamps: Math.max(sky.lamps, k),
+    lift: Math.max(sky.lift, k * 0.45),
+    low: sky.low * (1 - k),
+  };
 }
 
 const ROOM_DAY = rgb(0xf6e8d2);
@@ -113,10 +147,10 @@ const CAVE = rgb(0x4a5688);
 
 export function skyFor(season: Season, minute: number, weather: Weather, kind: MapKind): SkyState {
   const day = daylight(season, minute);
-  if (kind === 'cave') return { ambient: pack(CAVE), glow: 0, lamps: 1, day: 0, lift: 0 };
+  if (kind === 'cave') return { ambient: pack(CAVE), glow: 0, lamps: 1, day: 0, lift: 0, low: 0, side: -1 };
   if (kind === 'interior') {
     const t = smooth(0.05, 0.9, day);
-    return { ambient: pack(mix(ROOM_NIGHT, ROOM_DAY, t)), glow: 0, lamps: 0.55 + (1 - t) * 0.45, day, lift: 0 };
+    return { ambient: pack(mix(ROOM_NIGHT, ROOM_DAY, t)), glow: 0, lamps: 0.55 + (1 - t) * 0.45, day, lift: 0, low: 0, side: -1 };
   }
   const sun = sunClock(season, minute);
   let c = ramp(sun.evening ? EVENING_SKY : MORNING_SKY, sun.m);
@@ -131,5 +165,5 @@ export function skyFor(season: Season, minute: number, weather: Weather, kind: M
   const base = sun.evening ? smooth(-30, 75, sun.m) : 1 - smooth(-45, 20, sun.m);
   const lamps = Math.max(0, Math.min(1, base + (weather === 'storm' ? 0.35 : weather === 'rain' ? 0.15 : 0) * (1 - base * 0.5)));
   // snow is already bright, and blue added back onto it turns it electric
-  return { ambient: pack(c), glow: glowOf(sun, weather, season), lamps, day, lift: (1 - day) ** 1.2 * (season === 'winter' ? 0.3 : 1) };
+  return { ambient: pack(c), glow: glowOf(sun, weather, season), lamps, day, lift: (1 - day) ** 1.2 * (season === 'winter' ? 0.3 : 1), low: lowOf(sun, weather, season), side: sun.evening ? -1 : 1 };
 }

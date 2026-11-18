@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { EVENING, SUN, daylight, minutesPerSecond, sunClock } from '../src/game/clock';
+import { EVENING, SUN, daylight, minutesPerSecond, sunClock, sunIsUp } from '../src/game/clock';
 import type { PaceId } from '../src/game/clock';
 import { SEASONS } from '../src/game/types';
-import { lampOn, rgb, skyFor } from '../src/systems/sky';
+import { hushed, lampOn, rgb, skyFor } from '../src/systems/sky';
 
 describe('the evening', () => {
   it('falls slowly, in every season: full light before the first gold, none by the time the blue is in', () => {
@@ -48,6 +48,20 @@ describe('the evening', () => {
   });
 });
 
+describe('the clock', () => {
+  it('shows a sun until the sun touches the horizon and a moon until it clears it again, in every season', () => {
+    for (const season of ['spring', 'summer', 'fall', 'winter'] as const) {
+      const { rise, set } = SUN[season];
+      expect(sunIsUp(season, set - 1)).toBe(true);
+      expect(sunIsUp(season, set)).toBe(false);
+      expect(sunIsUp(season, 24 * 60 + 90)).toBe(false);
+      expect(sunIsUp(season, rise - 1)).toBe(false);
+      expect(sunIsUp(season, rise)).toBe(true);
+      expect(sunIsUp(season, 12 * 60)).toBe(true);
+    }
+  });
+});
+
 describe('the colour of the valley', () => {
   it('is untouched at noon with no lamps lit', () => {
     const s = skyFor('spring', 12 * 60, 'sun', 'outdoor');
@@ -85,6 +99,20 @@ describe('the colour of the valley', () => {
     expect(at(-8, 'sun', 'cave')).toEqual([0, 0, 0]);
   });
 
+  it('hangs the sun low for a while either side of the horizon, behind the left edge in the evening and the right in the morning', () => {
+    const at = (m: number, weather: 'sun' | 'storm' = 'sun') => skyFor('spring', m, weather, 'outdoor');
+    expect(at(12 * 60).low).toBe(0);
+    expect(at(SUN.spring.set + 120).low).toBe(0);
+    expect(at(SUN.spring.set - 10).low).toBeGreaterThan(0.9);
+    expect(at(SUN.spring.set - 10).side).toBe(-1);
+    expect(at(SUN.spring.set - 60).low).toBeGreaterThan(0.2);
+    expect(at(SUN.spring.rise + 5).low).toBeGreaterThan(0.8);
+    expect(at(SUN.spring.rise + 5).side).toBe(1);
+    expect(at(SUN.spring.set - 10, 'storm').low).toBe(0);
+    expect(skyFor('spring', SUN.spring.set - 10, 'sun', 'interior').low).toBe(0);
+    expect(skyFor('spring', SUN.spring.set - 10, 'sun', 'cave').low).toBe(0);
+  });
+
   it('keeps rooms and caves out of the outdoor blue', () => {
     expect(skyFor('spring', SUN.spring.set + 120, 'sun', 'interior').lift).toBe(0);
     expect(skyFor('spring', 12 * 60, 'sun', 'cave').lift).toBe(0);
@@ -93,6 +121,38 @@ describe('the colour of the valley', () => {
   it('lights lamps earlier in rain than in sun', () => {
     const m = SUN.fall.set - 20;
     expect(skyFor('fall', m, 'rain', 'outdoor').lamps).toBeGreaterThan(skyFor('fall', m, 'sun', 'outdoor').lamps);
+  });
+});
+
+describe('the hush over the shrine', () => {
+  const noon = skyFor('spring', 12 * 60, 'sun', 'outdoor');
+  const night = skyFor('spring', SUN.spring.set + 150, 'sun', 'outdoor');
+
+  it('changes nothing at zero', () => {
+    expect(hushed(noon, 0)).toBe(noon);
+  });
+
+  it('turns a bright noon into dusk with every lamp lit, and gives the sun back its glow to none', () => {
+    const dusk = hushed(skyFor('spring', SUN.spring.set - 10, 'sun', 'outdoor'), 1);
+    const [r, g, b] = rgb(dusk.ambient);
+    expect(Math.max(r, g, b)).toBeLessThan(200);
+    expect(b).toBeGreaterThan(r);
+    expect(dusk.lamps).toBe(1);
+    expect(dusk.glow).toBe(0);
+    expect(dusk.low).toBe(0);
+    expect(hushed(noon, 1).lift).toBeGreaterThan(0.4);
+  });
+
+  it('never makes a dark sky brighter, and gets there a little at a time', () => {
+    const [nr, ng, nb] = rgb(night.ambient);
+    const [hr, hg, hb] = rgb(hushed(night, 1).ambient);
+    expect(hr).toBeLessThanOrEqual(nr);
+    expect(hg).toBeLessThanOrEqual(ng);
+    expect(hb).toBeLessThanOrEqual(nb);
+    const half = rgb(hushed(noon, 0.5).ambient);
+    const full = rgb(hushed(noon, 1).ambient);
+    expect(half[0]).toBeGreaterThan(full[0]);
+    expect(half[0]).toBeLessThan(255);
   });
 });
 

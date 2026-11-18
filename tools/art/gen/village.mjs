@@ -176,9 +176,12 @@ export function shrine(lit) {
     day.hline(x - 4, y - 1, 9, R.ink[2]); day.hline(x - 2, y + 11, 5, R.ink[2]);
     if (i < lit) {
       day.rect(x - 2, y + 1, 5, 9, R.glow[2]); day.rect(x - 1, y + 2, 3, 7, R.glow[3]); day.vline(x, y + 3, 4, R.glow[4]);
+      day.hline(x - 2, y + 4, 5, R.glow[1]); day.hline(x - 2, y + 7, 5, R.glow[1]);
       glow.rect(x - 2, y + 1, 5, 9, R.glow[3]); glow.rect(x - 1, y + 2, 3, 7, R.glow[4]);
     } else {
-      day.rect(x - 2, y + 1, 5, 9, R.ink[3]); day.rect(x - 1, y + 2, 3, 7, R.ink[2]); day.set(x - 1, y + 3, R.ink[4]);
+      // paper that is waiting for its light: a pale violet, ribbed, lit on the left, so it reads as a lantern and not as a dark box
+      day.rect(x - 2, y + 1, 5, 9, R.purple[2]); day.vline(x - 2, y + 1, 9, R.purple[3]); day.vline(x + 2, y + 1, 9, R.purple[1]);
+      day.hline(x - 2, y + 4, 5, R.purple[1]); day.hline(x - 2, y + 7, 5, R.purple[1]); day.set(x - 1, y + 2, R.purple[4]);
     }
   });
   outline(day); glow.outline(() => null);

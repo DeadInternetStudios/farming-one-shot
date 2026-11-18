@@ -4,6 +4,7 @@ import { decorAt, frameOf } from '../features/garden/catalog';
 import type { LocationState, ObjectState } from '../game/state';
 import type { Season } from '../game/types';
 import { parseKey, tileKey } from '../game/types';
+import { SHRINE } from '../gen/art';
 import { DEPTH } from './MapView';
 import type { MapDef, ObjectKind } from './mapkit';
 
@@ -46,9 +47,22 @@ const SHADOW: Partial<Record<ObjectKind, { frame: string; alpha: number; dy: num
   berries: { frame: 'fx/shadow-m', alpha: 0.4, dy: -1 },
 };
 
+/** A shadow on the ground and how it was made, so the low sun can stretch it. */
+interface Shade {
+  img: Phaser.GameObjects.Image;
+  x: number;
+  sx: number;
+  sy: number;
+  alpha: number;
+  w: number;
+}
+
 /** Everything standing on the ground: trees, rocks, crops, buildings and props, sorted by their feet. */
 export class ObjectsView {
   private placed = new Map<string, Placed>();
+  private shades: Shade[] = [];
+  private sunLow = 0;
+  private sunSide: -1 | 1 = -1;
   private crops = new Map<string, Phaser.GameObjects.Image>();
   private grass: { sprite: Phaser.GameObjects.Image; phase: number }[] = [];
   readonly lights: LightSpot[] = [];
@@ -58,7 +72,9 @@ export class ObjectsView {
   readonly nightFrames: Phaser.GameObjects.Image[] = [];
   private bin: Phaser.GameObjects.Image | null = null;
   private animated: { img: Phaser.GameObjects.Image; frames: string[] }[] = [];
-  private shrine: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image } | null = null;
+  private shrine: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; left: number; top: number } | null = null;
+  /** A pool of warm light under each lantern that is lit. */
+  private lanternSpots: LightSpot[] = [];
   private grassTick = 0;
   private owned: Phaser.GameObjects.Image[] = [];
   /** Set when a garden light came or went, so the light map knows to pick up the new list. */
@@ -68,7 +84,7 @@ export class ObjectsView {
     for (const b of def.buildings) {
       const ax = (b.x + b.w / 2) * 16;
       const ay = (b.y + b.h) * 16;
-      this.img(ax, ay - 4, 'fx/shadow-l').setDisplaySize(b.w * 16 + 16, 18).setAlpha(0.5).setDepth(DEPTH.ground);
+      this.shade(ax, ay - 4, 'fx/shadow-l', 0.5, [b.w * 16 + 16, 18]);
       this.img(ax, ay, b.sprite).setOrigin(0.5, 1).setDepth(ay);
       if (b.glow) {
         const g = this.img(ax, ay, b.glow).setOrigin(0.5, 1).setDepth(ay + 0.5).setAlpha(0);
@@ -84,7 +100,7 @@ export class ObjectsView {
       const ay = (p.y + h) * 16;
       const sy = ay - (p.lift ?? 0);
       const depth = p.flat ? DEPTH.ground + 1 : ay;
-      if (!p.noShadow && !p.flat) this.img(ax, ay - 2, 'fx/shadow-m').setAlpha(0.4).setDepth(DEPTH.ground);
+      if (!p.noShadow && !p.flat) this.shade(ax, ay - 2, 'fx/shadow-m', 0.4);
       const s = this.img(ax, sy, p.sprite).setOrigin(0.5, 1).setDepth(depth);
       if (p.interact === 'bin') this.bin = s;
       if (p.frames) this.animated.push({ img: s, frames: p.frames });
@@ -92,7 +108,7 @@ export class ObjectsView {
       if (p.glow) {
         const g = this.img(ax, sy, p.glow).setOrigin(0.5, 1).setDepth(depth + 0.5).setAlpha(0);
         this.glows.push(g);
-        if (p.id === 'shrine') this.shrine = { img: s, glow: g };
+        if (p.id === 'shrine') this.shrine = { img: s, glow: g, left: p.x * 16, top: (p.y + h) * 16 - SHRINE.h };
       }
       if (p.light) this.lights.push({ x: ax + p.light.x, y: ay + p.light.y, r: p.light.r, color: p.light.color ?? 0xffbe66, flicker: true });
     }
@@ -105,16 +121,52 @@ export class ObjectsView {
     return i;
   }
 
+  /** A soft shadow on the ground under something, as long as the sun's height says. */
+  private shade(x: number, y: number, frame: string, alpha: number, size?: [number, number]): Phaser.GameObjects.Image {
+    const img = this.img(x, y, frame).setAlpha(alpha).setDepth(DEPTH.ground);
+    if (size) img.setDisplaySize(size[0], size[1]);
+    const shade: Shade = { img, x, sx: img.scaleX, sy: img.scaleY, alpha, w: img.displayWidth };
+    this.shades.push(shade);
+    this.stretch(shade);
+    return img;
+  }
+
+  private stretch(s: Shade): void {
+    const k = this.sunLow;
+    s.img.setScale(s.sx * (1 + k * 1.1), s.sy).setX(s.x - this.sunSide * k * s.w * 0.5).setAlpha(Math.min(1, s.alpha * (1 + k * 0.6)));
+  }
+
+  /** The low sun throws every shadow away from itself: long at the horizon, back under things when the sun is high or gone. */
+  setSun(low: number, side: -1 | 1): void {
+    const k = Math.round(low * 24) / 24;
+    if (k === this.sunLow && side === this.sunSide) return;
+    this.sunLow = k;
+    this.sunSide = side;
+    for (const s of this.shades) this.stretch(s);
+  }
+
   /** Show how many lanterns on the shrine are lit. */
   setLit(n: number): void {
-    this.shrine?.img.setFrame(`shrine/${n}`);
-    this.shrine?.glow.setFrame(`shrine/${n}-glow`);
+    const shrine = this.shrine;
+    if (!shrine) return;
+    shrine.img.setFrame(`shrine/${n}`);
+    shrine.glow.setFrame(`shrine/${n}-glow`);
+    // each lit lantern lights the stone under it, so one lantern out of seven still reads at dusk
+    for (const spot of this.lanternSpots) {
+      const i = this.lights.indexOf(spot);
+      if (i >= 0) this.lights.splice(i, 1);
+    }
+    this.lanternSpots = SHRINE.lanterns.slice(0, n).map((l) => ({ x: shrine.left + l.x, y: shrine.top + l.y, r: 24, color: 0xffc95e, flicker: true }));
+    this.lights.push(...this.lanternSpots);
+    this.lightsDirty = true;
   }
 
   destroy(): void {
     for (const i of this.owned) i.destroy();
     this.animated = [];
+    this.shades = [];
     this.shrine = null;
+    this.lanternSpots = [];
     this.owned = [];
     this.placed.clear();
     this.crops.clear();
@@ -164,7 +216,10 @@ export class ObjectsView {
   /** Take a placed object off the map, along with its shadow and any light it was giving. */
   private drop(key: string, have: Placed): void {
     have.sprite.destroy();
-    have.shadow?.destroy();
+    if (have.shadow) {
+      this.shades = this.shades.filter((s) => s.img !== have.shadow);
+      have.shadow.destroy();
+    }
     if (have.lit) {
       if (have.lit.glow) {
         const i = this.glows.indexOf(have.lit.glow);
@@ -216,10 +271,8 @@ export class ObjectsView {
         const px = x * 16 + 8;
         const py = (y + 1) * 16;
         const sprite = this.img(px, py, frame).setOrigin(0.5, 1).setDepth(py);
-        let shadow: Phaser.GameObjects.Image | undefined;
         const sh = SHADOW[o.k];
-        if (sh) shadow = this.img(px, py + sh.dy, sh.frame).setAlpha(sh.alpha).setDepth(DEPTH.ground);
-        if (o.k === 'tree') shadow?.setDisplaySize(30, 11);
+        const shadow = sh ? this.shade(px, py + sh.dy, sh.frame, sh.alpha, o.k === 'tree' ? [30, 11] : undefined) : undefined;
         this.placed.set(key, { sprite, shadow, kind: o.k, v: o.v, lit: this.lightUp(o, px, py) });
         if (o.k === 'tallgrass') this.grass.push({ sprite, phase: (x * 7 + y * 3) % 4 });
       }

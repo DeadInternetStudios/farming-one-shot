@@ -11,6 +11,8 @@ export interface ShrineStage {
   centre: { x: number; y: number };
   setLit(n: number): void;
   look(at: { x: number; y: number } | null): void;
+  /** How far the evening has been pulled over the green, 0 to 1. */
+  dusk(k: number): void;
 }
 
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
@@ -23,7 +25,8 @@ function bloom(scene: Phaser.Scene, x: number, y: number, tint: number, from: nu
 
 /**
  * A lantern lighting is the reward the whole game leans on, so it gets a moment of its own. The pop-up has closed, the world holds
- * still, the camera finds the shrine, and each new lantern comes on in turn with a bloom of gold.
+ * still, the interface steps back, dusk comes over the green whatever the hour, the camera finds the shrine, and each new lantern comes
+ * on in turn with a bloom of gold. Then the day comes back.
  * The caller shows the shrine as it was until now, so the first light happens in front of the player.
  */
 export function lightLanterns(scene: Phaser.Scene, fx: Fx, stage: ShrineStage, from: number, to: number): void {
@@ -32,10 +35,16 @@ export function lightLanterns(scene: Phaser.Scene, fx: Fx, stage: ShrineStage, f
     return;
   }
   session.hold();
+  session.events.emit('cinema', true);
   stage.look(stage.centre);
   const calm = settings.calm;
-  const lead = calm ? 300 : 650;
+  const lead = calm ? 450 : 1000;
   const gap = calm ? 500 : 950;
+  const hush = { k: 0 };
+  const fade = (to: number, ms: number, done?: () => void): void => {
+    scene.tweens.add({ targets: hush, k: to, duration: ms, ease: 'Sine.easeInOut', onUpdate: () => stage.dusk(hush.k), onComplete: done });
+  };
+  fade(1, lead - 100);
   for (let k = from; k < to; k++) {
     scene.time.delayedCall(lead + (k - from) * gap, () => {
       const at = stage.lanterns[k] ?? stage.lanterns[0];
@@ -48,8 +57,12 @@ export function lightLanterns(scene: Phaser.Scene, fx: Fx, stage: ShrineStage, f
       for (let i = 0; i < 6; i++) scene.time.delayedCall(i * 70, () => fx.sparkle(at.x + rnd(-14, 14), at.y + rnd(-18, 8)));
     });
   }
-  scene.time.delayedCall(lead + (to - from - 1) * gap + (calm ? 700 : 1300), () => {
-    stage.look(null);
-    session.release();
+  scene.time.delayedCall(lead + (to - from - 1) * gap + (calm ? 800 : 1500), () => {
+    fade(0, calm ? 500 : 1100, () => {
+      stage.dusk(0);
+      stage.look(null);
+      session.events.emit('cinema', false);
+      session.release();
+    });
   });
 }

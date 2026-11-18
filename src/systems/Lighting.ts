@@ -12,12 +12,19 @@ import type { SkyState } from './sky';
  */
 const NIGHT_LIFT = rgb(0x0c1640);
 
+/** The colour of the low sun's light, and how much of it reaches the screen at the horizon. */
+const SUN_EVENING = 0xff7a2a;
+const SUN_MORNING = 0xffb48a;
+const SUN_STRENGTH = 0.34;
+
 
 /** A multiplied light map: the ambient colour with warm pools of light added where lamps and windows are. */
 export class Lighting {
   private rt: Phaser.GameObjects.RenderTexture | null = null;
   private halos: Phaser.GameObjects.Image[] = [];
   private lift: Phaser.GameObjects.Rectangle | null = null;
+  /** The low sun, just off one edge of the screen: its light washes in from that side. */
+  private sun: Phaser.GameObjects.Image | null = null;
   private w = 0;
   private h = 0;
 
@@ -40,18 +47,21 @@ export class Lighting {
     if (this.rt && w === this.w && h === this.h) return;
     this.rt?.destroy();
     this.lift?.destroy();
+    this.sun?.destroy();
     this.w = w;
     this.h = h;
     this.rt = this.scene.add.renderTexture(0, 0, w, h).setOrigin(0, 0).setDepth(DEPTH.light).setBlendMode(Phaser.BlendModes.MULTIPLY);
     this.lift = this.scene.add.rectangle(0, 0, w, h, 0x000000).setOrigin(0, 0).setDepth(DEPTH.light + 50).setBlendMode(Phaser.BlendModes.ADD);
+    this.sun = this.scene.add.image(0, 0, 'atlas', 'fx/glow-128').setDepth(DEPTH.light + 51).setBlendMode(Phaser.BlendModes.ADD).setVisible(false);
   }
 
   update(sky: SkyState, time: number, glows: Phaser.GameObjects.Image[], extra: LightSpot[] = []): void {
-    const bright = sky.ambient === 0xffffff && sky.glow === 0 && sky.lamps < 0.02 && extra.length === 0;
+    const bright = sky.ambient === 0xffffff && sky.glow === 0 && sky.low === 0 && sky.lamps < 0.02 && extra.length === 0;
     for (const g of glows) g.setAlpha(lampOn(sky.lamps, g.x, g.y));
     if (bright) {
       this.rt?.setVisible(false);
       this.lift?.setVisible(false);
+      this.sun?.setVisible(false);
       for (const h of this.halos) h.setAlpha(0);
       return;
     }
@@ -67,6 +77,12 @@ export class Lighting {
     const glow = rgb(sky.glow);
     const added = [NIGHT_LIFT[0] * k + glow[0], NIGHT_LIFT[1] * k + glow[1], NIGHT_LIFT[2] * k + glow[2]] as [number, number, number];
     lift.setVisible(added[0] + added[1] + added[2] > 2).setPosition(ox, oy).setFillStyle(pack(added), 1);
+    (this.sun as Phaser.GameObjects.Image)
+      .setVisible(sky.low > 0.01)
+      .setPosition(ox + (sky.side < 0 ? 0 : this.w), oy + this.h * 0.42)
+      .setDisplaySize(this.w * 2, this.h * 1.6)
+      .setTint(sky.side < 0 ? SUN_EVENING : SUN_MORNING)
+      .setAlpha(sky.low * SUN_STRENGTH);
     const all = this.spots.concat(extra);
     all.forEach((s, i) => {
       const flick = s.flicker && !settings.calm ? 1 + Math.sin(time * 0.011 + i * 1.7) * 0.035 + Math.sin(time * 0.037 + i) * 0.02 : 1;
