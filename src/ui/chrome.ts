@@ -2,6 +2,8 @@ import type Phaser from 'phaser';
 import { tapH, type Layout } from '../display';
 import { PAL } from '../gen/art';
 import { COL, label, wrapText } from './kit';
+import { EASE, MS, pop } from './motion';
+import { settings } from '../game/settings';
 import type { Bag } from './widgets';
 
 /**
@@ -112,7 +114,16 @@ export function chip(bag: Bag, p: Pop, icon: string, iconW: number, tint: number
   place();
   // a long title (a shop's name) gives way to the chip instead of running under it
   p.title.setText(ellipsize(bag.scene, p.title.text, Math.round(right - t.width - 3 - iconW) - 8 - p.title.x));
-  return { set: (s) => { t.setText(s); place(); } };
+  let shown = text;
+  return {
+    set: (s) => {
+      t.setText(s);
+      place();
+      // the number someone is spending or earning nudges when it changes
+      if (s !== shown) pop(bag.scene, t);
+      shown = s;
+    },
+  };
 }
 
 /** The line at the foot of a pop-up that answers what you just did. Long answers wrap, and are cut with dots if they still do not fit. */
@@ -124,6 +135,12 @@ export function footer(bag: Bag, p: Pop, tint: number = COL.ink): (m: string, co
     const shown = all.slice(0, p.lines);
     if (all.length > p.lines) shown[p.lines - 1] = clip(bag.scene, shown[p.lines - 1] ?? '', room);
     t.setText(shown.join('\n')).setTint(color ?? tint);
+    // a new answer eases in, so a second purchase of the same thing still reads as a second answer
+    if (m && !settings.calm) {
+      bag.scene.tweens.killTweensOf(t);
+      t.setAlpha(0);
+      bag.scene.tweens.add({ targets: t, alpha: 1, duration: MS.quick, ease: EASE });
+    }
   };
 }
 

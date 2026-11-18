@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { session } from '../game/session';
 import { watchKey } from '../systems/keys';
 import type { Layout } from '../display';
+import { MS, reveal } from './motion';
+import type { Motion } from './motion';
 import { Bag, dimmer } from './widgets';
 
 export interface Host {
@@ -15,6 +17,8 @@ export interface Host {
 export abstract class Screen {
   protected bag: Bag;
   private extra: { destroy(): void }[] = [];
+  private motion: Motion | null = null;
+  private pageStart = -1;
 
   constructor(protected host: Host) {
     this.bag = new Bag(host.scene, 40);
@@ -49,14 +53,29 @@ export abstract class Screen {
   }
 
   teardown(): void {
+    this.motion?.stop();
+    this.motion = null;
     for (const e of this.extra) e.destroy();
     this.extra = [];
     this.bag.destroy();
   }
 
-  relayout(): void {
+  /** Marks where the page begins, under the title and tabs: a tab switch fades in only what is made after this. */
+  protected markPage(): void {
+    this.pageStart = this.scene.children.list.length;
+  }
+
+  /** The screen just opened: everything it made eases in. */
+  appear(made: readonly Phaser.GameObjects.GameObject[]): void {
+    this.motion = reveal(this.scene, made, { rise: 5, skipWide: this.l.uiW });
+  }
+
+  /** Builds the screen again, after a resize or a tab switch. `fade` brings the page in softly; the frame around it stays put. */
+  relayout(fade = false): void {
     this.teardown();
+    this.pageStart = -1;
     this.build();
+    if (fade && this.pageStart >= 0) this.motion = reveal(this.scene, this.scene.children.list.slice(this.pageStart), { ms: MS.quick });
   }
 }
 
@@ -83,7 +102,9 @@ export class ScreenStack implements Host {
     session.hold();
     if (this.stack.length === 0) session.events.emit('sfx', 'open');
     this.stack.push(s);
+    const before = new Set(this.scene.children.list);
     s.build();
+    s.appear(this.scene.children.list.filter((o) => !before.has(o)));
   }
 
   close(s: Screen): void {

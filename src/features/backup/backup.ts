@@ -65,7 +65,7 @@ export function unpackSave(text: string): Unpacked {
   let save = parsed;
   if (isObj(parsed) && 'game' in parsed) {
     if (parsed.game !== GAME) return { ok: false, msg: 'That file is not a Lantern Hollow save.' };
-    if (parsed.format !== FORMAT) return { ok: false, msg: 'That backup was made by a newer version of the game.' };
+    if (parsed.format !== FORMAT) return { ok: false, msg: 'A newer version of the game made that backup.' };
     save = parsed.save;
   }
   const wrong = whatIsWrong(save);

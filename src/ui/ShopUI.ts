@@ -66,7 +66,7 @@ function shelfEntries(ids: string[], hideLate: boolean): Entry[] {
     out.push({
       row: { text: 'More seeds soon', dim: true },
       title: 'The rest of the seeds',
-      lines: ['Seeds that cannot ripen before the season ends are kept in the back. They come out when it is time to plant them.'],
+      lines: ['Seeds that cannot ripen before the season ends stay in the back. They come out when it is time to plant them.'],
     });
   }
   return out;
@@ -95,15 +95,19 @@ function sellEntries(shopId: string): Entry[] {
         : [{ label: `Sell ${each}g`, kind: 'leaf', run: sellN(false) }],
     });
   });
-  if (out.length === 0) out.push({ row: { text: 'Nothing to sell', dim: true }, title: 'Nothing to sell', lines: ['Bring crops, fish and forage here when you have some.'] });
+  if (out.length === 0) out.push({ row: { text: 'Nothing to sell', dim: true, empty: true }, title: 'Nothing to sell', lines: ['Bring crops, fish and forage here when you have some.'] });
   return out;
 }
+
+/** What each farm upgrade looks like, from art the game already has. */
+const UPGRADE_ICON: Record<string, string> = { 'bag-1': 'ui/tab-bag', 'bag-2': 'ui/tab-bag', coop: 'prop/egg-basket', chick: 'critter/hen-brown-idle', cat: 'critter/cat-sit' };
 
 function upgradeEntries(): Entry[] {
   const st = session.state;
   return availableUpgrades(st).map((u: Upgrade): Entry => ({
-    row: { text: u.name, right: `${u.price}g`, dim: st.player.gold < u.price },
+    row: { text: u.name, right: `${u.price}g`, dim: st.player.gold < u.price, icon: UPGRADE_ICON[u.id] },
     title: u.name,
+    icon: UPGRADE_ICON[u.id],
     lines: [
       { t: `Costs ${u.price}g.`, tint: COL.ink },
       u.blurb,
@@ -121,7 +125,7 @@ function upgradeEntries(): Entry[] {
 
 function forgeEntries(): Entry[] {
   const st = session.state;
-  if (!st.flags['forge']) return [{ row: { text: 'Tool work', dim: true }, title: 'The forge', lines: ['Bram does not take tool work from strangers yet. Be friendly.'] }];
+  if (!st.flags['forge']) return [{ row: { text: 'Tool work', dim: true, empty: true }, title: 'The forge', lines: ['Bram does not take tool work from strangers yet. Be friendly.'] }];
   const out: Entry[] = [];
   if (st.forge) {
     const ready = st.forge.readyDay <= st.day;
@@ -164,7 +168,7 @@ function forgeEntries(): Entry[] {
       }],
     });
   }
-  if (out.length === 0) out.push({ row: { text: 'Nothing to upgrade', dim: true }, title: 'Nothing to upgrade', lines: ['Every tool in your bag is as good as it gets.'] });
+  if (out.length === 0) out.push({ row: { text: 'Nothing to upgrade', dim: true, empty: true }, title: 'Nothing to upgrade', lines: ['Every tool in your bag is as good as it gets.'] });
   return out;
 }
 
@@ -215,18 +219,19 @@ export class ShopScreen extends Screen {
     if (!p.wide && shop?.short) p.title.setText(shop.short);
     this.gold = chip(bag, p, 'ui/coin', 10, COL.berry, `${session.state.player.gold}g`);
     const strip = tabStrip(bag, p, p.top + 2, tabs, specs, String(this.tab), (id) => this.setTab(Number(id)));
-    const body = this.own(new Bag(this.scene, bag.depth));
     const speak = footer(bag, p, COL.dim);
     speak(this.msg, COL.dim);
+    this.markPage();
+    const body = this.own(new Bag(this.scene, bag.depth));
     const tab = this.tabs[this.tab] as Tab;
     this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, strip.bottom + 5), p.wide, () => tab.entries(), () => this.gold?.set(`${session.state.player.gold}g`), row, style));
-    this.pane.say = (m) => { this.msg = m; speak(m, COL.ink); };
+    this.pane.say = (m, color) => { this.msg = m; speak(m, color ?? COL.ink); };
   }
 
   private setTab(i: number): void {
     this.tab = i;
     this.msg = '';
-    this.relayout();
+    this.relayout(true);
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {

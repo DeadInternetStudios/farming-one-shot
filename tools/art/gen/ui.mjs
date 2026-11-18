@@ -247,6 +247,21 @@ const TAB_MAPS = {
     '....kddk....',
     '.....kk.....',
   ],
+  // a hammer: a broad stone head on a wooden handle, as chunky as its neighbours
+  craft: [
+    '.kkkkkkkkkk.',
+    'kSSSSSSSSSSk',
+    'kSssssssssdk',
+    'kssssssssddk',
+    'kddddddddddk',
+    '.kkkkwwkkkk.',
+    '....kwwk....',
+    '....kwwk....',
+    '....kwWk....',
+    '....kwWk....',
+    '....kWWk....',
+    '.....kk.....',
+  ],
   friends: [
     '............',
     '..kkk..kkk..',
@@ -265,16 +280,6 @@ const TAB_MAPS = {
 
 export function tabIcon(kind) {
   const i = new Img(12, 12);
-  if (kind === 'craft') {
-    // a hammer on the slant: a stone head across the top of a wooden handle
-    for (let x = 2; x <= 7; x++) i.set(x, 12 - x, R.wood[3]);
-    for (let x = 3; x <= 8; x++) i.set(x, 13 - x, R.wood[4]);
-    for (const [x, y] of [[6, 3], [7, 4], [8, 5], [9, 6]]) i.set(x, y, R.stone[3]);
-    for (const [x, y] of [[6, 2], [7, 3], [8, 4], [9, 5], [10, 6]]) i.set(x, y, R.stone[5]);
-    for (const [x, y] of [[7, 2], [8, 3], [9, 4], [10, 5]]) i.set(x, y, R.stone[6]);
-    i.outline(() => R.ink[0]);
-    return i;
-  }
   if (kind === 'options') {
     // a cog: a ring with eight teeth and a hole
     const c = 5.5;
@@ -292,6 +297,7 @@ export function tabIcon(kind) {
     c: R.wood[3], e: R.wood[2], R: R.red[3], H: R.pink[3], r: R.red[4], y: R.yellow[4],
   };
   if (kind === 'friends') { colors.R = R.red[3]; colors.H = R.pink[4]; }
+  if (kind === 'craft') colors.d = R.stone[3];
   if (kind === 'lantern') { colors.R = R.orange[3]; colors.H = R.orange[4]; colors.r = R.orange[4]; colors.y = R.yellow[4]; colors.d = R.red[3]; }
   TAB_MAPS[kind].forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') i.set(x, y, colors[ch] ?? R.ink[0]); }));
   return i;

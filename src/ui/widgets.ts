@@ -67,6 +67,8 @@ export interface Row {
   icon?: string;
   sub?: string;
   dim?: boolean;
+  /** A row that only says there is nothing here: centred, quiet, and never picked out as the chosen one. */
+  empty?: boolean;
   tint?: number;
 }
 
@@ -101,6 +103,8 @@ export class ListView {
   private bar: Phaser.GameObjects.Rectangle;
   private track: Phaser.GameObjects.Rectangle;
   private press: { y0: number; off0: number; moved: boolean } | null = null;
+  /** The row under a mouse, so a desktop pointer can tell what a click would pick. Fingers never hover. */
+  private hover = -1;
   private wheel: (p: Phaser.Input.Pointer, o: unknown, dx: number, dy: number) => void;
   private onMove: (p: Phaser.Input.Pointer) => void;
   private onUp: (p: Phaser.Input.Pointer) => void;
@@ -137,7 +141,8 @@ export class ListView {
     zone.on('pointerdown', (p: Phaser.Input.Pointer) => { this.press = { y0: this.uiY(p), off0: this.offset, moved: false }; });
     this.onMove = (p) => {
       const d = this.press;
-      if (!d || !p.isDown) return;
+      if (!d) { this.over(p); return; }
+      if (!p.isDown) return;
       const dy = this.uiY(p) - d.y0;
       if (!d.moved && Math.abs(dy) < DRAG_SLOP) return;
       d.moved = true;
@@ -160,6 +165,16 @@ export class ListView {
     bag.scene.input.on('wheel', this.wheel);
     bag.scene.input.on('pointermove', this.onMove);
     bag.scene.input.on('pointerup', this.onUp);
+  }
+
+  private over(p: Phaser.Input.Pointer): void {
+    if (p.wasTouch) return;
+    const wp = this.bag.scene.cameras.main.getWorldPoint(p.x, p.y);
+    const inside = wp.x >= this.x && wp.x <= this.x + this.w && wp.y >= this.y && wp.y < this.y + this.visible * this.rowH;
+    const at = inside ? this.offset + Math.floor((wp.y - this.y) / this.rowH) : -1;
+    if (at === this.hover) return;
+    this.hover = at;
+    this.paint();
   }
 
   private uiY(p: Phaser.Input.Pointer): number {
@@ -234,11 +249,18 @@ export class ListView {
         return;
       }
       const tint = r.tint ?? (r.dim ? COL.dim : COL.ink);
-      s.bg.setAlpha(idx === this.sel ? 0.5 : 0);
-      s.mark.setVisible(idx === this.sel);
+      const quiet = r.empty === true;
+      s.bg.setAlpha(quiet ? 0 : idx === this.sel ? 0.5 : idx === this.hover ? 0.22 : 0);
+      s.mark.setVisible(!quiet && idx === this.sel);
       s.right.setText(r.right ?? '').setTint(tint).setX(edge);
       const left = this.x + (r.icon ? 20 : 3);
-      fitText(s.text.setTint(tint).setX(left), r.text, edge - left - (r.right ? s.right.width + 6 : 0));
+      if (quiet) {
+        s.text.setOrigin(0.5, 0).setTint(tint).setX(this.x + this.w / 2);
+        fitText(s.text, r.text, this.w - 8);
+      } else {
+        s.text.setOrigin(0, 0);
+        fitText(s.text.setTint(tint).setX(left), r.text, edge - left - (r.right ? s.right.width + 6 : 0));
+      }
       if (r.icon) s.icon.setFrame(r.icon).setVisible(true).setAlpha(r.dim ? 0.55 : 1);
       else s.icon.setVisible(false);
     });

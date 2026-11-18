@@ -168,7 +168,7 @@ export function useTool(ctx: Ctx, tool: ToolId, tx: number, ty: number, dir: Dir
       if (o) return fail('Something is in the way.', tx, ty);
       if (isWater(ctx.map, tx, ty)) return fail("That's a bit wet to dig.", tx, ty);
       if (!ctx.map.tillable[ty * ctx.map.w + tx]) return fail("Can't dig here.", tx, ty);
-      if (!ctx.map.indoors && season === 'winter') return fail('The ground is frozen solid.', tx, ty);
+      if (!ctx.map.indoors && season === 'winter') return fail('The ground has frozen solid.', tx, ty);
       till(l.soil, key);
       return done({ sfx: 'hoe', fx: [{ t: 'dust', x: tx, y: ty }], changed: [key], energy: spend(ctx, tool) });
     }

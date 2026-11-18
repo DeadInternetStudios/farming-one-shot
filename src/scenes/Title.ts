@@ -430,7 +430,7 @@ export class TitleScene extends Phaser.Scene {
     const dim = this.add.rectangle(0, 0, l.uiW + 2, l.uiH + 2, PAL.ink[0], 0.62).setOrigin(0, 0).setDepth(D.ui + 10).setInteractive();
     parts.push(dim, nine(this, 'parchment', x, y, w, h).setDepth(D.ui + 11));
     parts.push(label(this, x + w / 2, y + 12, 'Start a new farm?', { tint: COL.ink, origin: [0.5, 0] }).setDepth(D.ui + 12));
-    parts.push(label(this, x + w / 2, y + 26, 'Your saved farm will be replaced.', { tint: COL.dim, origin: [0.5, 0], wrap: w - 20, align: 'center' }).setDepth(D.ui + 12));
+    parts.push(label(this, x + w / 2, y + 26, 'This replaces your saved farm.', { tint: COL.dim, origin: [0.5, 0], wrap: w - 20, align: 'center' }).setDepth(D.ui + 12));
     const half = Math.floor((w - 28) / 2);
     const yes = button(this, x + 10, y + h - bh - 9, half, bh, 'Start over', 'berry', () => { this.closeConfirm(); this.start(true); });
     const no = button(this, x + w - 10 - half, y + h - bh - 9, half, bh, 'Keep it', 'leaf', () => this.closeConfirm());

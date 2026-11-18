@@ -71,13 +71,13 @@ export const FESTIVALS: Readonly<Record<FestivalId, FestivalDef>> = {
       bram: 'Hot. Loud. Everyone is glad. I stood in the shade for an hour and enjoyed it.',
       ida: 'Cold soup and lemon ice. Eat before the sun gets to them.',
       tam: 'The Derby is mine every year. Some say the lake lets me win. The lake is a gentleman.',
-      wren: 'Look at the water. It looks like someone spilled the sky.',
+      wren: 'Look at the water. Someone spilled the sky in it.',
       olwen: 'Long days are for long remembering. Sit in the light a while.',
     },
   },
   harvest: {
     id: 'harvest', name: 'Harvest Fair', from: 10 * H, to: 20 * H,
-    stall: 'The table is being cleared. The judges are sleeping it off.',
+    stall: 'Stallholders are clearing the table. The judges are sleeping it off.',
     contest: {
       title: 'The Grand Harvest Table',
       invite: 'The Grand Harvest Table! Any crop or home-cooked dish. The judges are hungry, so something filling helps.',

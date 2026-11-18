@@ -263,7 +263,7 @@ export class Modals {
     };
     rule();
     if (s.sold.length === 0) {
-      this.text(open, x + pad, cy, 'Nothing was shipped today.', { tint: COL.dim });
+      this.text(open, x + pad, cy, 'You shipped nothing today.', { tint: COL.dim });
       cy += 12;
     } else {
       for (const r of rows) {

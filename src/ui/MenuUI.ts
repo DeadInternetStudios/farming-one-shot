@@ -80,7 +80,7 @@ export class ListPane {
   private card: Area;
   /** Set when the screen is torn down, which an action can do (taking a postcard closes the menu), so nothing paints after it. */
   private closed = false;
-  say: (m: string) => void = () => undefined;
+  say: (m: string, color?: number) => void = () => undefined;
 
   constructor(bag: Bag, scene: Phaser.Scene, a: Area, wide: boolean, private get: () => Entry[], private onChange: () => void = () => undefined, private rowH = 17, private style: CardStyle = { compact: true, pictures: true }) {
     const plan = planList(scene, a, wide, this.get(), rowH, style);
@@ -108,8 +108,10 @@ export class ListPane {
     if (!a) return;
     const m = a.run();
     if (this.closed) return;
-    if (typeof m === 'string') this.say(m);
-    else if (m) void m.then((late) => { if (this.closed) return; if (late) this.say(late); this.refresh(); });
+    // a button that was switched off can only be answering "no", and that reads in the warm red
+    const tone = a.off ? COL.berry : undefined;
+    if (typeof m === 'string') this.say(m, tone);
+    else if (m) void m.then((late) => { if (this.closed) return; if (late) this.say(late, tone); this.refresh(); });
     this.onChange();
     this.refresh();
   }
@@ -232,7 +234,7 @@ export function friendEntries(): Entry[] {
   const unmet = NPCS.length - met.length;
   if (unmet > 0) {
     out.push({
-      row: { text: met.length === 0 ? 'Say hello' : unmet === 1 ? 'One more to meet' : `${unmet} more to meet`, dim: true },
+      row: { text: met.length === 0 ? 'Say hello' : unmet === 1 ? 'One more to meet' : `${unmet} more to meet`, dim: true, empty: met.length === 0 },
       title: met.length === 0 ? 'You are new here' : 'Someone new',
       lines: [met.length === 0 ? 'Nobody knows your name yet. Walk into the village and say hello to the first person you see.' : `${unmet === 1 ? 'One neighbour is' : `${unmet} neighbours are`} still waiting to meet you. Look around the village.`],
     });
@@ -256,7 +258,7 @@ function accessEntries(): Entry[] {
     out.push({
       row: { text: 'Controls side', right: settings.lefty ? 'Left hand' : 'Right hand' },
       title: 'Controls side',
-      lines: ['Right hand puts the stick on the left and the action button on the right. Left hand swaps them.'],
+      lines: ['Right-handed: the stick on the left, the action button on the right. Left-handed: the other way round.'],
       adjust: () => toggle('lefty'),
       actions: [{ label: 'Swap sides', kind: 'leaf', run: () => { toggle('lefty'); return null; } }],
     });
@@ -269,7 +271,7 @@ function postcardEntry(closeMenu: () => void): Entry {
   return {
     row: { text: 'Take a postcard' },
     title: 'Take a postcard',
-    lines: ['Takes a picture of where you are standing and makes it into a postcard you can keep or send.', ...(getLayout().touch ? [] : ['On a keyboard you can also press P.'])],
+    lines: ['Photographs where you stand. Keep the postcard or send it.', ...(getLayout().touch ? [] : ['On a keyboard you can also press P.'])],
     actions: [{ label: 'Take it', kind: 'leaf', run: () => { closeMenu(); session.events.emit('postcard'); return null; } }],
   };
 }
@@ -290,13 +292,13 @@ function appEntries(st: GameState): Entry[] {
       {
         row: { text: 'Back up your farm' },
         title: 'Back up your farm',
-        lines: ['Saves a file with your whole farm in it. Keep it safe, or use it to move your game to another device.'],
+        lines: ['Saves a file with your whole farm in it. Keep it safe, or move your game to another device.'],
         actions: [{ label: 'Save a file', kind: 'leaf', run: () => backupToFile(st) }],
       },
       {
         row: { text: 'Restore a backup' },
         title: 'Restore a backup',
-        lines: ['Pick a backup file. It replaces the game saved on this device, then the game starts again from it.'],
+        lines: ['Pick a backup file. It replaces the game on this device, and the game restarts from it.'],
         actions: [{ label: 'Choose a file', kind: 'wood', run: () => restoreFromFile() }],
       },
     );
@@ -349,7 +351,7 @@ export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry
     {
       row: { text: 'Back to title' },
       title: 'Back to title',
-      lines: ['Your progress is saved first.'],
+      lines: ['The game saves your progress first.'],
       actions: [{ label: 'Leave', kind: 'berry', run: () => { saveGame(st); toTitle(); return null; } }],
     },
   ];
@@ -562,6 +564,7 @@ export class MenuScreen extends Screen {
     const strip = tabStrip(bag, p, p.top + 2, tabs, TABS, this.tab, (id) => this.setTab(id));
     const area = bodyOf(p, strip.bottom + 5);
     const say = footer(bag, p);
+    this.markPage();
     this.body = this.own(new Bag(this.scene, bag.depth));
     this.pane = null;
     this.bagView = null;
@@ -576,7 +579,7 @@ export class MenuScreen extends Screen {
 
   private setTab(t: TabId): void {
     this.tab = t;
-    this.relayout();
+    this.relayout(true);
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {

@@ -43,7 +43,7 @@ export const BUNDLES: readonly BundleDef[] = [
     reward: { gold: 600, item: { id: 'dish-stew', n: 3 } },
   },
   {
-    id: 'miner', name: "Miner's Satchel", blurb: 'What is hidden in the old quarry.',
+    id: 'miner', name: "Miner's Satchel", blurb: 'What the old quarry gives up.',
     slots: [one('copperBar', 2), one('ironBar'), one('coal', 5), { any: ['gem-amethyst', 'gem-topaz', 'gem-aquamarine', 'gem-ruby'], n: 2, label: 'Any gems' }],
     reward: { gold: 900, item: { id: 'goldBar', n: 1 } },
   },

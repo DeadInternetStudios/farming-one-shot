@@ -3,6 +3,7 @@ import { PAL } from '../gen/art';
 import { itemDef } from '../data/items';
 import type { GameState } from '../game/state';
 import type { ToolId } from '../game/types';
+import { shake } from './motion';
 
 /** Text colours: cream reads on the dark HUD pills, ink reads on parchment. */
 export const COL = {
@@ -71,6 +72,8 @@ export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: 
   } else if (pic) {
     pic.setX(Math.round(x + w / 2));
   }
+  const tx0 = tx.x;
+  const pic0 = pic?.x ?? 0;
   let enabled = true;
   const dead = (): boolean => !enabled || off;
   const set = (s: string): void => {
@@ -90,7 +93,10 @@ export function button(scene: Phaser.Scene, x: number, y: number, w: number, h: 
   zone.on('pointerdown', () => { armed = true; set('down'); });
   zone.on('pointerup', () => {
     set('hover');
-    if (armed && enabled) onClick();
+    if (armed && enabled) {
+      onClick();
+      if (off) shake(scene, (dx) => { ns.setX(x + dx); tx.setX(tx0 + dx); pic?.setX(pic0 + dx); });
+    }
     armed = false;
   });
   const parts: Phaser.GameObjects.GameObject[] = [ns, tx, zone];

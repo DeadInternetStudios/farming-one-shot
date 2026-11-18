@@ -568,7 +568,7 @@ export class WorldScene extends Phaser.Scene {
     const held = st.player.slots[st.player.selected];
     if (!held) return this.say('The shipping bin. Hold something to ship it. It sells overnight.');
     const def = itemDef(held.id);
-    if (def.kind === 'tool' || def.sell <= 0) return this.say("That can't be shipped.");
+    if (def.kind === 'tool' || def.sell <= 0) return this.say("You can't ship that.");
     const n = held.n;
     st.shipping.push({ id: held.id, n });
     st.player.slots[st.player.selected] = null;

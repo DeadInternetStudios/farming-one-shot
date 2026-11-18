@@ -7,7 +7,9 @@ import { HOTBAR_SIZE } from '../game/state';
 import { session } from '../game/session';
 import { PAL } from '../gen/art';
 import type { Layout } from '../display';
+import { settings } from '../game/settings';
 import { COL, iconFor, label, nine } from './kit';
+import { MS, easeOut } from './motion';
 
 /** Hotbar spacing in interface pixels. Touch screens get 22, which is 44 CSS pixels at the phone interface scale. */
 const pitchFor = (touch: boolean): number => (touch ? 22 : 19);
@@ -32,6 +34,13 @@ interface Toast {
 }
 
 /** The always-on interface: clock, gold, energy, hotbar, held item name and little toasts. */
+/** How clear a banner is: easing in from `from`, held until `until`, then fading out over `out` ms. */
+function banner(now: number, from: number, until: number, out: number): number {
+  const into = settings.calm ? 1 : easeOut((now - from) / MS.base);
+  const away = now > until ? 1 - (now - until) / out : 1;
+  return Math.min(into, away);
+}
+
 export class Hud {
   private objs: Phaser.GameObjects.GameObject[] = [];
   private season!: Phaser.GameObjects.Image;
@@ -48,12 +57,14 @@ export class Hud {
   private tipBg!: Phaser.GameObjects.NineSlice;
   private tipText!: Phaser.GameObjects.BitmapText;
   private tipUntil = 0;
+  private tipFrom = 0;
   private hintBg!: Phaser.GameObjects.NineSlice;
   private hintText!: Phaser.GameObjects.BitmapText;
   private hintShown = '';
   private placeBg!: Phaser.GameObjects.NineSlice;
   private placeText!: Phaser.GameObjects.BitmapText;
   private placeUntil = 0;
+  private placeFrom = 0;
   private placeName = '';
   private goalBg!: Phaser.GameObjects.NineSlice;
   private goalIcon!: Phaser.GameObjects.Image;
@@ -213,9 +224,10 @@ export class Hud {
     const y = this.hotbarTop - 20;
     this.tipBg.setPosition(cx - Math.floor(w / 2), y);
     this.tipText.setPosition(cx, y + 4);
-    this.tipUntil = this.scene.time.now + 1700;
-    this.tipBg.setVisible(true).setAlpha(1);
-    this.tipText.setVisible(true).setAlpha(1);
+    this.tipFrom = this.scene.time.now;
+    this.tipUntil = this.tipFrom + 1700;
+    this.tipBg.setVisible(true).setAlpha(settings.calm ? 1 : 0);
+    this.tipText.setVisible(true).setAlpha(settings.calm ? 1 : 0);
   }
 
   /** What the character is facing, when it can be used. An empty string clears it. */
@@ -272,9 +284,10 @@ export class Hud {
     this.placeBg.setSize(w, 17);
     const cx = Math.floor(this.l.uiW / 2);
     const top = this.topY();
-    this.placeBg.setPosition(cx - Math.floor(w / 2), top + 2).setVisible(true).setAlpha(1);
-    this.placeText.setPosition(cx, top + 7).setVisible(true).setAlpha(1);
-    this.placeUntil = this.scene.time.now + 2200;
+    this.placeBg.setPosition(cx - Math.floor(w / 2), top + 2).setVisible(true).setAlpha(settings.calm ? 1 : 0);
+    this.placeText.setPosition(cx, top + 7).setVisible(true).setAlpha(settings.calm ? 1 : 0);
+    this.placeFrom = this.scene.time.now;
+    this.placeUntil = this.placeFrom + 2200;
   }
 
   // ---------------------------------------------------------------- per frame
@@ -320,8 +333,8 @@ export class Hud {
       this.refreshSlots();
     }
 
-    if (this.tipText.visible && now > this.tipUntil) {
-      const a = 1 - (now - this.tipUntil) / 300;
+    if (this.tipText.visible) {
+      const a = banner(now, this.tipFrom, this.tipUntil, 300);
       if (a <= 0) {
         this.tipBg.setVisible(false);
         this.tipText.setVisible(false);
@@ -331,8 +344,8 @@ export class Hud {
       }
     }
 
-    if (this.placeText.visible && now > this.placeUntil) {
-      const a = 1 - (now - this.placeUntil) / 400;
+    if (this.placeText.visible) {
+      const a = banner(now, this.placeFrom, this.placeUntil, 400);
       if (a <= 0) {
         this.placeBg.setVisible(false);
         this.placeText.setVisible(false);

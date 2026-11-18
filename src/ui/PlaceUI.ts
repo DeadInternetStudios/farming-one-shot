@@ -54,7 +54,7 @@ export class PickScreen extends Screen {
         }],
       });
     });
-    if (out.length === 0) out.push({ row: { text: this.cfg.empty.title, dim: true }, title: this.cfg.empty.title, lines: this.cfg.empty.lines });
+    if (out.length === 0) out.push({ row: { text: this.cfg.empty.title, dim: true, empty: true }, title: this.cfg.empty.title, lines: this.cfg.empty.lines });
     return out;
   }
 
@@ -79,7 +79,7 @@ export class BoardScreen extends Screen {
     const st = session.state;
     const list = [...st.requests].sort((a, b) => a.until - b.until);
     if (list.length === 0) {
-      return [{ row: { text: 'Nothing posted', dim: true }, title: 'The board is bare', lines: ['New notes go up in the morning, once you have met the neighbours.', 'Say hello to everyone in the village.'] }];
+      return [{ row: { text: 'Nothing posted', dim: true, empty: true }, title: 'The board is bare', lines: ['New notes go up in the morning, once you have met the neighbours.', 'Say hello to everyone in the village.'] }];
     }
     return list.map((q): Entry => {
       const d = itemDef(q.item);
