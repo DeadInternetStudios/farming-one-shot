@@ -1,7 +1,7 @@
 // Plays the farm with a few kinds of player and prints how the money moves. `npm run sim`.
 //   npm run sim                 the table for each player
 //   npm run sim -- --days       also every day
-//   npm run sim -- --write      save the summary to .100x/must-not-break/game-economy.txt
+//   npm run sim -- --write      save the summary to .100x/must-not-break/game-economy-sim.txt
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { loadGame } from './load.mjs';
 

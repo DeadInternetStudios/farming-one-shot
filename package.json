@@ -14,6 +14,7 @@
     "audio": "node tools/audio/build.mjs",
     "assets": "npm run art && npm run audio",
     "sim": "node tools/sim/economy.mjs",
+    "check:economy": "node tools/sim/check.mjs",
     "audio:check": "node tools/audio/check.mjs"
   },
   "dependencies": {
