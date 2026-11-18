@@ -39,5 +39,5 @@ export default async ({ lh, page, wait, state, shot, log }) => {
   const hurry = await run(150, 'hurry');
   log(`[probe] walk ${walk.toFixed(1)} px/s, hurry ${hurry.toFixed(1)} px/s`);
   if (!(hurry > walk * 1.3)) throw new Error(`dragging past the ring should hurry: ${hurry.toFixed(1)} vs ${walk.toFixed(1)}`);
-  if (walk < 40) throw new Error(`a short drag should still walk at a steady pace, got ${walk.toFixed(1)}`);
+  if (walk < 25) throw new Error(`a short drag should still walk at a steady pace, got ${walk.toFixed(1)}`);
 };

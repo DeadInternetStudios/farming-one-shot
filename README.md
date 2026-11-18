@@ -21,6 +21,7 @@ Open the address Vite prints. Keyboard: arrows or WASD to move, E or Space to ac
 | --- | --- |
 | `npm run dev` | Starts the game with hot reload. |
 | `npm run build` | Type-checks, then builds the game into `dist/`. |
+| `npm run pack` | Builds, then zips the game into `release/` for a host that takes a folder of web files. It refuses a build with the test hooks in it. |
 | `npm run preview` | Serves `dist/` the way a host would. |
 | `npm test` | Runs the unit tests. |
 | `npm run check:economy` | Plays the farm with three kinds of player and fails if the money could dead-end, run away or stall. |
@@ -39,6 +40,10 @@ In the browser's own storage, under `lantern-hollow:save:v1`. It saves every few
 ## Security checks
 
 `npm audit --omit=dev` covers what ships, and it is clean. `npm audit` also lists a picomatch advisory that arrives through vite and vitest. No patched picomatch exists yet (the newest, 4.0.7, is the affected one), the build only gives it fixed patterns, and none of it is in the game people download. Check again when vite or vitest is next updated.
+
+## Selling it
+
+`docs/STORE.md` is a draft store page and a list of what only the owner can do first. `docs/SUPPORT.md` is the help page for players, and `docs/LISTEN.md` is a twenty minute check of the sound. The game shows its version under Options, Help and about. Build with `VITE_SUPPORT=you@example.com` to print a support address there.
 
 ## Licence
 

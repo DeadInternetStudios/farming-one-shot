@@ -27,10 +27,8 @@ export default async ({ lh, page, press, wait, shot, state, log }) => {
   await openOptions();
   await shot('options-1-list');
 
-  // the list, top to bottom
-  const rows = touch
-    ? ['Controls', 'Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Larger interface', 'Controls side', 'Take a postcard', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title']
-    : ['Controls', 'Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Larger interface', 'Take a postcard', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title'];
+  // the list, top to bottom, as the game itself names it, so a row added above the one wanted cannot send a press to the wrong place
+  const rows = await lh('options');
   const go = async (name) => {
     const to = rows.indexOf(name);
     for (let i = 0; i < (to - cur + rows.length) % rows.length; i++) await press('ArrowDown', 60);

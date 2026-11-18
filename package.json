@@ -11,6 +11,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "pack": "npm run build && node tools/pack.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "art": "node tools/art/build.mjs",

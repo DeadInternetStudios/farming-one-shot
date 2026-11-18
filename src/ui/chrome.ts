@@ -348,12 +348,17 @@ function needRow(b: Bag, x: number, y: number, w: number, need: NonNullable<Card
   if (done && pictures) b.img(x + w - count.width - 7, y + 8, 'ui/check');
 }
 
+/** Filled in by `drawCard` when a card is read a page at a time: how many of its lines this page took. */
+export interface CardPaging {
+  drawn: number;
+}
+
 /**
  * The card about the selected row: a picture and a title, a few lines, and buttons right under them.
  * Lines that do not fit above the buttons are cut with dots, so text never runs under them.
  * Says how tall the card came out, so a frame can be as tall as what it holds.
  */
-export function drawCard(b: Bag, box: Area, c: CardSpec, btnH: number, style: CardStyle, act: (i: number) => void): number {
+export function drawCard(b: Bag, box: Area, c: CardSpec, btnH: number, style: CardStyle, act: (i: number) => void, paging?: CardPaging): number {
   const { x, y, w, h } = box;
   const acts = c.actions ?? [];
   const limit = acts.length > 0 ? y + h - btnH - 4 : y + h;
@@ -370,6 +375,7 @@ export function drawCard(b: Bag, box: Area, c: CardSpec, btnH: number, style: Ca
     const t = b.text(x + 2, y + 2, c.title, { wrap: w - 4 });
     ty = y + 5 + Math.ceil(t.height);
   }
+  let drawn = 0;
   for (const ln of c.lines) {
     const line = asLine(ln);
     if (line.need) {
@@ -377,12 +383,17 @@ export function drawCard(b: Bag, box: Area, c: CardSpec, btnH: number, style: Ca
       if (ty + rowH > limit) break;
       needRow(b, x + 2, ty, w - 4, line.need, line.t, style.pictures);
       ty += rowH + 2;
+      drawn += 1;
       continue;
     }
+    // a card that is read a page at a time never cuts a paragraph in half, unless one alone is taller than the page
+    if (paging && drawn > 0 && wrapText(b.scene, line.t, w - 4).split('\n').length * LINE > limit - ty) break;
     const end = paragraph(b, x + 2, ty, w - 4, limit - ty, line.t, line.tint);
     if (end === ty) break;
     ty = end + 3;
+    drawn += 1;
   }
+  if (paging) paging.drawn = drawn;
   if (c.extra && ty + 12 <= limit) ty = c.extra(b, x + 2, ty + 1, w - 4);
   if (acts.length === 0) return ty - y;
   const by = Math.min(ty + 3, y + h - btnH);

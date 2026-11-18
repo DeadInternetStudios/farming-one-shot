@@ -14,6 +14,8 @@ import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offlin
 import { PACE_REAL_MINUTES } from '../game/clock';
 import type { PaceId } from '../game/clock';
 import { controlsLines } from './controlsText';
+import { helpLines } from './helpText';
+import { SUPPORT, versionLabel } from '../version';
 import { carryHint, swapHint } from './words';
 import { available, donate, giving, isComplete, progressOf, slotDone } from '../game/bundles';
 import { have, make, plan } from '../game/crafting';
@@ -26,6 +28,7 @@ import { session } from '../game/session';
 import { settings, saveSettings } from '../game/settings';
 import { friendOf, heartsOf } from '../game/social';
 import type { GameState } from '../game/state';
+import type { CardPaging } from './chrome';
 import { LINE, bodyOf, cardHeight, cardStyle, chip, drawCard, footer, frameOf, paragraph, planTabs, popup, tabStrip } from './chrome';
 import type { Area, CardSpec, CardStyle, Chip, Pop } from './chrome';
 import { COL, WEATHER_NAMES, iconFor, wrapText } from './kit';
@@ -97,6 +100,11 @@ export class ListPane {
   private listRowH: number;
   /** Set when the screen is torn down, which an action can do (taking a postcard closes the menu), so nothing paints after it. */
   private closed = false;
+  /** Which row's card is being read a page at a time, the first line of the page on show, and where the next page begins. */
+  private pagedFor = -1;
+  private page = 0;
+  private next = 0;
+  private paged = false;
   say: (m: string, color?: number) => void = () => undefined;
 
   /** `a` is the most room the page may have. The frame `pop` is as tall as the list and the selected card need, and follows the selection. */
@@ -150,16 +158,43 @@ export class ListPane {
     const b = this.info;
     b.destroy();
     const e = this.entries[this.list.sel];
-    const used = e ? drawCard(b, this.card, face(e), this.rowH, this.style, (i) => this.pick(this.list.sel, i)) : 0;
+    const used = e ? this.drawEntry(b, face(e)) : 0;
     // beside the card the page is as tall as the longer of the two; under the list it is both
     const listed = Math.min(this.entries.length, this.list.visible) * this.listRowH;
     this.pop.fit(this.a.y - this.pop.top + (this.pop.wide ? Math.max(listed, used) : this.card.y - this.a.y + used));
   }
 
+  /**
+   * A card with no buttons that is taller than the room it has (the Controls page on a phone held sideways) is read a page at a time,
+   * with a button to turn the page, so no line of it is ever lost. Every other card is drawn as it is.
+   */
+  private drawEntry(b: Bag, e: Entry): number {
+    const act = (i: number): void => this.pick(this.list.sel, i);
+    const long = !e.actions?.length && cardHeight(this.info.scene, this.card.w, e, this.rowH, this.style) > this.card.h + 1;
+    if (this.pagedFor !== this.list.sel) { this.pagedFor = this.list.sel; this.page = 0; }
+    if (!long) { this.paged = false; this.page = 0; return drawCard(b, this.card, e, this.rowH, this.style, act); }
+    if (this.page >= e.lines.length) this.page = 0;
+    const rest = { ...e, lines: e.lines.slice(this.page) };
+    // draw once out of sight to learn how many lines fit, so the button can say whether another page follows
+    const probe = new Bag(this.info.scene, this.info.depth);
+    const fit: CardPaging = { drawn: 0 };
+    drawCard(probe, this.card, { ...rest, actions: [{ label: 'More', kind: 'wood' }] }, this.rowH, this.style, () => undefined, fit);
+    probe.destroy();
+    this.next = this.page + Math.max(1, fit.drawn);
+    this.paged = true;
+    const last = this.next >= e.lines.length;
+    return drawCard(b, this.card, { ...rest, actions: [{ label: last ? 'From the top' : 'More', kind: 'wood' }] }, this.rowH, this.style, () => this.turnPage(), { drawn: 0 });
+  }
+
+  private turnPage(): void {
+    this.page = this.next >= (this.entries[this.list.sel]?.lines.length ?? 0) ? 0 : this.next;
+    this.paint();
+  }
+
   key(code: string, ev: KeyboardEvent): boolean {
     if (isUp(code)) this.list.move(-1);
     else if (isDown(code)) this.list.move(1);
-    else if (isConfirm(code)) this.pick(this.list.sel, ev.shiftKey ? 1 : 0);
+    else if (isConfirm(code)) { if (this.paged && !this.entries[this.list.sel]?.actions?.length) this.turnPage(); else this.pick(this.list.sel, ev.shiftKey ? 1 : 0); }
     else if (isLeft(code) && this.entries[this.list.sel]?.adjust) { (this.entries[this.list.sel] as Entry).adjust?.(-1); this.refresh(); }
     else if (isRight(code) && this.entries[this.list.sel]?.adjust) { (this.entries[this.list.sel] as Entry).adjust?.(1); this.refresh(); }
     else return false;
@@ -406,6 +441,10 @@ function controlsEntry(): Entry {
   return { row: { text: 'Controls' }, title: 'Controls', lines: controlsLines(getLayout().touch, POSTCARD_ON) };
 }
 
+function helpEntry(): Entry {
+  return { row: { text: 'Help and about' }, title: 'Help and about', lines: helpLines(versionLabel(), SUPPORT) };
+}
+
 export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry[] {
   const st = session.state;
   const pct = (v: number): string => `${Math.round(v * 10)}/10`;
@@ -421,6 +460,7 @@ export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry
   });
   return [
     controlsEntry(),
+    helpEntry(),
     slider('Music', 'music', 'How loud the music is.'),
     slider('Sounds', 'sfx', 'How loud the little sounds are.'),
     {
