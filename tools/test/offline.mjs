@@ -1,5 +1,6 @@
 // Plays the built game once online, then cuts the network and reloads: it must still start.
-// Run: npm run build && npx vite preview --port 54180 & node tools/test/offline.mjs http://127.0.0.1:54180/
+// It jumps into a farm with the test flags, so the build must be made with them: VITE_TEST_HOOKS=1 npm run build
+// Run: VITE_TEST_HOOKS=1 npm run build && npx vite preview --port 54180 & node tools/test/offline.mjs http://127.0.0.1:54180/
 import { createRequire } from 'node:module';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:54180/';

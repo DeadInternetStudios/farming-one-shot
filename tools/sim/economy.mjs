@@ -36,9 +36,10 @@ for (const key of ['casual', 'steady', 'keen']) {
   const noTime = run.days.filter((r) => r.note.includes('no time')).length;
   const withered = run.days.reduce((a, r) => a + r.withered, 0);
   out(`  days with thirsty crops: ${thirsty}, days too short for the store: ${noTime}, crops withered: ${withered}`);
-  const farmDays = run.days.filter((r) => r.note !== 'winter');
+  const farmDays = run.days.filter((r) => !r.note.startsWith('winter'));
+  const winterDays = run.days.filter((r) => r.note.startsWith('winter'));
   out(`  seeds bought: ${run.days.reduce((a, r) => a + r.spent, 0)}g, lowest gold in hand: ${Math.min(...run.days.map((r) => r.gold))}g, best day: ${Math.max(...run.days.map((r) => r.earned))}g`);
-  out(`  average on a farm day: ${Math.round(farmDays.reduce((a, r) => a + r.earned, 0) / farmDays.length)}g`);
+  out(`  average on a farm day: ${Math.round(farmDays.reduce((a, r) => a + r.earned, 0) / farmDays.length)}g, on a winter day at the lake: ${Math.round(winterDays.reduce((a, r) => a + r.earned, 0) / Math.max(1, winterDays.length))}g`);
   if (args.has('--days')) {
     out('  day  gold  paid  seeds  tiles  planted  harvested  energy  mins  note');
     for (const r of run.days) out(`  ${String(r.day).padStart(3)} ${String(r.gold).padStart(5)} ${String(r.earned).padStart(5)} ${String(r.spent).padStart(6)} ${String(r.tiles).padStart(6)} ${String(r.planted).padStart(8)} ${String(r.harvested).padStart(10)} ${String(r.energyLeft).padStart(7)} ${String(r.minutesLeft).padStart(5)}  ${r.note}`);

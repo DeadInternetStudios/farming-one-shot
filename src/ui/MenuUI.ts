@@ -352,6 +352,9 @@ function appEntries(st: GameState): Entry[] {
 const PACES: PaceId[] = ['relaxed', 'standard', 'brisk'];
 const PACE_NAMES: Record<PaceId, string> = { relaxed: 'Relaxed', standard: 'Standard', brisk: 'Brisk' };
 
+/** Set once Leave has warned that the browser will not keep the farm, so the next press goes through. */
+let leaveWarned = false;
+
 export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry[] {
   const st = session.state;
   const pct = (v: number): string => `${Math.round(v * 10)}/10`;
@@ -388,14 +391,40 @@ export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry
     {
       row: { text: 'Save game' },
       title: 'Save game',
-      lines: ['The game saves each night and whenever you walk through a door. You can also save now.'],
-      actions: [{ label: 'Save now', kind: 'leaf', run: () => { saveGame(st); session.events.emit('sfx', 'tick'); return 'Saved.'; } }],
+      lines: ['The game saves every few seconds, whenever you walk through a door, and each night. You can also save now.'],
+      actions: [{
+        label: 'Save now',
+        kind: 'leaf',
+        run: () => {
+          if (!saveGame(st)) {
+            session.events.emit('sfx', 'nope');
+            return 'The browser would not keep your farm. Back it up to a file so it is not lost.';
+          }
+          session.events.emit('sfx', 'tick');
+          return 'Saved.';
+        },
+      }],
     },
     {
       row: { text: 'Back to title' },
       title: 'Back to title',
       lines: ['The game saves your progress first.'],
-      actions: [{ label: 'Leave', kind: 'berry', run: () => { saveGame(st); toTitle(); return null; } }],
+      actions: [{
+        label: 'Leave',
+        kind: 'berry',
+        run: () => {
+          // if the browser will not keep the farm, say so once before leaving it behind; a second press leaves anyway
+          const kept = saveGame(st);
+          if (kept) leaveWarned = false;
+          if (!kept && !leaveWarned) {
+            leaveWarned = true;
+            session.events.emit('sfx', 'nope');
+            return 'The browser would not keep your farm. Back it up first, or press Leave again to go.';
+          }
+          toTitle();
+          return null;
+        },
+      }],
     },
   ];
 }

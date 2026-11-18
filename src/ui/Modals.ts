@@ -140,6 +140,21 @@ export class Modals {
     });
   }
 
+  /** Another tab has taken this farm. This page has stopped saving, and the only way on is to load it again. */
+  locked(): void {
+    const text = 'Lantern Hollow is open in another tab, so this one has stopped saving. Reload to play here instead.';
+    this.present(() => {
+      const { open } = this.begin(() => window.location.reload());
+      const w = Math.min(196, this.l.uiW - 12);
+      const t = label(this.scene, 0, 0, text, { wrap: w - 24 });
+      const h = Math.ceil(t.height) + 40;
+      t.destroy();
+      const { x, y } = this.panel(open, w, h);
+      this.text(open, x + 12, y + 12, text, { wrap: w - 24 });
+      this.btn(open, x + w - 70, 60, 'Reload', 'leaf', () => window.location.reload());
+    });
+  }
+
   // ---------------------------------------------------------------- the letter that starts the story
 
   letter(done: () => void): void {

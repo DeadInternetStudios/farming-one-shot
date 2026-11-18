@@ -65,7 +65,9 @@ export function nextGoal(st: GameState): Goal | null {
   if (!st.flags.shrineSeen) return gift('shrine', 'Look at the shrine in the village');
   if (!hasMet(st, 'tam') && countItem(st.player.slots, 'rod') === 0 && st.stats.caught === 0) return gift('tam', 'Find Old Tam at the lake');
   if (st.deepest === 0 && st.day >= 3) return gift('wood', 'Explore the woods north of the farm');
-  if (!planted && st.day > 1) return gift('replant', `Plant ${season === 'winter' ? 'something for spring' : 'a new crop'}`);
+  // the ground is frozen all winter, so there is nothing to plant: that is when the lake and the lanterns are for
+  if (!planted && st.day > 1 && season !== 'winter') return gift('replant', 'Plant a new crop');
+  if (season === 'winter' && !planted && st.stats.caught === 0 && countItem(st.player.slots, 'rod') > 0) return gift('ice', 'Too cold to plant. Try the lake');
 
   // once there is gold to spare, point at the garden: lanterns and the rest are what the money is for
   const cheapest = Math.min(...DECOR.map((d) => d.price));

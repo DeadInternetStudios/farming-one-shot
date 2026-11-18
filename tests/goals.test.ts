@@ -148,8 +148,48 @@ describe('the next goal', () => {
     for (const name of Object.values(FESTIVAL_NAMES)) samples.push(`${name} is on in the village`, `${name} opens at 10 in the village`, `${name} is tomorrow`);
     samples.push('The Lantern Festival is tonight', 'Be at the shrine when the lanterns rise', 'Olwen is waiting at the shrine after dark');
     for (const b of BUNDLES) samples.push(`Fill the ${b.name}`);
-    samples.push('Say hello to the villagers (0 of 6)', 'Sleep in your bed to grow the crops', 'Dig a patch of soil with the hoe', 'All lanterns lit! Festival: Winter 7');
+    samples.push('Too cold to plant. Try the lake', 'Say hello to the villagers (0 of 6)', 'Sleep in your bed to grow the crops', 'Dig a patch of soil with the hoe', 'All lanterns lit! Festival: Winter 7');
     expect(samples.length).toBeGreaterThan(15);
     for (const s of samples) expect(width(s), s).toBeLessThanOrEqual(200);
+  });
+});
+
+describe('winter, when nothing can be planted', () => {
+  const winter = (): GameState => {
+    const st = fresh();
+    st.flags.outside = true;
+    st.stats.harvested = 20;
+    st.stats.shipped = 10;
+    meet(st, 'mirren', 'bram', 'ida', 'tam', 'olwen', 'pip');
+    st.flags.shrineSeen = true;
+    st.deepest = 1;
+    st.stats.caught = 3;
+    st.player.gold = 10;
+    st.day = 24; // winter 3
+    st.minute = 9 * 60;
+    return st;
+  };
+
+  it('never tells the farmer to plant, and still points at the lanterns', () => {
+    const st = winter();
+    const g = nextGoal(st);
+    expect(g?.id).not.toBe('replant');
+    expect(g?.text).not.toMatch(/plant/i);
+    expect(g?.id).toBe('lantern');
+  });
+
+  it('points a farmer with no fish yet at the lake and the mine', () => {
+    const st = winter();
+    st.stats.caught = 0;
+    st.player.slots[9] = { id: 'rod', n: 1 };
+    expect(nextGoal(st)?.id).toBe('ice');
+    st.stats.caught = 1;
+    expect(nextGoal(st)?.id).toBe('lantern');
+  });
+
+  it('still asks for a new crop in the other seasons', () => {
+    const st = winter();
+    st.day = 15; // fall 1
+    expect(nextGoal(st)?.id).toBe('replant');
   });
 });

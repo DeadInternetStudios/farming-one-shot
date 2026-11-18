@@ -1,7 +1,7 @@
 // The money check, for people and for the build. Exits 1 when any line says FAIL.
 //   npm run check:economy                          the real rules
 //   npm run check:economy -- --defect=windfall     the same check with one bug put in on purpose
-// Defects: nan-price (a price that is not a number), windfall (crops pay four times), no-forage (picking pays nothing).
+// Defects: nan-price (a price that is not a number), windfall (crops pay four times), no-forage (picking pays nothing), frozen-lake (fish pay nothing).
 import { loadGame } from './load.mjs';
 
 const arg = process.argv.slice(2).find((a) => a.startsWith('--defect='));

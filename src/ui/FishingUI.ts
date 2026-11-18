@@ -5,6 +5,7 @@ import { minutesPerSecond } from '../game/clock';
 import { FishFight } from '../game/fishing';
 import { mulberry32 } from '../game/rng';
 import { session } from '../game/session';
+import { HOOKS, hookFlags } from '../hooks';
 import { watchKey } from '../systems/keys';
 import { COL } from './kit';
 import { Screen, isBack } from './Screens';
@@ -64,7 +65,7 @@ export class FishingScreen extends Screen {
     bag.text(x + PANEL_W / 2, y + PANEL_H - 15, hint, { origin: [0.5, 0], tint: COL.cream });
     this.banner = bag.text(x + PANEL_W / 2, y + PANEL_H / 2 - 4, '', { origin: [0.5, 0.5], outline: true, tint: COL.gold });
     this.banner.setDepth(bag.depth + 9);
-    if (new URLSearchParams(location.search).has('debug')) (window as unknown as { __fight: unknown }).__fight = this.fight;
+    if (HOOKS && hookFlags().has('debug')) (window as unknown as { __fight: unknown }).__fight = this.fight;
 
     const down = (ev: KeyboardEvent): void => { if (ev.code === 'Space' || ev.code === 'KeyE' || ev.code === 'Enter') this.holding = true; };
     const up = (ev: KeyboardEvent): void => { if (ev.code === 'Space' || ev.code === 'KeyE' || ev.code === 'Enter') this.holding = false; };

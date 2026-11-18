@@ -9,7 +9,8 @@ import type { Ctx } from '../../src/game/actions';
 import { seasonOf } from '../../src/game/clock';
 import { sleepThrough } from '../../src/game/day';
 import { CAN_CAPACITY, cropProfit, isRipe, ripensInTime } from '../../src/game/farming';
-import { countItem, removeItem } from '../../src/game/inventory';
+import { rollCatch } from '../../src/game/fishing';
+import { addItem, countItem, removeItem } from '../../src/game/inventory';
 import { mulberry32 } from '../../src/game/rng';
 import { buy } from '../../src/game/shop';
 import { newGame } from '../../src/game/state';
@@ -250,25 +251,47 @@ export function playFarm(profile: Profile, days = 28, seed = 1): Run {
   const records: DayRecord[] = [];
   for (let i = 0; i < days; i++) {
     const season = seasonOf(st.day);
-    // nothing grows in winter and the ground is frozen, so the farmer just ships what they have
+    // nothing grows in winter and the ground is frozen, so the farmer fishes the lake instead
     const rec = season === 'winter' ? winterDay(b) : playDay(b);
     records.push(rec);
   }
   return { profile, days: records, state: st };
 }
 
+/** Game minutes one winter cast takes: the wait for a bite, the fight, and getting back into place. */
+const CAST_MIN = 40;
+/** How much of a farmer's working time is spent with a line in the water; the rest is walking and mending. */
+const LAKE_SHARE = 0.6;
+/** Hard fish slip the line more often. A fight of difficulty d is lost this fraction of d of the time. */
+const SLIP = 0.8;
+
+/** Winter: the ground is frozen and nothing grows, so the farmer goes to the lake and ships what comes in. */
 function winterDay(b: Bot): DayRecord {
   const st = b.st;
-  const before = st.player.gold;
+  const rand = mulberry32(st.seed * 7919 + st.day);
+  const casts = Math.floor((b.p.workMin * LAKE_SHARE) / CAST_MIN);
+  let caught = 0;
+  for (let i = 0; i < casts; i++) {
+    const c = rollCatch(rand, { map: 'lake', season: 'winter', minute: 12 * 60, weather: 'sun', rodTier: 0 });
+    if (c.item && rand() >= c.difficulty * SLIP && addItem(st.player.slots, c.item, 1) === 0) caught += 1;
+  }
   ship(b);
   const rec: DayRecord = {
-    day: st.day, gold: 0, earned: 0, spent: 0, tiles: 0, planted: 0, harvested: 0, withered: 0, energyLeft: 100, minutesLeft: 0, note: 'winter',
+    day: st.day, gold: 0, earned: 0, spent: 0, tiles: 0, planted: 0, harvested: 0, withered: 0, energyLeft: 100, minutesLeft: 0, note: `winter, ${caught} fish`,
   };
   const summary = sleepThrough(st, () => b.map, false);
   rec.gold = st.player.gold;
   rec.earned = summary.earned;
-  void before;
   return rec;
+}
+
+/** What one winter day at the lake pays a farmer who starts it with no gold, no seeds and nothing growing. */
+export function winterPayday(profile: Profile, seed = 1): number {
+  const st = newGame(seed);
+  st.day = 22;
+  st.player.gold = 0;
+  const map = farmMap(seed, st);
+  return winterDay({ st, map, ctx: { state: st, map, rand: mulberry32(seed) }, p: profile, minutes: 0, field: [] }).earned;
 }
 
 export { removeItem };

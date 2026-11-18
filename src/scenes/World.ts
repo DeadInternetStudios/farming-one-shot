@@ -12,7 +12,8 @@ import { collectEggs, eggsWaiting, feedHens, henList, pet } from '../game/animal
 import type { Pet } from '../game/state';
 import { finaleDue, finaleReport, finishFinale } from '../game/finale';
 import { nextGoal } from '../game/goals';
-import { saveGame } from '../game/save';
+import { freezeSaves, saveGame } from '../game/save';
+import { holdFarm } from '../game/tablock';
 import { session } from '../game/session';
 import { shakeOn } from '../game/settings';
 import { litCount } from '../game/bundles';
@@ -21,6 +22,7 @@ import { addItem } from '../game/inventory';
 import type { Dir, ToolId, Weather } from '../game/types';
 import { tileKey } from '../game/types';
 import { getLayout } from '../display';
+import { HOOKS, hookFlags } from '../hooks';
 import { POSTCARD_ON } from '../features/postcard/layout';
 import { Angler } from '../entities/Angler';
 import { Critters } from '../entities/Critters';
@@ -46,6 +48,8 @@ import { SHRINE } from '../gen/art';
 import { WARM_DARK } from '../ui/kit';
 
 const REACH = 2.1;
+/** How often the farm is saved on its own, in milliseconds. */
+const AUTOSAVE_MS = 15000;
 
 const HINTS: Readonly<Record<string, string>> = {
   bed: 'Bed', chest: 'Chest', stove: 'Cook', counter: 'Counter', shelf: 'Bookshelf', bin: 'Shipping bin', sign: 'Sign', text: 'Look',
@@ -77,6 +81,11 @@ export class WorldScene extends Phaser.Scene {
   private travelling = false;
   private finaleOn = false;
   private wasPaused = false;
+  /** A press that came while the farmer was mid-swing, done as soon as the swing ends instead of being thrown away. */
+  private queuedAct: { at?: { x: number; y: number }; until: number } | null = null;
+  /** The last save did not go through, and the player has been told. */
+  private saveWarned = false;
+  private letGoOfFarm: (() => void) | null = null;
   /** Where the camera looks instead of at the player, during a cutscene. */
   private focus: { x: number; y: number } | null = null;
   /** How many shrine lanterns were lit before the pop-up that is lighting more of them opened. */
@@ -133,15 +142,23 @@ export class WorldScene extends Phaser.Scene {
     });
     subscribe(this, 'lantern', () => this.lightShrine());
 
-    // keep the farm safe if the tab is closed or the phone is put away
-    const keep = (): void => {
-      if (document.hidden && session.live && !this.travelling) {
-        this.syncPlayer();
-        saveGame(session.state);
-      }
-    };
+    // keep the farm safe: when the tab is put away or closed, and every few seconds in between, so a crash costs seconds and not a day
+    const keep = (): void => { if (document.hidden) this.persist(); };
+    const leaving = (): void => { this.persist(); };
     document.addEventListener('visibilitychange', keep);
-    this.events.once('shutdown', () => document.removeEventListener('visibilitychange', keep));
+    window.addEventListener('pagehide', leaving);
+    this.time.addEvent({ delay: AUTOSAVE_MS, loop: true, callback: () => { if (!this.sleeping && !this.travelling && !this.finaleOn) this.persist(); } });
+    // only one tab plays a farm: if another takes it, this one stops saving and says so
+    this.letGoOfFarm = holdFarm(() => {
+      freezeSaves();
+      session.events.emit('tab-lost');
+    });
+    this.events.once('shutdown', () => {
+      document.removeEventListener('visibilitychange', keep);
+      window.removeEventListener('pagehide', leaving);
+      this.letGoOfFarm?.();
+      this.letGoOfFarm = null;
+    });
 
     if (!st.flags.letter && st.player.loc === 'house') {
       st.flags.letter = true;
@@ -215,7 +232,7 @@ export class WorldScene extends Phaser.Scene {
       this.player.teleport((w.tx + 0.5) * 16, (w.ty + 0.8) * 16, w.dir);
       this.syncPlayer();
       this.rig.snapTo(this.player.x, this.player.y - 8);
-      saveGame(session.state);
+      this.persist();
       cam.fadeIn(220, 12, 9, 20);
       this.travelling = false;
       this.warpLock = 0.5;
@@ -227,6 +244,19 @@ export class WorldScene extends Phaser.Scene {
     p.x = this.player.x;
     p.y = this.player.y;
     p.dir = this.player.facing;
+  }
+
+  /** Saves the farm, and says so once if the browser will not keep it, so nobody plays an hour into a save that was never written. */
+  private persist(): boolean {
+    if (!session.live) return true;
+    this.syncPlayer();
+    const ok = saveGame(session.state);
+    if (!ok && !this.saveWarned) {
+      this.saveWarned = true;
+      session.events.emit('toast', 'This browser is not keeping your farm. Back it up to a file in Options so it is not lost.');
+    }
+    if (ok) this.saveWarned = false;
+    return ok;
   }
 
   private warpAt(tx: number, ty: number): Warp | undefined {
@@ -279,12 +309,18 @@ export class WorldScene extends Phaser.Scene {
       if (slot !== null) this.selectSlot(slot);
       const cyc = this.controls.cycle();
       if (cyc !== 0) this.selectSlot((st.player.selected + cyc + 10 * 100) % 10);
+      const waiting = this.queuedAct;
+      if (waiting && !this.player.swinging) {
+        this.queuedAct = null;
+        if (this.time.now <= waiting.until) this.act(waiting.at);
+      }
       if (this.controls.action()) this.act();
       if (this.controls.eat()) this.eatSelected();
       if (this.controls.menu()) session.events.emit('interact', { kind: 'menu' });
       if (POSTCARD_ON && this.controls.postcard() && !this.finaleOn) session.events.emit('postcard');
     } else {
       this.controls.flush();
+      this.queuedAct = null;
       this.player.update(dt, 0, 0, false, this.solid);
     }
 
@@ -388,7 +424,11 @@ export class WorldScene extends Phaser.Scene {
   // ------------------------------------------------------------- acting
 
   private act(at?: { x: number; y: number }): void {
-    if (this.player.swinging) return;
+    if (this.player.swinging) {
+      // a press during a swing is kept for the end of it, so the most repeated action in the game never goes missing
+      this.queuedAct = { at, until: this.time.now + 700 };
+      return;
+    }
     const st = session.state;
     const t = at ?? facingTile(this.player.x, this.player.y, this.player.facing);
     const ctx = this.ctx;
@@ -687,7 +727,7 @@ export class WorldScene extends Phaser.Scene {
       this.cameras.main.setZoom(this.zoomFor());
       this.rig.snapTo(this.player.x, this.player.y - 8);
       this.finaleOn = false;
-      saveGame(st);
+      this.persist();
       session.release();
     });
   }
@@ -709,13 +749,12 @@ export class WorldScene extends Phaser.Scene {
 
   /** A new morning: you wake beside your bed. */
   private afterSleep(summary: DaySummary): void {
-    const st = session.state;
     this.buildStage('house');
     const spawn = this.def.spawn;
     this.player.teleport((spawn.x + 0.5) * 16, (spawn.y + 0.8) * 16, 'down');
     this.syncPlayer();
     this.rig.snapTo(this.player.x, this.player.y - 8);
-    saveGame(st);
+    this.persist();
     session.events.emit('day-summary', summary, () => {
       this.cameras.main.fadeIn(900, 12, 9, 20);
       this.sleeping = false;
@@ -727,7 +766,7 @@ export class WorldScene extends Phaser.Scene {
   // ------------------------------------------------------------- hooks for testing
 
   private registerDebug(): void {
-    if (!new URLSearchParams(location.search).has('debug')) return;
+    if (!HOOKS || !hookFlags().has('debug')) return;
     const st = session.state;
     const toasts: string[] = [];
     subscribe(this, 'toast', (m: string) => toasts.push(m));

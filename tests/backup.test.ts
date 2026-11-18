@@ -81,8 +81,8 @@ describe('backup files', () => {
       ['a thing on the farm the game has no picture for', withEdit((s) => { ((s.locations as Record<string, { objects: Record<string, unknown> }>).farm as { objects: Record<string, unknown> }).objects['1,1'] = { k: 'spaceship', v: 0, hp: 1 }; })],
       ['an item nobody made in a chest', withEdit((s) => { ((s.locations as Record<string, { things: Record<string, unknown> }>).farm as { things: Record<string, unknown> }).things['22,13'] = { kind: 'chest', items: [{ id: 'unobtainium', n: 1 }] }; })],
       ['an item nobody made in the bin', withEdit((s) => { (s.shipping as unknown[]).push({ id: 'unobtainium', n: 1 }); })],
-      ['a list gone missing', withEdit((s) => { delete s.recipes; })],
-      ['a record gone missing', withEdit((s) => { delete s.flags; })],
+      ['a list that is not a list', withEdit((s) => { s.recipes = 'all of them'; })],
+      ['a record that is not a record', withEdit((s) => { s.flags = [1, 2]; })],
     ];
     for (const [what, text] of refused) {
       const r = unpackSave(text);
@@ -92,6 +92,17 @@ describe('backup files', () => {
         expect(r.msg, what).not.toMatch(/undefined|TypeError|JSON|\[object/);
       }
     }
+  });
+
+  it('fill in what a save from before a feature never kept, instead of refusing the whole farm', () => {
+    const back = unpackSave(withEdit((s) => { delete s.recipes; delete s.flags; delete s.pets; (s.stats as Record<string, unknown>) = { earned: 5, shipped: 1, harvested: 2, daysPlayed: 3 }; }));
+    expect(back.ok).toBe(true);
+    if (!back.ok) return;
+    expect(back.state.recipes.length).toBeGreaterThan(0);
+    expect(back.state.flags).toEqual({});
+    expect(back.state.pets).toEqual([]);
+    expect(back.state.stats).toMatchObject({ earned: 5, caught: 0, mined: 0 });
+    expect(back.state.player.gold).toBe(4321);
   });
 
   it('say "no saved game" for a file that is something else, and "different version" only for a save that is', () => {

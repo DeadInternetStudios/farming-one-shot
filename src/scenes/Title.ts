@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { dayOfSeason, seasonOf } from '../game/clock';
-import { loadGame } from '../game/save';
+import { BACKUP_ON, canUndoRestore, damagedToFile, restoreFromFile, undoLastRestore } from '../features/backup/backup';
+import { canStore, loadGame, readSave } from '../game/save';
+import { otherTabOpen } from '../game/tablock';
 import { session } from '../game/session';
 import { watchKey } from '../systems/keys';
 import { saveSettings, settings } from '../game/settings';
@@ -41,6 +43,7 @@ export class TitleScene extends Phaser.Scene {
   private picked = 0;
   private busy = false;
   private overlay: Phaser.GameObjects.GameObject[] = [];
+  private notice: Phaser.GameObjects.BitmapText | null = null;
   private ground = 0;
   private menuTop = 0;
   private menuStep = 0;
@@ -358,7 +361,9 @@ export class TitleScene extends Phaser.Scene {
 
   private menu(short: boolean): void {
     const l = this.l;
-    const saved = loadGame();
+    const loaded = readSave();
+    const saved = loaded.kind === 'ok' ? loaded.state : null;
+    const broken = loaded.kind === 'broken';
     const bw = Math.max(104, Math.min(124, Math.floor(l.uiW * 0.4)));
     const bh = l.touch ? 22 : 18;
     const gap = l.touch ? 7 : 6;
@@ -367,7 +372,14 @@ export class TitleScene extends Phaser.Scene {
     if (short) label(this, x, top - 15, 'A cozy farming tale', { tint: PAL.cream[1], origin: [0.5, 0], outline: true }).setDepth(D.ui + 2);
     this.choices = [];
     if (saved) this.choices.push({ text: 'Continue', kind: 'leaf', run: () => this.start(false) });
-    this.choices.push({ text: 'New Game', kind: saved ? 'wood' : 'leaf', run: () => (saved ? this.confirmNew() : this.start(true)) });
+    if (broken && BACKUP_ON) {
+      // a farm that will not open is still the player's: the first choice gets it back, the second keeps it, only the third starts over
+      if (canUndoRestore()) this.choices.push({ text: 'Undo restore', kind: 'leaf', run: () => this.say(undoLastRestore()) });
+      else this.choices.push({ text: 'Restore backup', kind: 'leaf', run: () => { void restoreFromFile().then((m) => { if (m) this.say(m); }); } });
+      this.choices.push({ text: 'Keep a copy', kind: 'wood', run: () => this.say(damagedToFile()) });
+    }
+    const replaces = saved !== null || broken;
+    this.choices.push({ text: 'New Game', kind: replaces ? 'wood' : 'leaf', run: () => (replaces ? this.confirmNew(broken) : this.start(true)) });
     this.choices.forEach((c, i) => {
       const y = top + i * (bh + gap);
       const b = button(this, x - Math.floor(bw / 2), y, bw, bh, c.text, c.kind, () => { this.picked = i; this.choose(); });
@@ -379,17 +391,28 @@ export class TitleScene extends Phaser.Scene {
     this.pointer = this.add.image(x - Math.floor(bw / 2) - 6, top + Math.floor(bh / 2), 'atlas', 'ui/arrow-right').setOrigin(1, 0.5).setDepth(D.ui + 3).setTint(0xffe39a);
     this.tweens.add({ targets: this.pointer, x: this.pointer.x - 2, duration: 450, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     this.select(0, false);
-    if (saved) {
-      const info = label(this, x, top + this.choices.length * (bh + gap) + 1, this.describe(saved), { tint: PAL.cream[0], origin: [0.5, 0], outline: true });
-      info.setDepth(D.ui + 2);
-    }
+    let below = top + this.choices.length * (bh + gap) + 1;
+    const wrap = Math.min(220, Math.floor(l.uiW) - 16);
+    const line = (text: string, tint: number): void => {
+      const t = label(this, x, below, text, { tint, origin: [0.5, 0], outline: true, wrap, align: 'center' }).setDepth(D.ui + 2);
+      below += Math.ceil(t.height) + 3;
+    };
+    if (saved) line(this.describe(saved), PAL.cream[0]);
+    if (loaded.kind === 'broken') line(`Your saved farm could not be opened. ${loaded.why}`, COL.berry);
+    // where there is nowhere to keep a farm, say so before anyone puts an hour into one
+    if (!canStore()) line('This browser will not keep your farm. You can play, but it is lost when the page closes.', COL.berry);
+    this.notice = label(this, x, below, '', { tint: PAL.cream[0], origin: [0.5, 0], outline: true, wrap, align: 'center' }).setDepth(D.ui + 2);
     if (!l.touch) {
-      const below = top + this.choices.length * (bh + gap) + (saved ? 14 : 2);
-      label(this, x, below, saved ? 'Up and Down to choose, Enter to start' : 'Press Enter to start', { tint: PAL.cream[0], origin: [0.5, 0], outline: true }).setAlpha(0.75).setDepth(D.ui + 2);
+      label(this, x, below + 12, saved ? 'Up and Down to choose, Enter to start' : this.choices.length > 1 ? 'Up and Down to choose, Enter to pick' : 'Press Enter to start', { tint: PAL.cream[0], origin: [0.5, 0], outline: true }).setAlpha(0.75).setDepth(D.ui + 2);
     }
     this.menuTop = top;
     this.menuStep = bh + gap;
     this.menuH = bh;
+  }
+
+  /** A line under the menu for what a choice did: a copy was kept, a backup was refused. */
+  private say(msg: string): void {
+    this.notice?.setText(msg);
   }
 
   private describe(st: GameState): string {
@@ -420,23 +443,37 @@ export class TitleScene extends Phaser.Scene {
     else if (ev.code === 'Enter' || ev.code === 'Space' || ev.code === 'KeyE') this.choose();
   }
 
-  private confirmNew(): void {
+  private confirmNew(damaged = false): void {
+    const says = damaged ? 'The farm that will not open stays in this browser, and Keep a copy still saves it.' : 'This replaces your saved farm.';
+    this.ask('Start a new farm?', says, 'Start over', damaged ? 'Not now' : 'Keep it', () => this.start(true));
+  }
+
+  /** Two tabs on one farm would overwrite each other's days, so a second one has to say it means it. */
+  private confirmTakeover(fresh: boolean): void {
+    this.ask('Already open', 'Lantern Hollow is open in another tab. Playing here stops it saving.', 'Play here', 'Cancel', () => this.start(fresh, true));
+  }
+
+  /** A small question over the title with a way out and a way on. */
+  private ask(title: string, says: string, yes: string, no: string, onYes: () => void): void {
     const l = this.l;
     const w = Math.min(176, Math.floor(l.uiW) - 12);
-    const h = 78;
+    const bh = l.touch ? 22 : 18;
+    const probe = label(this, 0, 0, says, { wrap: w - 20, align: 'center' }).setVisible(false);
+    const textH = Math.ceil(probe.height);
+    probe.destroy();
+    const h = 26 + textH + 10 + bh + 9;
     const x = Math.floor((l.uiW - w) / 2);
     const y = Math.floor((l.uiH - h) / 2);
-    const bh = l.touch ? 22 : 18;
     const parts: Phaser.GameObjects.GameObject[] = [];
     const dim = this.add.rectangle(0, 0, l.uiW + 2, l.uiH + 2, PAL.ink[0], 0.62).setOrigin(0, 0).setDepth(D.ui + 10).setInteractive();
     parts.push(dim, nine(this, 'parchment', x, y, w, h).setDepth(D.ui + 11));
-    parts.push(label(this, x + w / 2, y + 12, 'Start a new farm?', { tint: COL.ink, origin: [0.5, 0] }).setDepth(D.ui + 12));
-    parts.push(label(this, x + w / 2, y + 26, 'This replaces your saved farm.', { tint: COL.dim, origin: [0.5, 0], wrap: w - 20, align: 'center' }).setDepth(D.ui + 12));
+    parts.push(label(this, x + w / 2, y + 12, title, { tint: COL.ink, origin: [0.5, 0] }).setDepth(D.ui + 12));
+    parts.push(label(this, x + w / 2, y + 26, says, { tint: COL.dim, origin: [0.5, 0], wrap: w - 20, align: 'center' }).setDepth(D.ui + 12));
     const half = Math.floor((w - 28) / 2);
-    const yes = button(this, x + 10, y + h - bh - 9, half, bh, 'Start over', 'berry', () => { this.closeConfirm(); this.start(true); });
-    const no = button(this, x + w - 10 - half, y + h - bh - 9, half, bh, 'Keep it', 'leaf', () => this.closeConfirm());
-    for (const b of [yes, no]) for (const p of b.parts) (p as Phaser.GameObjects.GameObject & { setDepth: (d: number) => unknown }).setDepth(D.ui + 13);
-    parts.push(...yes.parts, ...no.parts);
+    const go = button(this, x + 10, y + h - bh - 9, half, bh, yes, 'berry', () => { this.closeConfirm(); onYes(); });
+    const stay = button(this, x + w - 10 - half, y + h - bh - 9, half, bh, no, 'leaf', () => this.closeConfirm());
+    for (const b of [go, stay]) for (const p of b.parts) (p as Phaser.GameObjects.GameObject & { setDepth: (d: number) => unknown }).setDepth(D.ui + 13);
+    parts.push(...go.parts, ...stay.parts);
     this.overlay = parts;
     audio.sfx('open');
   }
@@ -483,8 +520,12 @@ export class TitleScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ leaving
 
-  private start(fresh: boolean): void {
+  private start(fresh: boolean, takeover = false): void {
     if (this.busy) return;
+    if (!takeover && otherTabOpen()) {
+      this.confirmTakeover(fresh);
+      return;
+    }
     this.busy = true;
     const saved = fresh ? null : loadGame();
     if (saved) session.load(saved);

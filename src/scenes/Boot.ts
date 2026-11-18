@@ -3,6 +3,7 @@ import { NPCS } from '../data/npcs';
 import { SEASONS } from '../game/types';
 import { loadGame } from '../game/save';
 import { session } from '../game/session';
+import { hookFlags } from '../hooks';
 import { audio, queueFirstAudio } from '../systems/Audio';
 
 /** Loads everything, builds the animations, then opens the title screen. */
@@ -47,7 +48,7 @@ export class BootScene extends Phaser.Scene {
     }
 
     audio.start(this.game);
-    const q = new URLSearchParams(location.search);
+    const q = hookFlags();
     if (q.has('play')) {
       const saved = q.has('new') ? null : loadGame();
       if (saved) session.load(saved);

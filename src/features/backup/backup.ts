@@ -2,12 +2,10 @@
  * Backing up and restoring a save as a file. The menu has two buttons for it.
  * To cut it, set BACKUP_ON to false: the buttons go away and nothing else changes.
  */
-import { ITEMS } from '../../data/items';
-import { replaceSave } from '../../game/save';
-import { SAVE_VERSION } from '../../game/state';
+import { damagedCopy, hasRollback, replaceSave, undoRestore } from '../../game/save';
+import { checkSave } from '../../game/savecheck';
 import type { GameState } from '../../game/state';
 import { downloadBlob } from '../../systems/files';
-import { OBJECT_HP } from '../../world/mapkit';
 
 export const BACKUP_ON = true;
 
@@ -15,9 +13,6 @@ const GAME = 'lantern-hollow';
 const FORMAT = 1;
 /** A real save is a few hundred kilobytes. Anything past this is not one. */
 export const MAX_BACKUP_BYTES = 8 * 1024 * 1024;
-
-const PACES = ['relaxed', 'standard', 'brisk'];
-const WEATHERS = ['sun', 'cloud', 'rain', 'storm', 'snow'];
 
 export function packSave(state: GameState, now: Date = new Date()): { filename: string; text: string } {
   const text = JSON.stringify({ game: GAME, format: FORMAT, exportedAt: now.toISOString(), save: state });
@@ -27,31 +22,6 @@ export function packSave(state: GameState, now: Date = new Date()): { filename: 
 export type Unpacked = { ok: true; state: GameState } | { ok: false; msg: string };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const known = (id: unknown): boolean => typeof id === 'string' && Object.hasOwn(ITEMS, id);
-const stackOk = (s: unknown): boolean => s === null || (isObj(s) && known(s.id) && isNum(s.n) && Number.isInteger(s.n) && s.n > 0 && s.n <= 9999);
-
-/** The first thing wrong with a parsed save, in plain words, or null when it looks sound. */
-function whatIsWrong(s: unknown): string | null {
-  if (!isObj(s) || !('version' in s)) return 'There is no saved game in that file.';
-  if (s.version !== SAVE_VERSION) return 'That save is from a different version of the game.';
-  if (!isNum(s.seed) || !isNum(s.minute) || !isNum(s.day) || s.day < 1 || s.day > 100000) return 'That save is missing its calendar.';
-  if (!PACES.includes(s.pace as string) || !WEATHERS.includes(s.weather as string)) return 'That save is missing its settings.';
-  const p = s.player;
-  if (!isObj(p) || !isNum(p.gold) || p.gold < 0 || !isNum(p.energy) || !isNum(p.x) || !isNum(p.y)) return 'That save is missing its farmer.';
-  if (!Array.isArray(p.slots) || p.slots.length < 10 || p.slots.length > 200 || !p.slots.every(stackOk)) return 'That save has a bag the game cannot read.';
-  if (!isNum(p.selected) || p.selected < 0 || p.selected >= p.slots.length) return 'That save has a bag the game cannot read.';
-  if (!isObj(s.locations) || !isObj(s.locations.farm)) return 'That save is missing the farm.';
-  for (const loc of Object.values(s.locations)) {
-    if (!isObj(loc) || !isObj(loc.soil) || !isObj(loc.objects) || !isObj(loc.things)) return 'That save has a place the game cannot read.';
-    for (const o of Object.values(loc.objects)) if (!isObj(o) || typeof o.k !== 'string' || !Object.hasOwn(OBJECT_HP, o.k) || !isNum(o.v) || !isNum(o.hp)) return 'That save has something on the farm the game does not know.';
-    for (const t of Object.values(loc.things)) if (!isObj(t) || (t.items !== undefined && !(Array.isArray(t.items) && t.items.every(stackOk)))) return 'That save has a chest the game cannot read.';
-  }
-  if (!Array.isArray(s.shipping) || !s.shipping.every((x) => isObj(x) && known(x.id) && isNum(x.n))) return 'That save has a shipping bin the game cannot read.';
-  for (const k of ['recipes', 'requests', 'upgrades', 'pets', 'seen']) if (!Array.isArray(s[k])) return 'That save is missing some of its lists.';
-  for (const k of ['flags', 'stats', 'social', 'bundles']) if (!isObj(s[k])) return 'That save is missing some of its records.';
-  return null;
-}
 
 /** Reads a backup file's text. A bare save, as copied from the browser, is accepted too. */
 export function unpackSave(text: string): Unpacked {
@@ -68,8 +38,8 @@ export function unpackSave(text: string): Unpacked {
     if (parsed.format !== FORMAT) return { ok: false, msg: 'A newer version of the game made that backup.' };
     save = parsed.save;
   }
-  const wrong = whatIsWrong(save);
-  return wrong ? { ok: false, msg: wrong } : { ok: true, state: save as GameState };
+  // the same two steps a save in the browser goes through, so a file can never let in what the game could not open
+  return checkSave(save);
 }
 
 // ---------------------------------------------------------------- the browser end
@@ -110,4 +80,22 @@ export async function restoreFromFile(): Promise<string | null> {
   if (!replaceSave(read.state)) return 'This browser would not let the game keep that save.';
   setTimeout(() => location.reload(), 900);
   return 'Restored. Starting from your backup...';
+}
+
+/** Gives the player the save the game could not open, as a file, so a farm that will not load is still theirs. */
+export function damagedToFile(): string {
+  const text = damagedCopy();
+  if (text === null) return 'There is no damaged save to keep.';
+  downloadBlob('lantern-hollow-damaged-save.json', new Blob([text], { type: 'application/json' }));
+  return 'Saved lantern-hollow-damaged-save.json.';
+}
+
+/** True when a restore replaced a farm that can still be put back. */
+export const canUndoRestore = (): boolean => hasRollback();
+
+/** Puts back the farm a restore replaced, and starts the game again. */
+export function undoLastRestore(): string {
+  if (!undoRestore()) return 'There is no earlier farm to go back to.';
+  setTimeout(() => location.reload(), 600);
+  return 'Back to your earlier farm...';
 }

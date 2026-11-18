@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "A cozy pixel-art farming game for the browser, built with Phaser 4. Every sprite, font, sound and tune is made from code.",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

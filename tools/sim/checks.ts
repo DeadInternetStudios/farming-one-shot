@@ -12,10 +12,10 @@ import { buyPrice } from '../../src/game/shop';
 import { locationFromMap, newGame } from '../../src/game/state';
 import { SEASONS } from '../../src/game/types';
 import { buildMap } from '../../src/world/maps/registry';
-import { PROFILES, playFarm } from './farmer';
+import { PROFILES, playFarm, winterPayday } from './farmer';
 import type { Run } from './farmer';
 
-export const DEFECTS = ['none', 'nan-price', 'windfall', 'no-forage'] as const;
+export const DEFECTS = ['none', 'nan-price', 'windfall', 'no-forage', 'frozen-lake'] as const;
 export type Defect = (typeof DEFECTS)[number];
 
 export interface Result {
@@ -39,6 +39,8 @@ const LAST_GOAL_WITHIN = [8, 21] as const;
 const QUICK_CROP_DAYS = 4;
 /** How many of the cheapest seeds a farmer with nothing can pay for from one visit to the forest. */
 const RESCUE_SEEDS = 20;
+/** What a winter day at the lake must pay a farmer who starts it with nothing, in gold. Nothing grows from day 22 to 28, so this is the whole income. */
+const WINTER_PAYDAY = 100;
 
 const mutable = ITEMS as Record<string, (typeof ITEMS)[string]>;
 
@@ -46,6 +48,7 @@ function putInDefect(defect: Defect): void {
   if (defect === 'nan-price') (mutable.radish as { sell: number }).sell = Number.NaN;
   if (defect === 'windfall') for (const c of CROP_LIST) (mutable[c.id] as { sell: number }).sell *= 4;
   if (defect === 'no-forage') for (const id of ['flower', 'mushroom', 'berry']) (mutable[id] as { sell: number }).sell = 0;
+  if (defect === 'frozen-lake') for (const id of Object.keys(mutable)) if (mutable[id]?.kind === 'fish') (mutable[id] as { sell: number }).sell = 0;
 }
 
 interface Goal {
@@ -194,6 +197,11 @@ export function runChecks(defect: Defect = 'none'): Report {
   store.setItem('lantern-hollow:save:v1', '{"version":');
   const junk = loadGame();
   check(Boolean(same) && cut === null && junk === null, 'a save keeps the farm and a damaged one is refused', `${raw.length} bytes saved and read back ${same ? 'exactly' : 'differently'}; half a save reads as ${cut === null ? 'nothing' : 'a farm'}, broken text as ${junk === null ? 'nothing' : 'a farm'}`);
+
+  // 9. winter is not a dead season: the ground is frozen, so the lake has to pay for the week
+  const lake = Object.keys(PROFILES).map((n) => ({ n, pay: winterPayday(PROFILES[n] as NonNullable<(typeof PROFILES)[string]>) }));
+  const poorest = Math.min(...lake.map((l) => l.pay));
+  check(poorest >= WINTER_PAYDAY, 'winter still pays', `a farmer starting a winter day with nothing earns ${lake.map((l) => `${l.pay}g (${l.n})`).join(', ')} at the lake; the least is ${poorest}g, the limit is ${WINTER_PAYDAY}g`);
 
   // the table of what the money buys, by day, for the three farmers
   const names = Object.keys(PROFILES);
