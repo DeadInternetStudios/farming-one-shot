@@ -33,7 +33,9 @@ import { CameraRig } from '../systems/CameraRig';
 import { Controls } from '../systems/Controls';
 import { Finale } from '../systems/Finale';
 import { Fx } from '../systems/Fx';
-import { Lighting, skyFor } from '../systems/Lighting';
+import { lightLanterns } from '../systems/Ceremony';
+import { Lighting } from '../systems/Lighting';
+import { lampOn, skyFor } from '../systems/sky';
 import { MapView } from '../world/MapView';
 import { ObjectsView } from '../world/ObjectsView';
 import type { LightSpot } from '../world/ObjectsView';
@@ -75,6 +77,8 @@ export class WorldScene extends Phaser.Scene {
   private wasPaused = false;
   /** Where the camera looks instead of at the player, during a cutscene. */
   private focus: { x: number; y: number } | null = null;
+  /** How many shrine lanterns were lit before the pop-up that is lighting more of them opened. */
+  private lanternFrom: number | null = null;
   private warpLock = 0;
   private lastHint = '';
   private furnacesBusy = new Set<string>();
@@ -280,6 +284,12 @@ export class WorldScene extends Phaser.Scene {
       this.player.update(dt, 0, 0, false, this.solid);
     }
 
+    if (this.lanternFrom !== null && !session.paused && !this.travelling && !this.sleeping) {
+      const from = this.lanternFrom;
+      this.lanternFrom = null;
+      this.playLanterns(from);
+    }
+
     this.updateCursor(time);
     this.objects.update(time);
     if (time - this.lastMachineSync > 700) {
@@ -288,11 +298,10 @@ export class WorldScene extends Phaser.Scene {
       this.postcardNudge();
     }
     this.rig.update(dt, this.focus?.x ?? this.player.x, this.focus?.y ?? this.player.y - 8);
-    this.ambient.update(dt, { season: seasonOf(st.day), weather: st.weather, minute: st.minute, kind: this.def.kind });
     const sky = skyFor(seasonOf(st.day), st.minute, st.weather, this.def.kind);
+    this.ambient.update(dt, { season: seasonOf(st.day), weather: st.weather, minute: st.minute, kind: this.def.kind, day: sky.day });
     this.lighting.update(sky, time, this.objects.glows, this.torch());
-    const dark = 1 - Math.min(1, sky.day * 1.3);
-    for (const f of this.objects.nightFrames) f.setAlpha(dark);
+    for (const f of this.objects.nightFrames) f.setAlpha(lampOn(sky.lamps, f.x, f.y));
     this.chimneySmoke(dt, sky.day);
   }
 
@@ -521,14 +530,20 @@ export class WorldScene extends Phaser.Scene {
     this.say(lines.length > 0 ? lines.join(' ') : 'The hens are fed and clucking. Eggs come overnight.');
   }
 
+  /** A lantern was lit while the shrine pop-up was open. The shrine stays as it was until the pop-up closes, so the light comes on where it can be seen. */
   private lightShrine(): void {
-    this.objects.setLit(litCount(session.state));
+    this.lanternFrom ??= Math.max(0, litCount(session.state) - 1);
+    this.objects.setLit(this.lanternFrom);
+  }
+
+  private playLanterns(from: number): void {
     const at = this.def.hotspots.find((h) => h.kind === 'shrine');
-    if (at) {
-      this.fx.sparkle(at.x * 16 + at.w * 8, at.y * 16 - 2);
-      this.fx.sparkle(at.x * 16 + at.w * 8 - 14, at.y * 16 + 6);
-      this.fx.sparkle(at.x * 16 + at.w * 8 + 14, at.y * 16 + 6);
-    }
+    lightLanterns(this, this.fx, {
+      lanterns: this.shrineLanterns(),
+      centre: at ? { x: at.x * 16 + at.w * 8, y: at.y * 16 + at.h * 8 } : { x: this.player.x, y: this.player.y },
+      setLit: (n) => this.objects.setLit(n),
+      look: (to) => { this.focus = to; },
+    }, from, litCount(session.state));
   }
 
   private useHotspot(h: Hotspot): void {

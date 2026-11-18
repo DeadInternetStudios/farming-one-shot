@@ -47,23 +47,31 @@ export const SUN: Readonly<Record<Season, { rise: number; set: number }>> = {
   winter: { rise: 7.0 * 60, set: 17.0 * 60 },
 };
 
-/** 0 in full night, 1 in full daylight. Dawn and dusk blend over an hour. */
-export function daylight(season: Season, minute: number): number {
+/** Where the day is, as minutes either side of the sun crossing the horizon: past sunset in the evening, past sunrise in the morning. Negative is before. */
+export interface SunClock {
+  evening: boolean;
+  m: number;
+}
+
+export function sunClock(season: Season, minute: number): SunClock {
   const { rise, set } = SUN[season];
   const m = minute % (24 * 60);
   const t = m < DAY_START - 120 ? m + 24 * 60 : m; // 0:00..4:00 belongs to the night before
-  const dawn = clamp01((t - (rise - 30)) / 60);
-  const dusk = clamp01(((set + 30) - t) / 60);
-  return Math.min(dawn, dusk);
+  return t >= (rise + set) / 2 ? { evening: true, m: t - set } : { evening: false, m: t - rise };
 }
 
-/** 0..1 across the golden hour either side of sunrise and sunset. */
-export function goldenHour(season: Season, minute: number): number {
-  const { rise, set } = SUN[season];
-  const m = minute % (24 * 60);
-  const t = m < DAY_START - 120 ? m + 24 * 60 : m;
-  const near = Math.min(Math.abs(t - (rise + 40)), Math.abs(t - (set - 40)));
-  return clamp01(1 - near / 110);
+/** The evening runs from the first gold to full night over three hours of game time: about half a minute of real time at the standard pace. */
+export const EVENING = { from: -80, to: 110 } as const;
+
+/** 0 in full night, 1 in full daylight. Dusk takes the long way down, dawn a shorter way up. */
+export function daylight(season: Season, minute: number): number {
+  const s = sunClock(season, minute);
+  return s.evening ? 1 - smoothstep(-70, 105, s.m) : smoothstep(-55, 60, s.m);
 }
+
+const smoothstep = (a: number, b: number, v: number): number => {
+  const t = clamp01((v - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));

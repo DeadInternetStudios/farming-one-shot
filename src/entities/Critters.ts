@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { COOP, PEN, catOf, coopBuilt, eggsWaiting, henList, isChick } from '../game/animals';
 import { isSolidTile } from '../game/actions';
+import { seasonOf, sunClock } from '../game/clock';
 import type { GameState, LocationState, Pet } from '../game/state';
 import type { MapDef } from '../world/mapkit';
 
@@ -150,7 +151,9 @@ export class Critters {
   }
 
   update(dt: number, st: GameState): void {
-    const night = st.minute >= 19 * 60 + 30;
+    // the hens go in when the light has gone from the sky, whichever season that is
+    const sun = sunClock(seasonOf(st.day), st.minute);
+    const night = sun.evening && sun.m > 30;
     const stormy = st.weather === 'rain' || st.weather === 'storm' || st.weather === 'snow';
     const indoors = night || stormy;
     for (const c of this.all.values()) {

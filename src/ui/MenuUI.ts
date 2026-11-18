@@ -223,7 +223,6 @@ export function bundleEntries(canGive: boolean): Entry[] {
           });
           if (!any) { session.events.emit('sfx', 'nope'); return 'You have nothing this bundle needs.'; }
           if (finished) {
-            session.events.emit('sfx', 'lantern');
             session.events.emit('lantern', b.id);
             return `${b.name} is complete. A lantern lights!`;
           }

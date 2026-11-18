@@ -25,7 +25,12 @@ export interface Sky {
   weather: Weather;
   minute: number;
   kind: MapKind;
+  /** 1 in full daylight, 0 in the dead of night. */
+  day: number;
 }
+
+/** How much of the evening's quiet is here: 0 while it is still day, 1 once the fireflies are all out. */
+const eveningOf = (day: number): number => Math.max(0, Math.min(1, (0.6 - day) / 0.45));
 
 const DEPTH = 8500;
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
@@ -48,6 +53,7 @@ export class Ambient {
     const ox = this.rig.vx;
     const oy = this.rig.vy;
     const storm = sky.weather === 'storm';
+    const evening = eveningOf(sky.day);
     for (const m of this.motes) {
       m.phase += dt;
       switch (m.kind) {
@@ -76,7 +82,7 @@ export class Ambient {
           m.x += Math.cos(m.phase * 0.7 + m.vx) * 6 * dt;
           m.y += Math.sin(m.phase * 0.9 + m.vy) * 5 * dt;
           {
-            const glow = 0.3 + 0.7 * Math.max(0, Math.sin(m.phase * 2.2 + m.vx * 3));
+            const glow = (0.3 + 0.7 * Math.max(0, Math.sin(m.phase * 2.2 + m.vx * 3))) * evening;
             m.img.setAlpha(glow);
             m.halo?.setAlpha(glow * 0.45);
           }
@@ -118,7 +124,8 @@ export class Ambient {
   private wanted(sky: Sky, area: number): Record<Kind, number> {
     const none = { rain: 0, snow: 0, petal: 0, leaf: 0, firefly: 0 };
     if (sky.kind !== 'outdoor') return none;
-    const night = sky.minute >= 19 * 60 + 30 || sky.minute < 5 * 60;
+    const night = sky.day < 0.45;
+    const evening = eveningOf(sky.day);
     const dry = sky.weather === 'sun' || sky.weather === 'cloud';
     // calm mode keeps the weather readable with a lot less moving at once
     const k = settings.calm ? 0.35 : 1;
@@ -127,7 +134,7 @@ export class Ambient {
       snow: Math.round((sky.weather === 'snow' ? Math.min(220, area / 520) : 0) * k),
       petal: sky.season === 'spring' && dry && !night ? Math.round((area / 6000) * k) : 0,
       leaf: sky.season === 'fall' && sky.weather !== 'storm' && !night ? Math.round((area / 4200) * k) : 0,
-      firefly: night && dry && sky.season !== 'winter' ? Math.round((area / 5200) * k) : 0,
+      firefly: dry && sky.season !== 'winter' ? Math.round((area / 5200) * k * evening) : 0,
     };
   }
 
