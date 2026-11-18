@@ -72,6 +72,15 @@ export default async ({ page, wait, press, lh, log, shot }) => {
       await wait(600);
     }, async () => { await leave(['Enter']); }],
     ['summary', async () => { await lh('sleep'); await wait(3800); }, async () => { await leave(['Enter']); await wait(2500); await lh('setMinute', 600); await wait(400); }],
+    // a day with a long shipping list and every note, the tallest tally there is
+    ['summary-big', async () => {
+      await page.evaluate(() => {
+        const st = window.__lh.state();
+        for (let i = 0; i < 40; i++) st.shipping.push({ id: ['pumpkin', 'melon', 'corn', 'tomato', 'sunflower', 'pepper'][i % 6], n: 99 });
+      });
+      await lh('sleep');
+      await wait(3800);
+    }, async () => { await leave(['Enter']); await wait(2500); await lh('setMinute', 600); await wait(400); }],
   ];
 
   for (const [name, open, close, canTurn = true] of states) {
