@@ -75,9 +75,15 @@ export function sleepThrough(state: GameState, mapOf: (id: string) => MapDef, pa
   for (const s of state.shipping) {
     const gold = itemDef(s.id).sell * s.n;
     earned += gold;
-    sold.push({ id: s.id, n: s.n, gold });
+    // two trips to the bin with the same crop are one line on the tally
+    const row = sold.find((r) => r.id === s.id);
+    if (row) {
+      row.n += s.n;
+      row.gold += gold;
+    } else sold.push({ id: s.id, n: s.n, gold });
     state.stats.shipped += s.n;
   }
+  sold.sort((a, b) => b.gold - a.gold);
   state.shipping = [];
   state.player.gold += earned;
   state.stats.earned += earned;

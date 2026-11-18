@@ -23,6 +23,7 @@ import { SHOPS } from '../src/data/shops';
 import { newGame } from '../src/game/state';
 import type { GameState } from '../src/game/state';
 import { farmMap } from '../src/world/maps/farm';
+import { buildMap } from '../src/world/maps/registry';
 import { PROFILES, playFarm } from '../tools/sim/farmer';
 import { SEASONS } from '../src/game/types';
 import type { Season } from '../src/game/types';
@@ -363,5 +364,17 @@ describe('the seasons line up', () => {
     const open: Season[] = ['spring', 'summer', 'fall'];
     for (const s of open) expect(storeStock(s, {}).filter((id) => id.startsWith('seed-')).length, s).toBeGreaterThanOrEqual(4);
     expect(seasonOf(22)).toBe('winter');
+  });
+});
+
+describe("the night's tally", () => {
+  it('is one line for each kind of thing, the best paid first, and adds up to what was earned', () => {
+    const st = newGame(1);
+    st.shipping.push({ id: 'radish', n: 3 }, { id: 'pumpkin', n: 2 }, { id: 'radish', n: 4 });
+    const summary = sleepThrough(st, (id) => buildMap(id, st), false);
+    expect(summary.sold.map((r) => r.id)).toEqual(['pumpkin', 'radish']);
+    expect(summary.sold.find((r) => r.id === 'radish')?.n).toBe(7);
+    expect(summary.sold.reduce((a, r) => a + r.gold, 0)).toBe(summary.earned);
+    expect(st.stats.shipped).toBe(9);
   });
 });

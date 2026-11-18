@@ -275,7 +275,7 @@ export class Modals {
         cy += 13;
       }
       if (extra > 0) {
-        this.text(open, x + pad + 18, cy, `and ${extra} more kinds...`, { tint: COL.dim });
+        this.text(open, x + pad + 18, cy, `and ${extra} more ${extra === 1 ? 'kind' : 'kinds'}...`, { tint: COL.dim });
         cy += 11;
       }
       cy += 2;
