@@ -285,8 +285,11 @@ export function interactTile(ctx: Ctx, tx: number, ty: number): Outcome | null {
     const h = harvest(l.soil, key, ctx.rand);
     if (!h) return null;
     addItem(slots, h.id, h.n);
+    const first = ctx.state.stats.harvested === 0;
     ctx.state.stats.harvested += h.n;
     return done({
+      // the first crop of a farm is a moment, and the line says where it goes next
+      msg: first ? 'Your first harvest! Ship it in the bin by the house.' : undefined,
       sfx: 'harvest', swing: false, changed: [key],
       fx: [{ t: 'pop', x: tx, y: ty, item: h.id, n: h.n }, { t: 'sparkle', x: tx, y: ty }, { t: 'dust', x: tx, y: ty }],
     });

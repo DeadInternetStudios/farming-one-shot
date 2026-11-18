@@ -18,6 +18,9 @@ export const COL = {
   off: 0x8b7a62,
 } as const;
 
+/** The dark the opening passes through: a lit lantern's, not the night's, so the title opens into the house's light. */
+export const WARM_DARK = [58, 36, 16] as const;
+
 export const WEATHER_NAMES = { sun: 'Sunny', cloud: 'Cloudy', rain: 'Rainy', storm: 'Stormy', snow: 'Snowy' } as const;
 
 export function iconFor(state: GameState, id: string): string {

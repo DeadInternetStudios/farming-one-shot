@@ -42,6 +42,7 @@ import type { LightSpot } from '../world/ObjectsView';
 import type { Hotspot, MapDef, Warp } from '../world/mapkit';
 import { hasMap } from '../world/maps/registry';
 import { SHRINE } from '../gen/art';
+import { WARM_DARK } from '../ui/kit';
 
 const REACH = 2.1;
 
@@ -146,7 +147,7 @@ export class WorldScene extends Phaser.Scene {
     }
 
     this.registerDebug();
-    this.cameras.main.fadeIn(500, 26, 20, 35);
+    this.cameras.main.fadeIn(800, ...WARM_DARK);
   }
 
   private applyLayout(): void {
@@ -711,6 +712,7 @@ export class WorldScene extends Phaser.Scene {
       this.cameras.main.fadeIn(900, 12, 9, 20);
       this.sleeping = false;
       session.events.emit('sleeping', false);
+      session.events.emit('morning');
     });
   }
 

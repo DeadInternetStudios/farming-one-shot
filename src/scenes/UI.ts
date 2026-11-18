@@ -9,6 +9,7 @@ import { takePostcard } from '../features/postcard/capture';
 import { POSTCARD_ON } from '../features/postcard/layout';
 import type { Layout } from '../display';
 import { subscribe } from '../systems/bus';
+import { dayCard } from '../ui/DayCard';
 import { Hud } from '../ui/Hud';
 import { Modals } from '../ui/Modals';
 import { interact } from '../ui/Interactions';
@@ -44,7 +45,8 @@ export class UIScene extends Phaser.Scene {
     subscribe(this, 'ask-sleep', () => this.modals.askSleep(() => session.events.emit('confirm-sleep')));
     subscribe(this, 'day-summary', (s: DaySummary, done: () => void) => this.modals.daySummary(s, done));
     subscribe(this, 'dialog', (text: string) => this.modals.dialog(text));
-    subscribe(this, 'letter', () => this.modals.letter(() => { session.release(); session.events.emit('sfx', 'tick'); }));
+    subscribe(this, 'letter', () => this.modals.letter(() => { session.release(); session.events.emit('sfx', 'tick'); session.events.emit('morning'); }));
+    subscribe(this, 'morning', () => dayCard(this, getLayout(), session.state));
     subscribe(this, 'finale', (report: FinaleReport, done: () => void) => this.modals.finale(report, done));
     subscribe(this, 'settings', () => this.rebuildTouch());
     subscribe(this, 'cinema', (on: boolean) => this.tweens.add({ targets: this.cameras.main, alpha: on ? 0 : 1, duration: 600 }));

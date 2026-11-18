@@ -9,7 +9,7 @@ import { fitUiCamera, getLayout } from '../display';
 import type { Layout } from '../display';
 import { BLOB_INDEX, PAL, TILESET, TILE_ID } from '../gen/art';
 import { audio } from '../systems/Audio';
-import { COL, button, label, nine } from '../ui/kit';
+import { COL, WARM_DARK, button, label, nine } from '../ui/kit';
 import type { Button } from '../ui/kit';
 
 const SEASON_NAMES = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' } as const;
@@ -485,7 +485,12 @@ export class TitleScene extends Phaser.Scene {
     session.live = true;
     audio.sfx('lantern');
     const cam = this.cameras.main;
-    cam.fadeOut(520, 12, 9, 20);
+    // the lantern is lit: its glow swells over the whole picture, and the dark that follows is a warm one, so the house opens out of the light
+    if (!settings.calm) {
+      const bloom = this.add.image(this.l.uiW / 2, this.l.uiH * 0.62, 'atlas', 'fx/glow-128').setTint(0xffd070).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setScale(0.5).setDepth(D.ui + 20);
+      this.tweens.add({ targets: bloom, alpha: 0.9, scale: 8, duration: 560, ease: 'Cubic.easeOut' });
+    }
+    this.time.delayedCall(settings.calm ? 0 : 380, () => cam.fadeOut(settings.calm ? 520 : 460, ...WARM_DARK));
     cam.once('camerafadeoutcomplete', () => {
       audio.override(null);
       this.scene.start('World');
