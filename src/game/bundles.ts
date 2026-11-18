@@ -27,6 +27,16 @@ export function available(state: GameState, slot: BundleSlot): { id: string; n: 
   return null;
 }
 
+/** How many things the bag could hand to a bundle right now: what "give what fits" would give. */
+export function giveable(state: GameState, b: BundleDef): number {
+  const prog = progressOf(state, b);
+  return b.slots.reduce((sum, slot, i) => {
+    const need = slot.n - (prog[i] ?? 0);
+    const have = available(state, slot);
+    return need > 0 && have ? sum + Math.min(need, have.n) : sum;
+  }, 0);
+}
+
 export interface DonateResult {
   gave: number;
   itemId: string | null;

@@ -63,7 +63,7 @@ export class PickScreen extends Screen {
     this.dim(0.5);
     const { p, row, style, area } = listPage(l, bag, this.cfg.title, { wideH: 250, tallH: 480 }, 0, this.entries(), () => this.close(), false);
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => this.entries(), undefined, row, style));
+    this.pane = this.own(new ListPane(body, this.scene, area, p, () => this.entries(), undefined, row, style));
   }
 
   override onKey(code: string, ev: KeyboardEvent): void {
@@ -79,7 +79,7 @@ export class BoardScreen extends Screen {
     const st = session.state;
     const list = [...st.requests].sort((a, b) => a.until - b.until);
     if (list.length === 0) {
-      return [{ row: { text: 'Nothing posted', dim: true, empty: true }, title: 'The board is bare', lines: ['New notes go up in the morning, once you have met the neighbours.', 'Say hello to everyone in the village.'] }];
+      return [{ row: { text: 'Nothing posted', dim: true, empty: true }, title: 'Nothing posted', lines: ['New notes go up each morning, once you have met a few neighbours. Say hello around the village.'] }];
     }
     return list.map((q): Entry => {
       const d = itemDef(q.item);
@@ -113,7 +113,7 @@ export class BoardScreen extends Screen {
     this.dim(0.5);
     const { p, row, style, area } = listPage(l, bag, 'Notice Board', { wideH: 250, tallH: 480 }, 0, this.entries(), () => this.close());
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => this.entries(), undefined, row, style));
+    this.pane = this.own(new ListPane(body, this.scene, area, p, () => this.entries(), undefined, row, style));
     this.pane.say = footer(bag, p);
   }
 
@@ -189,6 +189,8 @@ export class ChestScreen extends Screen {
   private chest!: SlotGrid;
   private pack!: SlotGrid;
   private line: Phaser.GameObjects.BitmapText | null = null;
+  /** Beside the title while nothing is stored, so a bare chest says so instead of leaving a grid of holes to speak for itself. */
+  private bare: Phaser.GameObjects.BitmapText | null = null;
   /** What the last move did. Cleared as soon as the cursor goes somewhere else. */
   private moved = '';
 
@@ -215,6 +217,7 @@ export class ChestScreen extends Screen {
     const h = tall(cols);
     const p = popup(bag, l, { title: 'Chest', maxW: cols * pitch + 20, wideH: h, tallH: h, close: () => this.close() });
     const { x, y } = p;
+    this.bare = bag.text(p.closeX - 8, p.titleY, 'Nothing stored', { origin: [1, 0], tint: COL.dim });
     const body = this.own(new Bag(this.scene, bag.depth));
     const chestRows = Math.ceil(CHEST_SLOTS / cols);
     this.chest = new SlotGrid(body, x + 10, y + 26 + lift, cols, pitch, () => this.items, (i) => { this.focus = 'chest'; this.move('chest', i); });
@@ -231,6 +234,7 @@ export class ChestScreen extends Screen {
   }
 
   private paint(): void {
+    this.bare?.setVisible(this.items.every((s) => s === null));
     this.chest.paint(this.focus === 'chest');
     this.pack.paint(this.focus === 'bag');
     const g = this.focus === 'chest' ? this.chest : this.pack;
@@ -353,7 +357,7 @@ export class FurnaceScreen extends Screen {
     this.dim(0.5);
     const { p, row, style, area } = listPage(l, bag, 'Furnace', { wideH: 250, tallH: 480 }, 0, this.entries(), () => this.close());
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => this.entries(), undefined, row, style));
+    this.pane = this.own(new ListPane(body, this.scene, area, p, () => this.entries(), undefined, row, style));
     this.pane.say = footer(bag, p);
   }
 

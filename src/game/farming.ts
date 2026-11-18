@@ -88,7 +88,7 @@ export function plantAdviceFor(cropId: string, day: number): { text: string; war
   if (last < day) return { text: 'Too late to plant this season.', warn: true };
   let best = -1;
   for (let d = day; d <= last; d++) if (cropProfit(cropId, d) > 0) best = d;
-  if (best < day) return { text: 'Planted now, it will not repay its seed.', warn: true };
+  if (best < day) return { text: 'Planted now, it loses money.', warn: true };
   if (best === day) return { text: 'Plant it today to turn a profit.', warn: false };
   const name = seasonOf(best);
   return { text: `Plant by ${name.charAt(0).toUpperCase()}${name.slice(1)} ${dayOfSeason(best)}.`, warn: false };

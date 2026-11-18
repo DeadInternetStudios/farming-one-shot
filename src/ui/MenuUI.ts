@@ -12,7 +12,7 @@ import { POSTCARD_ON } from '../features/postcard/layout';
 import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offline';
 import { PACE_REAL_MINUTES } from '../game/clock';
 import type { PaceId } from '../game/clock';
-import { available, donate, isComplete, progressOf, slotDone } from '../game/bundles';
+import { donate, giveable, isComplete, progressOf, slotDone } from '../game/bundles';
 import { have, make, plan } from '../game/crafting';
 import { weatherFor } from '../game/day';
 import { nextGoal } from '../game/goals';
@@ -51,25 +51,37 @@ export interface Entry {
 export interface ListPlan {
   listW: number;
   listH: number;
+  /** How tall each row is. A few entries with pictures beside a tall card become big tiles, so the list is not left half empty. */
+  rowH: number;
   card: Area;
   need: number;
 }
 
+/** A row this tall is a tile: the picture is drawn twice the size. */
+const TILE = 34;
+
+/** What a card shows for an entry. A row that only says there is nothing here already named it, so its card just explains. */
+const face = (e: Entry): Entry => (e.row.empty ? { ...e, title: '' } : e);
+
 export function planList(scene: Phaser.Scene, a: Area, wide: boolean, entries: readonly Entry[], rowH: number, style: CardStyle): ListPlan {
   const listW = wide ? Math.floor(a.w * 0.5) - 4 : a.w;
   const cardW = wide ? a.w - listW - 10 : a.w;
-  const cardH = Math.max(0, ...entries.map((e) => cardHeight(scene, cardW, e, rowH, style)));
+  const cardH = Math.max(0, ...entries.map((e) => cardHeight(scene, cardW, face(e), rowH, style)));
   if (wide) {
     // side by side: the page is as tall as the longer of the two
     const need = Math.min(a.h, Math.max(Math.min(entries.length, Math.floor(a.h / rowH)) * rowH, cardH));
-    const listH = Math.max(1, Math.floor(need / rowH)) * rowH;
-    return { listW, listH, card: { x: a.x + listW + 10, y: a.y, w: cardW, h: need }, need };
+    const card = { x: a.x + listW + 10, y: a.y, w: cardW, h: need };
+    const tile = Math.min(Math.floor(need / Math.max(1, entries.length)), 3 * rowH);
+    if (entries.length > 0 && entries.every((e) => e.row.icon) && entries.length * rowH * 1.5 <= need && tile >= TILE) {
+      return { listW, listH: entries.length * tile, rowH: tile, card, need };
+    }
+    return { listW, listH: Math.max(1, Math.floor(need / rowH)) * rowH, rowH, card, need };
   }
   // stacked: as many rows as there are entries, if the card still fits under them
   const rows = Math.max(1, Math.min(entries.length, Math.max(2, Math.floor((a.h - 8 - cardH) / rowH))));
   const listH = rows * rowH;
   const need = Math.min(a.h, listH + 8 + cardH);
-  return { listW, listH, card: { x: a.x, y: a.y + listH + 8, w: a.w, h: Math.min(a.h - listH - 8, cardH) }, need };
+  return { listW, listH, rowH, card: { x: a.x, y: a.y + listH + 8, w: a.w, h: Math.min(a.h - listH - 8, cardH) }, need };
 }
 
 /** A list on one side and a card about the selected entry on the other. Shared by the menu pages. */
@@ -78,14 +90,17 @@ export class ListPane {
   private info: Bag;
   private entries: Entry[] = [];
   private card: Area;
+  private listRowH: number;
   /** Set when the screen is torn down, which an action can do (taking a postcard closes the menu), so nothing paints after it. */
   private closed = false;
   say: (m: string, color?: number) => void = () => undefined;
 
-  constructor(bag: Bag, scene: Phaser.Scene, a: Area, wide: boolean, private get: () => Entry[], private onChange: () => void = () => undefined, private rowH = 17, private style: CardStyle = { compact: true, pictures: true }) {
-    const plan = planList(scene, a, wide, this.get(), rowH, style);
-    this.list = new ListView(bag, a.x, a.y, plan.listW, plan.listH, rowH, (i) => this.pick(i, 0), () => this.paint(), false);
+  /** `a` is the most room the page may have. The frame `pop` is as tall as the list and the selected card need, and follows the selection. */
+  constructor(bag: Bag, scene: Phaser.Scene, private a: Area, private pop: Pop, private get: () => Entry[], private onChange: () => void = () => undefined, private rowH = 17, private style: CardStyle = { compact: true, pictures: true }) {
+    const plan = planList(scene, a, pop.wide, this.get(), rowH, style);
+    this.list = new ListView(bag, a.x, a.y, plan.listW, plan.listH, plan.rowH, (i) => this.pick(i, 0), () => this.paint(), false);
     this.card = plan.card;
+    this.listRowH = plan.rowH;
     this.info = new Bag(scene, bag.depth);
     this.refresh(true);
   }
@@ -121,7 +136,10 @@ export class ListPane {
     const b = this.info;
     b.destroy();
     const e = this.entries[this.list.sel];
-    if (e) drawCard(b, this.card, e, this.rowH, this.style, (i) => this.pick(this.list.sel, i));
+    const used = e ? drawCard(b, this.card, face(e), this.rowH, this.style, (i) => this.pick(this.list.sel, i)) : 0;
+    // beside the card the page is as tall as the longer of the two; under the list it is both
+    const listed = Math.min(this.entries.length, this.list.visible) * this.listRowH;
+    this.pop.fit(this.a.y - this.pop.top + (this.pop.wide ? Math.max(listed, used) : this.card.y - this.a.y + used));
   }
 
   key(code: string, ev: KeyboardEvent): boolean {
@@ -181,6 +199,7 @@ export function bundleEntries(canGive: boolean): Entry[] {
     const prog = progressOf(st, b);
     const done = isComplete(st, b);
     const got = b.slots.filter((_, i) => slotDone(st, b, i)).length;
+    const fits = canGive && !done ? giveable(st, b) : 0;
     return {
       row: { text: b.name, right: done ? 'Lit' : `${got}/${b.slots.length}`, icon: done ? 'item/lantern' : undefined, tint: done ? COL.leaf : undefined },
       title: b.name,
@@ -193,7 +212,8 @@ export function bundleEntries(canGive: boolean): Entry[] {
         `Reward: ${b.reward.gold}g${b.reward.item ? ` and ${b.reward.item.n} ${itemDef(b.reward.item.id).name}` : ''}.`,
       ],
       actions: canGive && !done ? [{
-        label: 'Give what fits', kind: 'leaf', off: !b.slots.some((sl, i) => !slotDone(st, b, i) && available(st, sl)), run: () => {
+        // the button says what it will hand over, so a full bag and an empty one never look alike
+        label: fits > 0 ? `Give ${fits} ${fits === 1 ? 'item' : 'items'}` : 'Give what fits', kind: 'leaf', off: fits === 0, run: () => {
           let any = false;
           let finished: BundleDef['reward'] | null = null;
           b.slots.forEach((_, i) => {
@@ -568,7 +588,7 @@ export class MenuScreen extends Screen {
     this.body = this.own(new Bag(this.scene, bag.depth));
     this.pane = null;
     this.bagView = null;
-    const pane = (get: () => Entry[]): ListPane => this.own(new ListPane(this.body, this.scene, area, p.wide, get, undefined, row, style));
+    const pane = (get: () => Entry[]): ListPane => this.own(new ListPane(this.body, this.scene, area, p, get, undefined, row, style));
     if (this.tab === 'bag') this.bagView = this.own(new BagView(this.body, this.scene, area, say, slotPitch(l), row, style));
     else if (this.tab === 'craft') this.pane = pane(() => recipeEntries('craft'));
     else if (this.tab === 'bundles') this.pane = pane(() => bundleEntries(false));
@@ -617,7 +637,7 @@ export class RecipeScreen extends Screen {
     this.dim(0.45);
     const { p, row, style, area } = listPage(l, bag, this.title, LIST_FRAME, 0, recipeEntries(this.kind), () => this.close());
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => recipeEntries(this.kind), undefined, row, style));
+    this.pane = this.own(new ListPane(body, this.scene, area, p, () => recipeEntries(this.kind), undefined, row, style));
     this.pane.say = footer(bag, p);
   }
 
@@ -646,7 +666,7 @@ export class ShrineScreen extends Screen {
     this.showLit();
     if (lines > 0) paragraph(bag, p.x + 12, p.top + 2, p.w - 24, lines * LINE, SHRINE_TEXT);
     const body = this.own(new Bag(this.scene, bag.depth));
-    this.pane = this.own(new ListPane(body, this.scene, area, p.wide, () => bundleEntries(true), () => this.showLit(), row, style));
+    this.pane = this.own(new ListPane(body, this.scene, area, p, () => bundleEntries(true), () => this.showLit(), row, style));
     this.pane.say = footer(bag, p);
   }
 

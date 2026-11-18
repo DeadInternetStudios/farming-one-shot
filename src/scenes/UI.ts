@@ -84,7 +84,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   override update(): void {
-    this.hud.update();
+    this.hud.update(this.stack.isOpen);
     this.stack.update();
   }
 }

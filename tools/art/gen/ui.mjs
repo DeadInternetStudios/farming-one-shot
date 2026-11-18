@@ -136,8 +136,15 @@ export function seasonIcon(season) {
     for (const [x, y] of [[5, 2], [8, 4], [7, 8], [3, 8], [2, 4]]) i.disc(x, y, 1.8, R.blossom[3]);
     i.disc(5, 5, 1.4, R.yellow[3]);
   } else if (season === 'summer') {
-    i.disc(5, 5, 3.2, R.yellow[3]); i.set(3, 3, R.yellow[4]);
-    for (const [x, y] of [[5, 0], [5, 10], [0, 5], [10, 5], [1, 1], [9, 1], [1, 9], [9, 9]]) i.set(x, y, R.yellow[2]);
+    // a melon wedge: the clock already shows a sun for clear weather, and a second one beside it read as two
+    i.blit(Img.ascii([
+      '.RRRRRRRRR.',
+      '.RKRRRRRKR.',
+      '.WRRRKRRRW.',
+      '..GWRRRWG..',
+      '...GWWWG...',
+      '....GGG....',
+    ], { R: R.red[3], K: R.ink[0], W: R.cream[3], G: R.leaf[3] }), 0, 2);
   } else if (season === 'fall') {
     i.poly([[5, 0], [9, 4], [8, 8], [5, 10], [2, 8], [1, 4]], R.autumn[3]);
     i.vline(5, 3, 8, R.autumn[1]); i.set(4, 4, R.autumn[4]); i.set(6, 6, R.autumn[2]);
@@ -147,6 +154,50 @@ export function seasonIcon(season) {
   }
   i.outline((c) => outlineOf(c));
   return i;
+}
+
+/** A cat's face, for the shop: the sitting cat is too small to read as a cat at the size of a list row. */
+export function catIcon() {
+  return Img.ascii([
+    '................',
+    '..oo........oo..',
+    '.oooo......oooo.',
+    '.opooo....ooopo.',
+    '.oooooooooooooo.',
+    '.oooooooooooooo.',
+    '.oOooooOOooooOo.',
+    '.ooowEoooowEooo.',
+    '.oooEEooooEEooo.',
+    '.ooooollllooooo.',
+    '.ooooolpplooooo.',
+    '.ooooollllooooo.',
+    '..oooooooooooo..',
+    '...oooooooooo...',
+    '................',
+    '................',
+  ], { o: R.orange[3], O: R.orange[1], p: R.pink[3], l: R.cream[3], E: R.ink[0], w: R.cream[3] }).outline((c) => outlineOf(c));
+}
+
+/** A hen house, for the shop: the egg basket it stood in for said nothing about a coop. */
+export function coopIcon() {
+  return Img.ascii([
+    '................',
+    '.......rr.......',
+    '......rrrr......',
+    '.....rrrrrr.....',
+    '....rrrrrrrr....',
+    '...rrrrrrrrrr...',
+    '..rrrrrrrrrrrr..',
+    '.RRRRRRRRRRRRRR.',
+    '..wwvwwvwwvwwv..',
+    '..wwvwwvwwvwwv..',
+    '..wwwwwkkwwwww..',
+    '..wwwwkkkkwwww..',
+    '..wwwwkkkkwwww..',
+    '..wwwwkkkkwwww..',
+    '..bbbbbbbbbbbb..',
+    '................',
+  ], { r: R.red[3], R: R.red[1], w: R.wood[4], v: R.wood[3], k: R.ink[0], b: R.wood[2] }).outline((c) => outlineOf(c));
 }
 
 export function weatherIcon(kind) {

@@ -253,17 +253,23 @@ export class Hud {
     return this.l.uiW < 330 ? 54 : 38;
   }
 
-  /** The one line that says what to do next, under the clock. */
-  private updateGoal(now: number): void {
+  /** The one line that says what to do next, under the clock. It steps aside for a pop-up, which would otherwise show it through its own fade. */
+  private updateGoal(now: number, covered: boolean): void {
+    const show = this.goalShown !== '' && !covered;
+    if (this.goalBg.visible !== show) {
+      this.goalBg.setVisible(show);
+      this.goalIcon.setVisible(show);
+      this.goalText.setVisible(show);
+    }
     if (now < this.goalCheck) return;
     this.goalCheck = now + 400;
     const text = nextGoal(session.state)?.text ?? '';
     if (text === this.goalShown) return;
     this.goalShown = text;
     const on = text !== '';
-    this.goalBg.setVisible(on);
-    this.goalIcon.setVisible(on);
-    this.goalText.setVisible(on);
+    this.goalBg.setVisible(on && !covered);
+    this.goalIcon.setVisible(on && !covered);
+    this.goalText.setVisible(on && !covered);
     if (!on) {
       this.goalRect.setTo(0, 0, 0, 0);
       return;
@@ -292,12 +298,12 @@ export class Hud {
 
   // ---------------------------------------------------------------- per frame
 
-  update(): void {
+  update(covered = false): void {
     const st = session.state;
     const p = st.player;
     const now = this.scene.time.now;
 
-    this.updateGoal(now);
+    this.updateGoal(now, covered);
     const season = seasonOf(st.day);
     const clockSig = `${st.day}|${Math.floor(st.minute / 10)}|${st.weather}`;
     if (clockSig !== this.clockSig) {

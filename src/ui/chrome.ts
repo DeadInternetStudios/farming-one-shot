@@ -1,6 +1,5 @@
 import type Phaser from 'phaser';
 import { tapH, type Layout } from '../display';
-import { PAL } from '../gen/art';
 import { COL, label, wrapText } from './kit';
 import { EASE, MS, pop } from './motion';
 import { settings } from '../game/settings';
@@ -38,6 +37,10 @@ export interface Pop extends Area {
   /** Where the message line starts, and how many lines it may use. */
   foot: number;
   lines: number;
+  /** Makes the frame as tall as a page of `body` needs, within what the frame may be. The top stays where it is. */
+  fit(body: number): void;
+  /** Runs `move` whenever the frame changes height, for anything pinned to its bottom. */
+  follow(move: () => void): void;
 }
 
 export interface PopupOpts {
@@ -87,7 +90,7 @@ export function popup(bag: Bag, l: Layout, o: PopupOpts): Pop {
   const h = o.body === undefined ? f.maxH : Math.min(f.maxH, f.chrome + o.body);
   const x = Math.floor((l.uiW - w) / 2);
   const y = Math.floor((l.uiH - Math.max(h, o.hold === undefined ? 0 : Math.min(f.maxH, f.chrome + o.hold))) / 2);
-  bag.panel(x, y, w, h);
+  const panel = bag.panel(x, y, w, h);
   const size = l.touch ? tapH(l) : 14;
   const closeX = x + w - size - 11;
   const cy = y + (l.touch ? 5 : 6);
@@ -95,7 +98,20 @@ export function popup(bag: Bag, l: Layout, o: PopupOpts): Pop {
   const titleY = cy + Math.floor((size - 9) / 2) + 2;
   const title = bag.text(x + 12, titleY, o.title, {});
   const lines = wide ? 1 : 2;
-  return { x, y, w, h, title, wide, closeX, titleY, top: y + f.head, foot: y + h - 7 - lines * LINE, lines };
+  const moves: (() => void)[] = [];
+  const p: Pop = {
+    x, y, w, h, title, wide, closeX, titleY, top: y + f.head, foot: y + h - 7 - lines * LINE, lines,
+    fit: (body) => {
+      const to = Math.min(f.maxH, f.chrome + body);
+      if (to === p.h) return;
+      p.h = to;
+      p.foot = y + to - 7 - lines * LINE;
+      panel.setSize(w, to);
+      for (const move of moves) move();
+    },
+    follow: (move) => { moves.push(move); },
+  };
+  return p;
 }
 
 /** The part of a pop-up between `top` and the message line, or the bottom edge for pages that never speak. */
@@ -129,6 +145,7 @@ export function chip(bag: Bag, p: Pop, icon: string, iconW: number, tint: number
 /** The line at the foot of a pop-up that answers what you just did. Long answers wrap, and are cut with dots if they still do not fit. */
 export function footer(bag: Bag, p: Pop, tint: number = COL.ink): (m: string, color?: number) => void {
   const t = bag.text(p.x + p.w / 2, p.foot, '', { origin: [0.5, 0], tint, align: 'center' });
+  p.follow(() => { t.setY(p.foot); });
   const room = p.w - 24;
   return (m, color) => {
     const all = wrapText(bag.scene, m, room).split('\n');
@@ -314,20 +331,22 @@ export function cardHeight(scene: Phaser.Scene, w: number, c: CardSpec, btnH: nu
 function needRow(b: Bag, x: number, y: number, w: number, need: NonNullable<CardLine['need']>, name: string, pictures: boolean): void {
   const done = need.have >= need.n;
   const count = b.text(x + w - 1, y + (pictures ? 4 : 1), `${Math.min(need.have, need.n)}/${need.n}`, { origin: [1, 0], tint: done ? COL.leaf : need.have === 0 ? COL.berry : COL.ink });
-  const left = pictures ? 20 : 12;
+  const left = pictures ? 20 : 15;
   if (pictures) b.img(x + 9, y + 8, need.icon);
-  else if (done) b.img(x + 5, y + 5, 'ui/check');
-  else b.rect(x + 3, y + 3, 4, 4, PAL.wood[2], 0.45);
+  else if (done) b.img(x + 6, y + 6, 'ui/check');
+  // a short card has no room for the whole picture, so the same one is drawn smaller
+  else b.img(x + 6, y + 6, need.icon).setScale(0.75);
   const room = w - left - count.width - 8;
   b.text(x + left, y + (pictures ? 4 : 1), ellipsize(b.scene, name, room), { tint: done ? COL.leaf : COL.ink });
   if (done && pictures) b.img(x + w - count.width - 7, y + 8, 'ui/check');
 }
 
 /**
- * The card about the selected row: a picture and a title, a few lines, and buttons pinned to the bottom.
+ * The card about the selected row: a picture and a title, a few lines, and buttons right under them.
  * Lines that do not fit above the buttons are cut with dots, so text never runs under them.
+ * Says how tall the card came out, so a frame can be as tall as what it holds.
  */
-export function drawCard(b: Bag, box: Area, c: CardSpec, btnH: number, style: CardStyle, act: (i: number) => void): void {
+export function drawCard(b: Bag, box: Area, c: CardSpec, btnH: number, style: CardStyle, act: (i: number) => void): number {
   const { x, y, w, h } = box;
   const acts = c.actions ?? [];
   const limit = acts.length > 0 ? y + h - btnH - 4 : y + h;
@@ -357,8 +376,10 @@ export function drawCard(b: Bag, box: Area, c: CardSpec, btnH: number, style: Ca
     if (end === ty) break;
     ty = end + 3;
   }
-  if (c.extra && ty + 12 <= limit) c.extra(b, x + 2, ty + 1, w - 4);
-  if (acts.length === 0) return;
+  if (c.extra && ty + 12 <= limit) ty = c.extra(b, x + 2, ty + 1, w - 4);
+  if (acts.length === 0) return ty - y;
+  const by = Math.min(ty + 3, y + h - btnH);
   const bw = Math.floor((w - 4 - (acts.length - 1) * 4) / acts.length);
-  acts.forEach((a, i) => b.btn(x + 2 + i * (bw + 4), y + h - btnH, bw, a.label, a.kind, () => act(i), btnH, undefined, a.off));
+  acts.forEach((a, i) => b.btn(x + 2 + i * (bw + 4), by, bw, a.label, a.kind, () => act(i), btnH, undefined, a.off));
+  return by + btnH - y;
 }

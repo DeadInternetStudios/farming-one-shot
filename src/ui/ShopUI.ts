@@ -46,7 +46,8 @@ function stockEntry(it: string): Entry {
     row: { text: d.name, right: `${price}g`, icon: iconFor(st, it), dim: st.player.gold < price },
     title: d.name,
     icon: iconFor(st, it),
-    lines: [{ t: `Costs ${price}g. You have ${countItem(st.player.slots, it)}.`, tint: COL.ink }, d.blurb, ...(advice ? [{ t: advice.text, tint: advice.warn ? COL.berry : COL.dim }] : [])],
+    // what to know before buying comes before the flavour, which is what a short card drops first
+    lines: [{ t: `Costs ${price}g. You have ${countItem(st.player.slots, it)}.`, tint: COL.ink }, ...(advice ? [{ t: advice.text, tint: advice.warn ? COL.berry : COL.dim }] : []), d.blurb],
     actions: [
       { label: 'Buy', kind: 'leaf', off: buyBlock(st, it, 1) !== null, run: buyN(1) },
       { label: 'Buy 5', kind: 'wood', off: buyBlock(st, it, 5) !== null, run: buyN(5) },
@@ -100,7 +101,7 @@ function sellEntries(shopId: string): Entry[] {
 }
 
 /** What each farm upgrade looks like, from art the game already has. */
-const UPGRADE_ICON: Record<string, string> = { 'bag-1': 'ui/tab-bag', 'bag-2': 'ui/tab-bag', coop: 'prop/egg-basket', chick: 'critter/hen-brown-idle', cat: 'critter/cat-sit' };
+const UPGRADE_ICON: Record<string, string> = { 'bag-1': 'ui/tab-bag', 'bag-2': 'ui/tab-bag', coop: 'ui/icon-coop', chick: 'critter/hen-brown-idle', cat: 'ui/icon-cat' };
 
 function upgradeEntries(): Entry[] {
   const st = session.state;
@@ -224,7 +225,7 @@ export class ShopScreen extends Screen {
     this.markPage();
     const body = this.own(new Bag(this.scene, bag.depth));
     const tab = this.tabs[this.tab] as Tab;
-    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, strip.bottom + 5), p.wide, () => tab.entries(), () => this.gold?.set(`${session.state.player.gold}g`), row, style));
+    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, strip.bottom + 5), p, () => tab.entries(), () => this.gold?.set(`${session.state.player.gold}g`), row, style));
     this.pane.say = (m, color) => { this.msg = m; speak(m, color ?? COL.ink); };
   }
 

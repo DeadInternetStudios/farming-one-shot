@@ -109,6 +109,8 @@ export class ListView {
   private onMove: (p: Phaser.Input.Pointer) => void;
   private onUp: (p: Phaser.Input.Pointer) => void;
   readonly visible: number;
+  /** A tall row is a tile: its picture is drawn twice the size, and its name starts after the bigger picture. */
+  private readonly big: boolean;
 
   constructor(
     private bag: Bag,
@@ -122,12 +124,13 @@ export class ListView {
     private pickOnTap = true,
   ) {
     this.visible = Math.max(1, Math.floor(h / rowH));
+    this.big = rowH >= 34;
     for (let i = 0; i < this.visible; i++) {
       const ry = y + i * rowH;
       const bg = bag.rect(x, ry, w, rowH - 1, PAL.yellow[2], 1, 1).setAlpha(0);
       const mark = bag.rect(x, ry, 2, rowH - 1, PAL.red[3], 1, 2).setVisible(false);
-      const icon = bag.img(x + 9, ry + rowH / 2, 'item/stone').setVisible(false);
-      const text = bag.text(x + 20, ry + Math.floor((rowH - 9) / 2), '');
+      const icon = bag.img(x + (this.big ? 19 : 9), ry + rowH / 2, 'item/stone').setVisible(false).setScale(this.big ? 2 : 1);
+      const text = bag.text(x + (this.big ? 40 : 20), ry + Math.floor((rowH - 9) / 2), '');
       const right = bag.text(x + w - 3, ry + Math.floor((rowH - 9) / 2), '', { origin: [1, 0] });
       this.slots.push({ bg, mark, icon, text, right });
     }
@@ -250,10 +253,12 @@ export class ListView {
       }
       const tint = r.tint ?? (r.dim ? COL.dim : COL.ink);
       const quiet = r.empty === true;
-      s.bg.setAlpha(quiet ? 0 : idx === this.sel ? 0.5 : idx === this.hover ? 0.22 : 0);
-      s.mark.setVisible(!quiet && idx === this.sel);
+      // the chosen row is gold with a red edge; the one under the mouse is only shaded, so the two never read as one
+      const chosen = idx === this.sel;
+      s.bg.setFillStyle(chosen ? PAL.yellow[2] : PAL.wood[1]).setAlpha(quiet ? 0 : chosen ? 0.5 : idx === this.hover ? 0.16 : 0);
+      s.mark.setVisible(!quiet && chosen);
       s.right.setText(r.right ?? '').setTint(tint).setX(edge);
-      const left = this.x + (r.icon ? 20 : 3);
+      const left = this.x + (r.icon ? (this.big ? 40 : 20) : 3);
       if (quiet) {
         s.text.setOrigin(0.5, 0).setTint(tint).setX(this.x + this.w / 2);
         fitText(s.text, r.text, this.w - 8);
