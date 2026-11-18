@@ -1,9 +1,9 @@
 // Opens every pop-up on the mid-game save and photographs it. Run it at each size you care about:
 //   node tools/test/probe.mjs tools/test/scenarios/menus.mjs --size 360x640 --dpr 2 --touch --out .100x/shots/menus-360
-// Set ONLY=shop,chest to take some of them.
+// Set ONLY=shop,chest to take some of them, and FIXTURE=lategame for the save with 99,999,999 gold and the widest totals.
 export default async ({ page, wait, shot, press, log }) => {
   const url = page.url().replace('&new=1', '').replace('&skip=1', '');
-  await page.addInitScript({ path: 'tools/test/fixtures/midgame.js' });
+  await page.addInitScript({ path: `tools/test/fixtures/${process.env.FIXTURE ?? 'midgame'}.js` });
   await page.goto(url, { waitUntil: 'load' });
   await wait(2600);
   await page.evaluate(() => window.__lh.setMinute(600));
