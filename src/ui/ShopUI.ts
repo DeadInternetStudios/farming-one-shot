@@ -14,6 +14,7 @@ import type { Area, Chip } from './chrome';
 import { COL, iconFor } from './kit';
 import { ListPane, planList } from './MenuUI';
 import type { Entry, Line } from './MenuUI';
+import { money } from './money';
 import { Screen, isBack, isLeft, isRight } from './Screens';
 import { Bag } from './widgets';
 
@@ -218,14 +219,14 @@ export class ShopScreen extends Screen {
     const chrome = 2 + tabs.h + 5;
     const p = popup(bag, l, { title: shop?.name ?? 'Shop', ...SHOP_FRAME, body: chrome + (needs[this.tab] as number), hold: chrome + Math.max(...needs), close: () => this.close() });
     if (!p.wide && shop?.short) p.title.setText(shop.short);
-    this.gold = chip(bag, p, 'ui/coin', 10, COL.berry, `${session.state.player.gold}g`);
+    this.gold = chip(bag, p, 'ui/coin', 10, COL.berry, `${money(session.state.player.gold)}g`);
     const strip = tabStrip(bag, p, p.top + 2, tabs, specs, String(this.tab), (id) => this.setTab(Number(id)));
     const speak = footer(bag, p, COL.dim);
     speak(this.msg, COL.dim);
     this.markPage();
     const body = this.own(new Bag(this.scene, bag.depth));
     const tab = this.tabs[this.tab] as Tab;
-    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, strip.bottom + 5), p, () => tab.entries(), () => this.gold?.set(`${session.state.player.gold}g`), row, style));
+    this.pane = this.own(new ListPane(body, this.scene, bodyOf(p, strip.bottom + 5), p, () => tab.entries(), () => this.gold?.set(`${money(session.state.player.gold)}g`), row, style));
     this.pane.say = (m, color) => { this.msg = m; speak(m, color ?? COL.ink); };
   }
 

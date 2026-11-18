@@ -10,6 +10,7 @@ import type { Layout } from '../display';
 import { BLOB_INDEX, PAL, TILESET, TILE_ID } from '../gen/art';
 import { audio } from '../systems/Audio';
 import { COL, WARM_DARK, button, label, nine } from '../ui/kit';
+import { money } from '../ui/money';
 import type { Button } from '../ui/kit';
 
 const SEASON_NAMES = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' } as const;
@@ -392,7 +393,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private describe(st: GameState): string {
-    return `Day ${dayOfSeason(st.day)} of ${SEASON_NAMES[seasonOf(st.day)]}, ${st.player.gold}g`;
+    return `Day ${dayOfSeason(st.day)} of ${SEASON_NAMES[seasonOf(st.day)]}, ${money(st.player.gold)}g`;
   }
 
   private select(i: number, sound = true): void {

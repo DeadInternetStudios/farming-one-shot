@@ -11,6 +11,7 @@ import { PAL } from '../gen/art';
 import { tapH, type Layout } from '../display';
 import { COL, WEATHER_NAMES, button, iconFor, label, nine } from './kit';
 import type { Button } from './kit';
+import { money } from './money';
 
 const SEASON_NAMES = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' } as const;
 
@@ -270,7 +271,7 @@ export class Modals {
         const d = itemDef(r.id);
         open.parts.push(this.scene.add.image(x + pad + 7, cy + 5, 'atlas', iconFor(st, r.id)).setScale(0.75).setDepth(this.depth + 2));
         this.text(open, x + pad + 18, cy, `${d.name}${r.n > 1 ? ` x${r.n}` : ''}`);
-        this.text(open, x + w - pad, cy, `${r.gold}g`, { origin: [1, 0] });
+        this.text(open, x + w - pad, cy, `${money(r.gold)}g`, { origin: [1, 0] });
         cy += 13;
       }
       if (extra > 0) {
@@ -279,7 +280,7 @@ export class Modals {
       }
       cy += 2;
       this.text(open, x + pad, cy, 'Earned tonight', { tint: COL.berry });
-      this.text(open, x + w - pad, cy, `${s.earned}g`, { origin: [1, 0], tint: COL.berry });
+      this.text(open, x + w - pad, cy, `${money(s.earned)}g`, { origin: [1, 0], tint: COL.berry });
       cy += 14;
     }
     for (const l of lines) {

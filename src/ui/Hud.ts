@@ -10,6 +10,7 @@ import type { Layout } from '../display';
 import { settings } from '../game/settings';
 import { COL, iconFor, label, nine } from './kit';
 import { MS, easeOut } from './motion';
+import { money } from './money';
 
 /** Hotbar spacing in interface pixels. Touch screens get 22, which is 44 CSS pixels at the phone interface scale. */
 const pitchFor = (touch: boolean): number => (touch ? 22 : 19);
@@ -322,8 +323,8 @@ export class Hud {
     if (this.goldShown !== this.goldTarget) {
       const diff = this.goldTarget - this.goldShown;
       this.goldShown += Math.abs(diff) < 3 ? diff : Math.sign(diff) * Math.max(1, Math.floor(Math.abs(diff) * 0.12));
-      this.goldText.setText(String(this.goldShown));
-    } else if (this.goldText.text === '0' && p.gold !== 0) this.goldText.setText(String(p.gold));
+      this.goldText.setText(money(this.goldShown));
+    } else if (this.goldText.text === '0' && p.gold !== 0) this.goldText.setText(money(p.gold));
 
     const e = Math.max(0, Math.min(1, p.energy / p.maxEnergy));
     this.energyFill.setSize(Math.max(e > 0 ? 1 : 0, Math.round(this.energyW * e)), 4);
