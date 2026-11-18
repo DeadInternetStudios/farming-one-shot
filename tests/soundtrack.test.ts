@@ -71,6 +71,20 @@ describe('which tune plays', () => {
     expect(trackFor(at({ minute: 23 * 60, music: 'mine', kind: 'cave' }))).toBe('mine');
   });
 
+  it('follows the sun: a summer evening is still light long after a winter one has gone dark', () => {
+    expect(trackFor(at({ season: 'summer', minute: 21 * 60 + 30 }))).toBe('farm');
+    expect(trackFor(at({ season: 'summer', minute: 22 * 60 + 5 }))).toBe('night');
+    expect(trackFor(at({ season: 'winter', minute: 17 * 60 }))).toBe('farm');
+    expect(trackFor(at({ season: 'winter', minute: 18 * 60 + 5 }))).toBe('night');
+  });
+
+  it('starts the crickets as the sun goes and stops the birds a while before it', () => {
+    expect(bedLevels(at({ season: 'summer', minute: 20 * 60 }))['amb-crickets']).toBe(0);
+    expect(bedLevels(at({ season: 'summer', minute: 21 * 60 + 10 }))['amb-crickets']).toBeGreaterThan(0);
+    expect(bedLevels(at({ season: 'summer', minute: 19 * 60 }))['amb-birds']).toBeGreaterThan(0);
+    expect(bedLevels(at({ season: 'summer', minute: 19 * 60 + 40 }))['amb-birds']).toBe(0);
+  });
+
   it('plays festival music in the village on festival days, and the lantern song after dusk on the last one', () => {
     const village = { place: 'village', music: 'village' };
     expect(festivalToday(7)).toBe('blossom');

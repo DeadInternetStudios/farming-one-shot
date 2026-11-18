@@ -1,7 +1,7 @@
 import { BED_NAMES, TRACK_NAMES } from '../gen/audio';
 import type { BedName, TrackName } from '../gen/audio';
 import type { MapKind } from '../world/mapkit';
-import { seasonOf } from './clock';
+import { SUN, seasonOf } from './clock';
 import { festivalToday } from '../data/festivals';
 import type { GameState } from './state';
 import type { Season, Weather } from './types';
@@ -21,7 +21,8 @@ export function listeningTo(st: GameState, map: { id: string; music: string; kin
   return { place: map.id, music: map.music, kind: map.kind, day: st.day, season: seasonOf(st.day), minute: st.minute, weather: st.weather };
 }
 
-const NIGHT_FROM = 20 * 60 + 30;
+/** The night tune comes in an hour after the sun has set, whichever season that is. */
+const nightFrom = (season: Season): number => SUN[season].set + 60;
 const FEAST_FROM = 10 * 60;
 const FEAST_TO = 23 * 60;
 const LANTERN_FROM = 18 * 60;
@@ -35,7 +36,7 @@ export function trackFor(l: Listening): TrackName {
   if (feast && l.place === 'village' && l.minute >= FEAST_FROM && l.minute < FEAST_TO) {
     return feast === 'lantern' && l.minute >= LANTERN_FROM ? 'lantern' : 'festival';
   }
-  if (l.kind === 'outdoor' && l.minute >= NIGHT_FROM) return 'night';
+  if (l.kind === 'outdoor' && l.minute >= nightFrom(l.season)) return 'night';
   return isTrack(l.music) ? l.music : 'farm';
 }
 
@@ -46,8 +47,9 @@ export function musicLevel(l: Listening): number {
 }
 
 const BIRD_SEASON: Readonly<Record<Season, number>> = { spring: 0.9, summer: 0.7, fall: 0.35, winter: 0 };
-const BIRDS_UNTIL = 18 * 60;
-const CRICKETS_FROM = 19 * 60 + 30;
+/** The birds go quiet an hour and a half before sunset; the crickets start as the sun goes. */
+const birdsUntil = (season: Season): number => SUN[season].set - 90;
+const cricketsFrom = (season: Season): number => SUN[season].set;
 
 /** How much of each looping background sound belongs here and now, from 0 to 1. */
 export function bedLevels(l: Listening): Record<BedName, number> {
@@ -65,10 +67,10 @@ export function bedLevels(l: Listening): Record<BedName, number> {
   }
   const breeze = l.weather === 'storm' ? 0.6 : l.weather === 'snow' ? 0.4 : l.season === 'winter' ? 0.3 : l.weather === 'rain' ? 0.25 : 0.12;
   out['amb-wind'] = breeze + (l.place === 'forest' ? 0.08 : 0);
-  const night = l.minute >= CRICKETS_FROM;
+  const night = l.minute >= cricketsFrom(l.season);
   const calm = l.weather === 'sun' || l.weather === 'cloud';
   if (night && calm && l.season !== 'winter') out['amb-crickets'] = l.season === 'fall' ? 0.5 : 0.8;
-  if (!night && l.minute < BIRDS_UNTIL && calm) {
+  if (!night && l.minute < birdsUntil(l.season) && calm) {
     const morning = l.minute < 9 * 60 ? 1 : 0.6;
     out['amb-birds'] = BIRD_SEASON[l.season] * morning * (l.weather === 'sun' ? 1 : 0.5);
   }
