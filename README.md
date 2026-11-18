@@ -36,6 +36,10 @@ In the browser's own storage, under `lantern-hollow:save:v1`. It saves every few
 
 `?play=1&new=1&skip=1&debug=1` jumps into a new farm and adds a `window.__lh` helper that tests use. They work in `npm run dev`. A normal build leaves them out, so a link or a console line cannot reach into a saved farm. To test a built game, make it with `VITE_TEST_HOOKS=1 npm run build`.
 
+## Security checks
+
+`npm audit --omit=dev` covers what ships, and it is clean. `npm audit` also lists a picomatch advisory that arrives through vite and vitest. No patched picomatch exists yet (the newest, 4.0.7, is the affected one), the build only gives it fixed patterns, and none of it is in the game people download. Check again when vite or vitest is next updated.
+
 ## Licence
 
 None yet. Until the owner picks one, all rights are reserved.

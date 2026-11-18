@@ -24,6 +24,8 @@
       #boot { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #efe2c7; font: 600 14px/1.2 ui-rounded, system-ui, sans-serif; letter-spacing: 0.08em; transition: opacity 0.4s; pointer-events: none; }
       #boot .lamp { width: 18px; height: 18px; border-radius: 50%; background: #ffc95e; box-shadow: 0 0 24px 10px rgba(255, 166, 58, 0.55); animation: glow 1.6s ease-in-out infinite; }
       #boot.done { opacity: 0; }
+      #boot.stuck .lamp { animation: none; opacity: 0.35; }
+      #boot .why { max-width: 320px; padding: 0 20px; text-align: center; font-weight: 400; letter-spacing: 0; line-height: 1.5; opacity: 0.9; }
       @keyframes glow { 0%, 100% { transform: scale(0.85); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { #boot .lamp { animation: none; } }
     </style>
