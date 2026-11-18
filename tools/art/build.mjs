@@ -189,6 +189,7 @@ for (const c of crops) {
   add('int/plant-0', IN.plant(0)); add('int/plant-1', IN.plant(1)); add('int/plant-2', IN.plant(2));
   for (let k = 0; k < 3; k++) add(`int/picture-${k}`, IN.picture(k));
   add('int/mat', IN.doorMat());
+  add('bg/timber', IN.timber());
   const fp = IN.fireplace(); add('int/fireplace', fp.day); add('int/fireplace-glow', fp.glow);
   const hl = IN.hangLamp(); add('int/lamp', hl.day); add('int/lamp-glow', hl.glow);
 }

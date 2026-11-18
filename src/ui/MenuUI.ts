@@ -3,6 +3,7 @@ import { BUNDLES } from '../data/bundles';
 import type { BundleDef } from '../data/bundles';
 import { cropOfSeed, itemDef } from '../data/items';
 import { NPCS } from '../data/npcs';
+import type { NpcDef } from '../data/npcs';
 import { RECIPES } from '../data/recipes';
 import type { Recipe } from '../data/recipes';
 import { getLayout, slotPitch, tapH } from '../display';
@@ -12,7 +13,7 @@ import { POSTCARD_ON } from '../features/postcard/layout';
 import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offline';
 import { PACE_REAL_MINUTES } from '../game/clock';
 import type { PaceId } from '../game/clock';
-import { donate, giveable, isComplete, progressOf, slotDone } from '../game/bundles';
+import { available, donate, giveable, isComplete, progressOf, slotDone } from '../game/bundles';
 import { have, make, plan } from '../game/crafting';
 import { weatherFor } from '../game/day';
 import { nextGoal } from '../game/goals';
@@ -33,7 +34,7 @@ import type { Row } from './widgets';
 export interface Line {
   t: string;
   tint?: number;
-  need?: { icon: string; have: number; n: number };
+  need?: { icon: string; have: number; n: number; ready?: number };
 }
 
 export interface Entry {
@@ -162,9 +163,32 @@ function needed(i: Recipe['ingredients'][number]): string {
   return i.label.startsWith('Any ') ? `${i.n} ${i.label.slice(4)}` : `${i.label.charAt(0).toLowerCase()}${i.label.slice(1)}`;
 }
 
+/** The neighbour who teaches a recipe, and how many hearts of friendship it takes. */
+function teacherOf(recipe: string): { npc: NpcDef; hearts: number } | null {
+  for (const npc of NPCS) {
+    const u = npc.unlocks.find((x) => x.recipe === recipe);
+    if (u) return { npc, hearts: u.hearts };
+  }
+  return null;
+}
+
+/** A recipe not learned yet: still on the list, quiet, and saying where it comes from, so the list shows what there is to look forward to. */
+function lockedRecipe(st: GameState, r: Recipe): Entry {
+  const made = itemDef(r.makes);
+  const teacher = teacherOf(r.id);
+  const who = teacher && friendOf(st, teacher.npc.id).met ? teacher.npc.name : 'A neighbour';
+  return {
+    row: { text: made.name, icon: iconFor(st, r.makes), dim: true, right: 'Locked' },
+    title: r.name,
+    icon: iconFor(st, r.makes),
+    lines: [r.blurb, teacher ? `${who} shares this one once you are good friends: ${teacher.hearts} hearts.` : 'Someone in the valley knows this one.'],
+  };
+}
+
 export function recipeEntries(kind: Recipe['kind']): Entry[] {
   const st = session.state;
   const list = RECIPES.filter((r) => r.kind === kind && st.recipes.includes(r.id));
+  const locked = RECIPES.filter((r) => r.kind === kind && !st.recipes.includes(r.id)).map((r) => lockedRecipe(st, r));
   return list.map((r): Entry => {
     const missing = r.ingredients.find((i) => plan(st.player.slots, i) === null);
     const ok = !missing;
@@ -190,7 +214,7 @@ export function recipeEntries(kind: Recipe['kind']): Entry[] {
         },
       }],
     };
-  });
+  }).concat(locked);
 }
 
 export function bundleEntries(canGive: boolean): Entry[] {
@@ -207,7 +231,7 @@ export function bundleEntries(canGive: boolean): Entry[] {
         b.blurb,
         ...b.slots.map((s, i): Line => ({
           t: s.label || itemDef(s.any[0] as string).name,
-          need: { icon: iconFor(st, s.any[0] as string), have: Math.min(prog[i] ?? 0, s.n), n: s.n },
+          need: { icon: iconFor(st, s.any[0] as string), have: Math.min(prog[i] ?? 0, s.n), n: s.n, ready: canGive ? Math.min(s.n - (prog[i] ?? 0), available(st, s)?.n ?? 0) : 0 },
         })),
         `Reward: ${b.reward.gold}g${b.reward.item ? ` and ${b.reward.item.n} ${itemDef(b.reward.item.id).name}` : ''}.`,
       ],
@@ -250,12 +274,12 @@ export function friendEntries(): Entry[] {
       extra: (b, x, y) => { hearts(b, x, y, h); return y + 12; },
     };
   });
-  const unmet = NPCS.length - met.length;
-  if (unmet > 0) {
+  // everyone in the valley has a place on the list from the start: the ones not met yet are a name still to learn and a job to go and find
+  for (const n of NPCS.filter((x) => !friendOf(st, x.id).met)) {
     out.push({
-      row: { text: met.length === 0 ? 'Say hello' : unmet === 1 ? 'One more to meet' : `${unmet} more to meet`, dim: true, empty: met.length === 0 },
-      title: met.length === 0 ? 'You are new here' : 'Someone new',
-      lines: [met.length === 0 ? 'Nobody knows your name yet. Walk into the village and say hello to the first person you see.' : `${unmet === 1 ? 'One neighbour is' : `${unmet} neighbours are`} still waiting to meet you. Look around the village.`],
+      row: { text: '???', dim: true, right: 'New' },
+      title: 'Someone new',
+      lines: [`${n.role}.`, 'Walk through the village in the daytime and say hello to meet them.'],
     });
   }
   return out;

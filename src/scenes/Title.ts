@@ -457,7 +457,13 @@ export class TitleScene extends Phaser.Scene {
     nine(this, 'dark', x, y, size, size).setDepth(D.ui + 2);
     const note = this.add.image(x + size / 2, y + size / 2, 'atlas', 'fx/note/0').setDepth(D.ui + 3);
     const slash = this.add.rectangle(x + 3, y + size / 2, size - 6, 2, PAL.red[3]).setOrigin(0, 0.5).setRotation(-0.6).setDepth(D.ui + 4);
-    const sync = (): void => { note.setAlpha(on() ? 1 : 0.4); slash.setVisible(!on()); };
+    // the button says what it is, so nobody has to guess at a note in a box
+    const caption = label(this, x - 4, y + size / 2, '', { origin: [1, 0.5], outline: true }).setDepth(D.ui + 3);
+    const sync = (): void => {
+      note.setAlpha(on() ? 1 : 0.4);
+      slash.setVisible(!on());
+      caption.setText(on() ? 'Sound' : 'Muted').setTint(on() ? COL.cream : COL.berry);
+    };
     sync();
     const zone = this.add.zone(x, y, size, size).setOrigin(0, 0).setInteractive({ useHandCursor: true }).setDepth(D.ui + 5);
     zone.on('pointerup', () => {
@@ -488,8 +494,10 @@ export class TitleScene extends Phaser.Scene {
     const cam = this.cameras.main;
     // the lantern is lit: its glow swells over the whole picture, and the dark that follows is a warm one, so the house opens out of the light
     if (!settings.calm) {
-      const bloom = this.add.image(this.l.uiW / 2, this.l.uiH * 0.62, 'atlas', 'fx/glow-128').setTint(0xffd070).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setScale(0.5).setDepth(D.ui + 20);
-      this.tweens.add({ targets: bloom, alpha: 0.9, scale: 8, duration: 560, ease: 'Cubic.easeOut' });
+      // it swells from the house to about the size of the screen and no further: the sky and the hills stay in the picture, only warmer
+      const reach = (Math.max(this.l.uiW, this.l.uiH) * 1.15) / 128;
+      const bloom = this.add.image(this.l.uiW / 2, this.l.uiH * 0.62, 'atlas', 'fx/glow-128').setTint(0xffb454).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setScale(0.5).setDepth(D.ui + 20);
+      this.tweens.add({ targets: bloom, alpha: 0.85, scale: reach, duration: 560, ease: 'Cubic.easeOut' });
     }
     this.time.delayedCall(settings.calm ? 0 : 380, () => cam.fadeOut(settings.calm ? 520 : 460, ...WARM_DARK));
     cam.once('camerafadeoutcomplete', () => {

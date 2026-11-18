@@ -243,10 +243,16 @@ export class Hud {
     this.hintText.setText(text);
     const w = Math.ceil(this.hintText.width) + 14;
     this.hintBg.setSize(w, 15);
-    const cx = Math.floor(this.l.uiW / 2);
-    const y = this.hotbarTop - 38;
-    this.hintBg.setPosition(cx - Math.floor(w / 2), y).setVisible(true);
-    this.hintText.setPosition(cx, y + 4).setVisible(true);
+    let x = Math.floor((this.l.uiW - w) / 2);
+    let y = this.hotbarTop - 38;
+    if (this.l.touch) {
+      // on a phone the hint is the action button's: it sits right beside it, on the side the thumb is not
+      const bx = settings.lefty ? 26 : this.l.uiW - 26;
+      x = settings.lefty ? bx + 22 : bx - 22 - w;
+      y = this.l.uiH - 52 - 11;
+    }
+    this.hintBg.setPosition(x, y).setVisible(true);
+    this.hintText.setPosition(x + Math.floor(w / 2), y + 4).setVisible(true);
   }
 
   /** Where the centred pop-ups start. Narrow screens keep them below the goal line. */

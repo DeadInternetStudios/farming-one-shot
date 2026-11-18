@@ -17,6 +17,8 @@ export interface LightSpot {
   color: number;
   /** Lamp flames flicker; windows do not. */
   flicker: boolean;
+  /** Carried by the player: it comes up smoothly with the evening instead of waiting for its own moment, wherever it goes. */
+  carried?: boolean;
 }
 
 interface Placed {

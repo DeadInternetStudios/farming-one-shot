@@ -25,6 +25,8 @@ export class MapView {
   readonly land: Phaser.Tilemaps.TilemapLayer;
   readonly overlay: Phaser.Tilemaps.TilemapLayer;
   readonly water: Phaser.GameObjects.TileSprite | null = null;
+  /** Dark timber beyond the walls of a room, so a small room on a tall screen sits on something. */
+  private readonly timber: Phaser.GameObjects.TileSprite | null = null;
   private tileset: Phaser.Tilemaps.Tileset;
   private waterFrame = 0;
   private waterTimer: Phaser.Time.TimerEvent | null = null;
@@ -43,6 +45,11 @@ export class MapView {
           water.setFrame(`water-${this.waterFrame}`);
         },
       });
+    }
+
+    if (def.kind === 'interior') {
+      const pad = 640;
+      this.timber = scene.add.tileSprite(-pad, -pad, def.w * 16 + pad * 2, def.h * 16 + pad * 2, 'atlas', 'bg/timber').setOrigin(0, 0).setDepth(DEPTH.water - 10);
     }
 
     this.tilemap = scene.make.tilemap({ tileWidth: 16, tileHeight: 16, width: def.w, height: def.h });
@@ -73,6 +80,7 @@ export class MapView {
   destroy(): void {
     this.waterTimer?.remove();
     this.water?.destroy();
+    this.timber?.destroy();
     this.tilemap.destroy();
   }
 

@@ -27,9 +27,9 @@ export function morningLine(st: GameState): string {
 export function dayCard(scene: Phaser.Scene, l: Layout, st: GameState): void {
   const cx = Math.floor(l.uiW / 2);
   const cy = Math.floor(l.uiH * 0.3);
-  const band = scene.add.rectangle(0, cy - 24, l.uiW, 54, PAL.ink[0], 0.4).setOrigin(0, 0);
+  const band = scene.add.rectangle(0, cy - 24, l.uiW, 54, PAL.ink[0], 0.62).setOrigin(0, 0);
   const title = label(scene, cx, cy - 6, `${SEASONS[seasonOf(st.day)]} ${dayOfSeason(st.day)}`, { outline: true, origin: [0.5, 0.5] }).setScale(3);
-  const sub = label(scene, cx, cy + 16, `${WEEKDAYS[weekdayOf(st.day)]}. ${morningLine(st)}`, { outline: true, origin: [0.5, 0.5], tint: COL.gold });
+  const sub = label(scene, cx, cy + 16, st.day === 1 ? 'Your first morning in the valley' : `${WEEKDAYS[weekdayOf(st.day)]}. ${morningLine(st)}`, { outline: true, origin: [0.5, 0.5], tint: COL.cream });
   const parts = [band, title, sub];
   for (const p of parts) p.setDepth(DEPTH).setAlpha(0);
   const gone = (): void => { for (const p of parts) p.destroy(); };

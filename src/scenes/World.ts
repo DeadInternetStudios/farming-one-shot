@@ -36,6 +36,7 @@ import { Fx } from '../systems/Fx';
 import { lightLanterns } from '../systems/Ceremony';
 import { Lighting } from '../systems/Lighting';
 import { hushed, lampOn, skyFor } from '../systems/sky';
+import type { SkyState } from '../systems/sky';
 import { MapView } from '../world/MapView';
 import { ObjectsView } from '../world/ObjectsView';
 import type { LightSpot } from '../world/ObjectsView';
@@ -305,7 +306,7 @@ export class WorldScene extends Phaser.Scene {
     this.ambient.update(dt, { season: seasonOf(st.day), weather: st.weather, minute: st.minute, kind: this.def.kind, day: sky.day });
     if (this.objects.lightsDirty) this.useLights();
     this.objects.setSun(sky.low, sky.side);
-    this.lighting.update(sky, time, this.objects.glows, this.torch());
+    this.lighting.update(sky, time, this.objects.glows, this.torch(sky));
     for (const f of this.objects.nightFrames) f.setAlpha(lampOn(sky.lamps, f.x, f.y));
     this.chimneySmoke(dt, sky.day);
   }
@@ -320,9 +321,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** In the mine you carry a little light of your own. */
-  private torch(): LightSpot[] {
-    if (this.def.kind !== 'cave') return [];
-    return [{ x: this.player.x, y: this.player.y - 10, r: 92, color: 0xffd9a3, flicker: true }];
+  /** The light you carry: all the way down in a cave, and a small warm pool once the evening has begun, so you and what you grew are never lost in the dark. */
+  private torch(sky: SkyState): LightSpot[] {
+    if (this.def.kind === 'cave') return [{ x: this.player.x, y: this.player.y - 10, r: 92, color: 0xffd9a3, flicker: true }];
+    if (this.def.kind !== 'outdoor' || sky.lamps < 0.05) return [];
+    return [{ x: this.player.x, y: this.player.y - 8, r: 40, color: 0xc99763, flicker: true, carried: true }];
   }
 
   private say(msg: string): void {

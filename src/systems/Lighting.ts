@@ -88,7 +88,7 @@ export class Lighting {
       const flick = s.flicker && !settings.calm ? 1 + Math.sin(time * 0.011 + i * 1.7) * 0.035 + Math.sin(time * 0.037 + i) * 0.02 : 1;
       const r = s.r * flick;
       if (s.x + r < ox || s.x - r > ox + this.w || s.y + r < oy || s.y - r > oy + this.h) return;
-      const on = lampOn(sky.lamps, s.x, s.y);
+      const on = s.carried ? Math.min(1, sky.lamps * 1.5) : lampOn(sky.lamps, s.x, s.y);
       if (on <= 0.01) return;
       rt.stamp('atlas', 'fx/glow-128', s.x - ox, s.y - oy, { originX: 0.5, originY: 0.5, scale: r / 64, tint: s.color, alpha: Math.min(1, on * 1.15), blendMode: Phaser.BlendModes.ADD });
     });

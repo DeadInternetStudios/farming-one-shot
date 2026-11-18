@@ -6,6 +6,41 @@ import { Rng } from '../rng.mjs';
 const T = 16;
 const out = (img) => img.outline((c) => outlineOf(c));
 
+// ------------------------------------------------------------------ the dark timber around a room
+
+const shiftRgb = (c, d) => {
+  const f = (v) => Math.max(0, Math.min(255, v + d));
+  return (f((c >> 16) & 255) << 16) | (f((c >> 8) & 255) << 8) | f(c & 255);
+};
+
+// What lies beyond a small room on a tall screen: upright boards with seams, joints, nails and a few knots, dark enough that the room is
+// what the eye goes to. Tiles both ways, 32 x 64.
+export function timber() {
+  const W = 32, H = 64;
+  const img = new Img(W, H);
+  const rng = new Rng(404);
+  const tones = [0x4a2b25, 0x52302a, 0x472922, 0x4e2e28];
+  for (let k = 0; k < 4; k++) {
+    const x0 = k * 8;
+    const tone = tones[k];
+    img.rect(x0, 0, 8, H, tone);
+    for (let g = 0; g < 9; g++) {
+      const gx = x0 + 2 + rng.int(0, 5);
+      const gy = rng.int(0, H - 8);
+      img.vline(gx, gy, rng.int(3, 8), shiftRgb(tone, -9));
+    }
+    img.vline(x0 + 1, 0, H, shiftRgb(tone, 9));
+    img.vline(x0, 0, H, R.ink[0]);
+    const joint = (k * 23 + 11) % H;
+    img.hline(x0, joint, 8, R.ink[0]);
+    img.hline(x0 + 1, (joint + 1) % H, 7, shiftRgb(tone, 7));
+    for (const nx of [x0 + 2, x0 + 5]) { img.set(nx, (joint + 4) % H, R.ink[0]); img.set(nx, (joint + H - 4) % H, R.ink[0]); }
+    const kx = x0 + rng.int(2, 5), ky = (joint + 24 + rng.int(0, 10)) % (H - 4);
+    img.set(kx, ky, shiftRgb(tone, -16)); img.set(kx + 1, ky, shiftRgb(tone, -16)); img.set(kx, ky + 1, shiftRgb(tone, -12)); img.set(kx + 1, ky + 1, shiftRgb(tone, -16));
+  }
+  return img;
+}
+
 // ------------------------------------------------------------------ floors
 
 export function floorWood(v = 0) {
@@ -347,8 +382,19 @@ export function fireplace() {
   day.rect(8, 16, 24, 28, R.ink[1]); day.rect(10, 18, 20, 26, R.ink[0]);
   day.roundRect(9, 15, 22, 8, 4, R.ink[1]);
   day.rect(12, 38, 16, 3, R.wood[1]); day.rect(14, 36, 12, 3, R.wood[2]);
-  glow.disc(20, 36, 7, R.glow[1]); glow.ellipse(20, 33, 6, 8, R.glow[2]); glow.ellipse(20, 33, 3.5, 5.5, R.glow[3]); glow.ellipse(20, 35, 1.8, 3, R.glow[4]);
-  glow.set(14, 31, R.glow[2]); glow.set(26, 30, R.glow[2]);
+  // a fire is tongues, not an egg: a tall one in the middle and two shorter ones leaning in, each a layer hotter than the one around it
+  const tongue = (cx, top, bottom, maxW, c) => {
+    for (let y = top; y <= bottom; y++) {
+      const t = (y - top) / (bottom - top);
+      const w = Math.max(1, Math.round(maxW * Math.pow(t, 0.75)));
+      glow.hline(cx - Math.floor(w / 2) + (y < top + 4 ? (cx < 20 ? 1 : cx > 20 ? -1 : 0) : 0), y, w, c);
+    }
+  };
+  tongue(20, 19, 38, 12, R.glow[1]); tongue(14, 27, 38, 6, R.glow[1]); tongue(26, 25, 38, 7, R.glow[1]);
+  tongue(20, 23, 38, 9, R.glow[2]); tongue(26, 29, 38, 4, R.glow[2]); tongue(14, 31, 38, 3, R.glow[2]);
+  tongue(20, 28, 38, 6, R.glow[3]);
+  tongue(20, 33, 38, 3, R.glow[4]);
+  glow.set(17, 22, R.glow[2]); glow.set(24, 21, R.glow[2]);
   out(day);
   return { day, glow };
 }

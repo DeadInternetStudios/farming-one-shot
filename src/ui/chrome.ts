@@ -287,7 +287,7 @@ export interface CardLine {
   t: string;
   tint?: number;
   /** Something to bring: its picture, how many are in the bag and how many are needed. */
-  need?: { icon: string; have: number; n: number };
+  need?: { icon: string; have: number; n: number; ready?: number };
 }
 
 export interface CardSpec {
@@ -330,13 +330,17 @@ export function cardHeight(scene: Phaser.Scene, w: number, c: CardSpec, btnH: nu
 /** One thing to bring, as a row: what it is, a tick when it is all there, and how many of how many. */
 function needRow(b: Bag, x: number, y: number, w: number, need: NonNullable<CardLine['need']>, name: string, pictures: boolean): void {
   const done = need.have >= need.n;
-  const count = b.text(x + w - 1, y + (pictures ? 4 : 1), `${Math.min(need.have, need.n)}/${need.n}`, { origin: [1, 0], tint: done ? COL.leaf : need.have === 0 ? COL.berry : COL.ink });
+  const ready = done ? 0 : need.ready ?? 0;
+  const ty = y + (pictures ? 4 : 1);
+  // what the bag could add right now is said beside the count, in green, so a red 0/2 is never the whole story when the items are in hand
+  const count = b.text(x + w - 1, ty, `${Math.min(need.have, need.n)}/${need.n}`, { origin: [1, 0], tint: done || ready > 0 ? (done ? COL.leaf : COL.ink) : need.have === 0 ? COL.berry : COL.ink });
+  const plus = ready > 0 ? b.text(x + w - 1 - count.width - 3, ty, `+${ready}`, { origin: [1, 0], tint: COL.leaf }) : null;
   const left = pictures ? 20 : 15;
   if (pictures) b.img(x + 9, y + 8, need.icon);
   else if (done) b.img(x + 6, y + 6, 'ui/check');
   // a short card has no room for the whole picture, so the same one is drawn smaller
   else b.img(x + 6, y + 6, need.icon).setScale(0.75);
-  const room = w - left - count.width - 8;
+  const room = w - left - count.width - (plus ? plus.width + 3 : 0) - 8;
   b.text(x + left, y + (pictures ? 4 : 1), ellipsize(b.scene, name, room), { tint: done ? COL.leaf : COL.ink });
   if (done && pictures) b.img(x + w - count.width - 7, y + 8, 'ui/check');
 }
