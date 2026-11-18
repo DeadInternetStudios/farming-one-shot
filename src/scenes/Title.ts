@@ -384,7 +384,7 @@ export class TitleScene extends Phaser.Scene {
     }
     if (!l.touch) {
       const below = top + this.choices.length * (bh + gap) + (saved ? 14 : 2);
-      label(this, x, below, 'Up and Down to choose, Enter to start', { tint: PAL.cream[0], origin: [0.5, 0], outline: true }).setAlpha(0.75).setDepth(D.ui + 2);
+      label(this, x, below, saved ? 'Up and Down to choose, Enter to start' : 'Press Enter to start', { tint: PAL.cream[0], origin: [0.5, 0], outline: true }).setAlpha(0.75).setDepth(D.ui + 2);
     }
     this.menuTop = top;
     this.menuStep = bh + gap;

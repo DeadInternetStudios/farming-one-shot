@@ -1,4 +1,5 @@
 import { daylight, sunClock } from '../game/clock';
+import type { SunClock } from '../game/clock';
 import type { Season, Weather } from '../game/types';
 import type { MapKind } from '../world/mapkit';
 
@@ -19,9 +20,9 @@ const EVENING_SKY: readonly (readonly [number, RGB])[] = [
   [-80, [255, 255, 255]],
   [-40, [255, 240, 214]],
   [0, [255, 205, 150]],
-  [25, [240, 164, 160]],
-  [50, [172, 120, 170]],
-  [80, [92, 92, 160]],
+  [25, [222, 186, 168]],
+  [50, [150, 138, 176]],
+  [80, [86, 96, 166]],
   [110, [46, 60, 122]],
 ];
 
@@ -63,9 +64,41 @@ export function lampOn(lamps: number, x: number, y: number): number {
   return smooth(at - 0.16, at + 0.16, lamps);
 }
 
+/**
+ * The light the low sun adds on top of its tint, by minutes past sunset. Multiplying only darkens, so on its own the golden hour is a
+ * dimmer day; adding gold back is what makes it glow. The added light turns rose and then violet after the sun is down, which keeps
+ * the greens from going the colour of mud, and has faded out by the time the blue night's own lift takes over.
+ */
+const EVENING_GLOW: readonly (readonly [number, RGB])[] = [
+  [-75, [0, 0, 0]],
+  [-8, [34, 17, 4]],
+  [20, [28, 9, 14]],
+  [42, [12, 5, 20]],
+  [70, [0, 0, 0]],
+];
+
+/** And a shorter, thinner one before the sun is up. */
+const MORNING_GLOW: readonly (readonly [number, RGB])[] = [
+  [-30, [0, 0, 0]],
+  [0, [26, 12, 22]],
+  [18, [26, 14, 5]],
+  [48, [0, 0, 0]],
+];
+
+/** How much of that light each weather lets through. */
+const GLOW_WEATHER: Record<Weather, number> = { sun: 1, cloud: 0.5, rain: 0.12, storm: 0, snow: 0.5 };
+
+function glowOf(sun: SunClock, weather: Weather, season: Season): number {
+  const k = GLOW_WEATHER[weather] * (season === 'winter' ? 0.55 : 1);
+  const c = ramp(sun.evening ? EVENING_GLOW : MORNING_GLOW, sun.m);
+  return pack([c[0] * k, c[1] * k, c[2] * k]);
+}
+
 export interface SkyState {
   /** Multiply colour for the whole scene. */
   ambient: number;
+  /** Light added on top of the tint, packed r,g,b: the glow of the low sun. 0 when there is none. */
+  glow: number;
   /** 0 before the evening, 1 once it is dark enough for every lamp: the lamps and windows come on one at a time between. */
   lamps: number;
   day: number;
@@ -80,10 +113,10 @@ const CAVE = rgb(0x4a5688);
 
 export function skyFor(season: Season, minute: number, weather: Weather, kind: MapKind): SkyState {
   const day = daylight(season, minute);
-  if (kind === 'cave') return { ambient: pack(CAVE), lamps: 1, day: 0, lift: 0 };
+  if (kind === 'cave') return { ambient: pack(CAVE), glow: 0, lamps: 1, day: 0, lift: 0 };
   if (kind === 'interior') {
     const t = smooth(0.05, 0.9, day);
-    return { ambient: pack(mix(ROOM_NIGHT, ROOM_DAY, t)), lamps: 0.55 + (1 - t) * 0.45, day, lift: 0 };
+    return { ambient: pack(mix(ROOM_NIGHT, ROOM_DAY, t)), glow: 0, lamps: 0.55 + (1 - t) * 0.45, day, lift: 0 };
   }
   const sun = sunClock(season, minute);
   let c = ramp(sun.evening ? EVENING_SKY : MORNING_SKY, sun.m);
@@ -98,5 +131,5 @@ export function skyFor(season: Season, minute: number, weather: Weather, kind: M
   const base = sun.evening ? smooth(-30, 75, sun.m) : 1 - smooth(-45, 20, sun.m);
   const lamps = Math.max(0, Math.min(1, base + (weather === 'storm' ? 0.35 : weather === 'rain' ? 0.15 : 0) * (1 - base * 0.5)));
   // snow is already bright, and blue added back onto it turns it electric
-  return { ambient: pack(c), lamps, day, lift: (1 - day) ** 1.2 * (season === 'winter' ? 0.3 : 1) };
+  return { ambient: pack(c), glow: glowOf(sun, weather, season), lamps, day, lift: (1 - day) ** 1.2 * (season === 'winter' ? 0.3 : 1) };
 }

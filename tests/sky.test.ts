@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EVENING, SUN, daylight, minutesPerSecond, sunClock } from '../src/game/clock';
 import type { PaceId } from '../src/game/clock';
 import { SEASONS } from '../src/game/types';
-import { lampOn, skyFor } from '../src/systems/sky';
+import { lampOn, rgb, skyFor } from '../src/systems/sky';
 
 describe('the evening', () => {
   it('falls slowly, in every season: full light before the first gold, none by the time the blue is in', () => {
@@ -70,6 +70,19 @@ describe('the colour of the valley', () => {
     expect((gold >> 16) & 255).toBeGreaterThan(gold & 255);
     const rose = skyFor('spring', SUN.spring.set + 25, 'sun', 'outdoor').ambient;
     expect((rose >> 16) & 255).toBeGreaterThan(rose & 255);
+  });
+
+  it('adds the low sun back as light: none at noon, gold at the horizon, violet a little after, none in a storm or indoors', () => {
+    const at = (m: number, weather: 'sun' | 'storm' = 'sun', kind: 'outdoor' | 'interior' | 'cave' = 'outdoor'): number[] => rgb(skyFor('spring', SUN.spring.set + m, weather, kind).glow);
+    expect(skyFor('spring', 12 * 60, 'sun', 'outdoor').glow).toBe(0);
+    const gold = at(-8);
+    expect(gold[0]).toBeGreaterThan((gold[2] as number) * 4);
+    const violet = at(42);
+    expect(violet[2]).toBeGreaterThan(violet[0] as number);
+    expect(skyFor('spring', SUN.spring.set + 120, 'sun', 'outdoor').glow).toBe(0);
+    expect(at(-8, 'storm')).toEqual([0, 0, 0]);
+    expect(at(-8, 'sun', 'interior')).toEqual([0, 0, 0]);
+    expect(at(-8, 'sun', 'cave')).toEqual([0, 0, 0]);
   });
 
   it('keeps rooms and caves out of the outdoor blue', () => {

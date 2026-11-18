@@ -12,6 +12,7 @@ import type { SkyState } from './sky';
  */
 const NIGHT_LIFT = rgb(0x0c1640);
 
+
 /** A multiplied light map: the ambient colour with warm pools of light added where lamps and windows are. */
 export class Lighting {
   private rt: Phaser.GameObjects.RenderTexture | null = null;
@@ -46,7 +47,7 @@ export class Lighting {
   }
 
   update(sky: SkyState, time: number, glows: Phaser.GameObjects.Image[], extra: LightSpot[] = []): void {
-    const bright = sky.ambient === 0xffffff && sky.lamps < 0.02 && extra.length === 0;
+    const bright = sky.ambient === 0xffffff && sky.glow === 0 && sky.lamps < 0.02 && extra.length === 0;
     for (const g of glows) g.setAlpha(lampOn(sky.lamps, g.x, g.y));
     if (bright) {
       this.rt?.setVisible(false);
@@ -63,7 +64,9 @@ export class Lighting {
     rt.fill(sky.ambient, 1);
     const lift = this.lift as Phaser.GameObjects.Rectangle;
     const k = sky.lift;
-    lift.setVisible(k > 0.01).setPosition(ox, oy).setFillStyle(pack([NIGHT_LIFT[0] * k, NIGHT_LIFT[1] * k, NIGHT_LIFT[2] * k]), 1);
+    const glow = rgb(sky.glow);
+    const added = [NIGHT_LIFT[0] * k + glow[0], NIGHT_LIFT[1] * k + glow[1], NIGHT_LIFT[2] * k + glow[2]] as [number, number, number];
+    lift.setVisible(added[0] + added[1] + added[2] > 2).setPosition(ox, oy).setFillStyle(pack(added), 1);
     const all = this.spots.concat(extra);
     all.forEach((s, i) => {
       const flick = s.flicker && !settings.calm ? 1 + Math.sin(time * 0.011 + i * 1.7) * 0.035 + Math.sin(time * 0.037 + i) * 0.02 : 1;
