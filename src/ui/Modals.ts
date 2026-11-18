@@ -45,7 +45,8 @@ export class Modals {
 
   setLayout(l: Layout): void {
     this.l = l;
-    this.again?.();
+    const redraw = this.again;
+    if (redraw) this.present(redraw);
   }
 
   close(): void {
@@ -61,7 +62,14 @@ export class Modals {
   /** Opens a panel that knows how to draw itself again when the screen changes shape. */
   private present(draw: () => void): void {
     this.again = draw;
-    draw();
+    try {
+      draw();
+    } catch (e) {
+      // a pop-up that cannot be drawn must not leave the game paused behind it
+      console.error(e);
+      this.close();
+      session.events.emit('toast', 'That would not open. Your farm is safe.');
+    }
   }
 
   private begin(confirm: () => void, cancel?: () => void): { open: Open; dim: Phaser.GameObjects.Rectangle } {

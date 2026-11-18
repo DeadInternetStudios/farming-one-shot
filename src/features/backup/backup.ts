@@ -79,7 +79,7 @@ export async function restoreFromFile(): Promise<string | null> {
   if (!read.ok) return read.msg;
   if (!replaceSave(read.state)) return 'This browser would not let the game keep that save.';
   setTimeout(() => location.reload(), 900);
-  return 'Restored. Starting from your backup...';
+  return 'Restored. Starting from your backup. Your earlier farm is kept until you sleep.';
 }
 
 /** Gives the player the save the game could not open, as a file, so a farm that will not load is still theirs. */

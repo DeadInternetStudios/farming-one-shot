@@ -126,6 +126,25 @@ describe('the save in the browser', () => {
     expect(readSave()).toEqual({ kind: 'none' });
   });
 
+  it('keeps the farm a restore replaced through the autosaves, and lets it go when the restored farm has been slept in', async () => {
+    const { replaceSave, saveGame } = await fresh();
+    const before = newGame(1);
+    before.player.gold = 111;
+    saveGame(before);
+    const restored = newGame(2);
+    restored.player.gold = 999;
+    replaceSave(restored);
+    // the game reloads after a restore, so this page's own flag is not the one that matters: a new page saves again and again
+    vi.resetModules();
+    const again = await import('../src/game/save');
+    for (let i = 0; i < 5; i++) expect(again.saveGame(restored)).toBe(true);
+    expect(again.hasRollback()).toBe(true);
+    expect(again.rollbackFarm()?.player.gold).toBe(111);
+    again.settleRestore();
+    expect(again.hasRollback()).toBe(false);
+    expect(again.rollbackFarm()).toBeNull();
+  });
+
   it('puts a restored backup in place, keeps the farm it replaced, and can put it back', async () => {
     const { hasRollback, loadGame, replaceSave, saveGame, undoRestore } = await fresh();
     const before = newGame(1);

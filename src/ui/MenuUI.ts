@@ -8,7 +8,7 @@ import { RECIPES } from '../data/recipes';
 import type { Recipe } from '../data/recipes';
 import { getLayout, slotPitch, tapH } from '../display';
 import type { Layout } from '../display';
-import { BACKUP_ON, backupToFile, restoreFromFile } from '../features/backup/backup';
+import { BACKUP_ON, backupToFile, canUndoRestore, restoreFromFile, undoLastRestore } from '../features/backup/backup';
 import { POSTCARD_ON } from '../features/postcard/layout';
 import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offline';
 import { PACE_REAL_MINUTES } from '../game/clock';
@@ -18,7 +18,8 @@ import { have, make, plan } from '../game/crafting';
 import { weatherFor } from '../game/day';
 import { nextGoal } from '../game/goals';
 import { plantAdvice } from '../game/farming';
-import { saveGame } from '../game/save';
+import { rollbackFarm, saveGame } from '../game/save';
+import { describeFarm } from './describe';
 import { session } from '../game/session';
 import { settings, saveSettings } from '../game/settings';
 import { friendOf, heartsOf } from '../game/social';
@@ -341,10 +342,20 @@ function appEntries(st: GameState): Entry[] {
       {
         row: { text: 'Restore a backup' },
         title: 'Restore a backup',
-        lines: ['Pick a backup file. It replaces the game on this device, and the game restarts from it.'],
+        lines: ['Pick a backup file. It replaces the game on this device, and the game restarts from it. The farm it replaces is kept until you have slept a night in the new one.'],
         actions: [{ label: 'Choose a file', kind: 'wood', run: () => restoreFromFile() }],
       },
     );
+    // picked the wrong file? until the restored farm has been slept in, the one it replaced is still here
+    const earlier = canUndoRestore() ? rollbackFarm() : null;
+    if (earlier) {
+      out.push({
+        row: { text: 'Undo restore' },
+        title: 'Undo restore',
+        lines: [`Brings back the farm that was here before the restore: ${describeFarm(earlier)}.`, 'Anything you have done since the restore is lost.'],
+        actions: [{ label: 'Go back', kind: 'berry', run: () => undoLastRestore() }],
+      });
+    }
   }
   return out;
 }

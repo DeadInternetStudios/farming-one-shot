@@ -4,7 +4,7 @@ import type { GameState } from './state';
 const KEY = 'lantern-hollow:save:v1';
 /** A save the game could not open, kept as it was so nothing about it is lost. */
 const DAMAGED = 'lantern-hollow:save:damaged';
-/** The farm that was here before a backup was restored, until the restored one has started and saved. */
+/** The farm that was here before a backup was restored, kept until the restored farm has been slept in, or another restore replaces it. */
 const BEFORE_RESTORE = 'lantern-hollow:save:before-restore';
 
 /** Set once a backup has been put in place or another tab has taken over: the running game must not write over it. */
@@ -26,18 +26,34 @@ export function saveGame(state: GameState): boolean {
   } catch {
     return false;
   }
-  // the restored farm has started and saved: the one it replaced is no longer needed
+  return true;
+}
+
+/** The restored farm has been slept in, so the one it replaced can go: undoing now would cost more than it gives back. */
+export function settleRestore(): void {
+  if (frozen) return;
   try {
     localStorage.removeItem(BEFORE_RESTORE);
   } catch {
     /* nothing to clean up */
   }
-  return true;
+}
+
+/** The farm a restore replaced, as it was, or null when there is none or it cannot be read. */
+export function rollbackFarm(): GameState | null {
+  try {
+    const raw = localStorage.getItem(BEFORE_RESTORE);
+    if (raw === null) return null;
+    const r = checkSave(JSON.parse(raw));
+    return r.ok ? r.state : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Swap in a save that came from outside, such as a backup file, and stop the running game saving over it.
- * The farm it replaces is kept aside until the new one has started and saved, so a bad backup costs nothing.
+ * The farm it replaces is kept aside until the new one has been slept in, so picking the wrong file costs nothing.
  */
 export function replaceSave(state: GameState): boolean {
   try {

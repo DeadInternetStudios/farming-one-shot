@@ -12,7 +12,7 @@ import { collectEggs, eggsWaiting, feedHens, henList, pet } from '../game/animal
 import type { Pet } from '../game/state';
 import { finaleDue, finaleReport, finishFinale } from '../game/finale';
 import { nextGoal } from '../game/goals';
-import { freezeSaves, saveGame } from '../game/save';
+import { freezeSaves, hasRollback, saveGame, settleRestore } from '../game/save';
 import { holdFarm } from '../game/tablock';
 import { session } from '../game/session';
 import { shakeOn } from '../game/settings';
@@ -150,6 +150,8 @@ export class WorldScene extends Phaser.Scene {
     document.addEventListener('visibilitychange', keep);
     window.addEventListener('pagehide', leaving);
     this.time.addEvent({ delay: AUTOSAVE_MS, loop: true, callback: () => { if (!this.sleeping && !this.travelling && !this.finaleOn) this.persist(); } });
+    // after a restore, say once per visit where the way back is
+    if (hasRollback()) this.time.delayedCall(2500, () => session.events.emit('toast', 'Backup restored. Undo restore is in Options until you sleep.'));
     // only one tab plays a farm: if another takes it, this one stops saving and says so
     this.letGoOfFarm = holdFarm(() => {
       freezeSaves();
@@ -756,7 +758,8 @@ export class WorldScene extends Phaser.Scene {
     this.player.teleport((spawn.x + 0.5) * 16, (spawn.y + 0.8) * 16, 'down');
     this.syncPlayer();
     this.rig.snapTo(this.player.x, this.player.y - 8);
-    this.persist();
+    // a night has been slept in the restored farm: the one it replaced is let go
+    if (this.persist()) settleRestore();
     session.events.emit('day-summary', summary, () => {
       this.cameras.main.fadeIn(900, 12, 9, 20);
       this.sleeping = false;

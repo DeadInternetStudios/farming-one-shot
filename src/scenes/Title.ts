@@ -1,21 +1,18 @@
 import Phaser from 'phaser';
-import { dayOfSeason, seasonOf } from '../game/clock';
 import { BACKUP_ON, canUndoRestore, damagedToFile, restoreFromFile, undoLastRestore } from '../features/backup/backup';
-import { canStore, loadGame, readSave } from '../game/save';
+import { canStore, loadGame, readSave, rollbackFarm } from '../game/save';
 import { otherTabOpen } from '../game/tablock';
 import { session } from '../game/session';
 import { watchKey } from '../systems/keys';
 import { saveSettings, settings } from '../game/settings';
-import type { GameState } from '../game/state';
 import { fitUiCamera, getLayout } from '../display';
 import type { Layout } from '../display';
 import { BLOB_INDEX, PAL, TILESET, TILE_ID } from '../gen/art';
 import { audio } from '../systems/Audio';
 import { COL, WARM_DARK, button, label, nine } from '../ui/kit';
-import { money } from '../ui/money';
+import { describeFarm } from '../ui/describe';
 import type { Button } from '../ui/kit';
 
-const SEASON_NAMES = { spring: 'Spring', summer: 'Summer', fall: 'Fall', winter: 'Winter' } as const;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 const DUSK = 0xdcd2f0;
 const HILL_W = 320;
@@ -377,10 +374,12 @@ export class TitleScene extends Phaser.Scene {
     if (short) label(this, x, top - 15, 'A cozy farming tale', { tint: PAL.cream[1], origin: [0.5, 0], outline: true }).setDepth(D.ui + 2);
     this.choices = [];
     if (saved) this.choices.push({ text: 'Continue', kind: 'leaf', run: () => this.start(false) });
+    // after a restore the farm it replaced is kept for a night: the way back is here as well as in Options
+    const undo = BACKUP_ON && canUndoRestore();
+    if (undo) this.choices.push({ text: 'Undo restore', kind: broken ? 'leaf' : 'wood', run: () => this.say(undoLastRestore()) });
     if (broken && BACKUP_ON) {
       // a farm that will not open is still the player's: the first choice gets it back, the second keeps it, only the third starts over
-      if (canUndoRestore()) this.choices.push({ text: 'Undo restore', kind: 'leaf', run: () => this.say(undoLastRestore()) });
-      else this.choices.push({ text: 'Restore backup', kind: 'leaf', run: () => { void restoreFromFile().then((m) => { if (m) this.say(m); }); } });
+      if (!undo) this.choices.push({ text: 'Restore backup', kind: 'leaf', run: () => { void restoreFromFile().then((m) => { if (m) this.say(m); }); } });
       this.choices.push({ text: 'Keep a copy', kind: 'wood', run: () => this.say(damagedToFile()) });
     }
     const replaces = saved !== null || broken;
@@ -403,7 +402,9 @@ export class TitleScene extends Phaser.Scene {
       const t = label(this, x, below, text, { tint, origin: [0.5, 0], outline: true, wrap, align: 'center' }).setDepth(D.ui + 2);
       below += Math.ceil(t.height) + 3;
     };
-    if (saved) line(this.describe(saved), PAL.cream[0]);
+    if (saved) line(describeFarm(saved), PAL.cream[0]);
+    const earlier = undo && saved ? rollbackFarm() : null;
+    if (earlier) line(`Undo restore brings back ${describeFarm(earlier)}`, PAL.cream[0]);
     if (loaded.kind === 'broken') line(`Your saved farm could not be opened. ${loaded.why}`, COL.berry);
     // where there is nowhere to keep a farm, say so before anyone puts an hour into one
     if (!canStore()) line('This browser will not keep your farm. You can play, but it is lost when the page closes.', COL.berry);
@@ -423,9 +424,6 @@ export class TitleScene extends Phaser.Scene {
     this.notice?.setText(msg);
   }
 
-  private describe(st: GameState): string {
-    return `Day ${dayOfSeason(st.day)} of ${SEASON_NAMES[seasonOf(st.day)]}, ${money(st.player.gold)}g`;
-  }
 
   private select(i: number, sound = true): void {
     if (i === this.picked && sound) return;

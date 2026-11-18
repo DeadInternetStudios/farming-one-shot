@@ -103,8 +103,16 @@ export class ScreenStack implements Host {
     if (this.stack.length === 0) session.events.emit('sfx', 'open');
     this.stack.push(s);
     const before = new Set(this.scene.children.list);
-    s.build();
-    s.appear(this.scene.children.list.filter((o) => !before.has(o)));
+    try {
+      s.build();
+      s.appear(this.scene.children.list.filter((o) => !before.has(o)));
+    } catch (e) {
+      // a screen that cannot be drawn must not take the game with it: clear what it made, let go of the pause, and say so
+      console.error(e);
+      for (const o of this.scene.children.list.filter((c) => !before.has(c))) o.destroy();
+      this.close(s);
+      session.events.emit('toast', 'That would not open. Your farm is safe.');
+    }
   }
 
   close(s: Screen): void {
@@ -112,8 +120,13 @@ export class ScreenStack implements Host {
     if (i < 0) return;
     this.stack.splice(i, 1);
     if (this.stack.length === 0) session.events.emit('sfx', 'close');
-    s.teardown();
-    this.scene.time.delayedCall(80, () => session.release());
+    try {
+      s.teardown();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      this.scene.time.delayedCall(80, () => session.release());
+    }
   }
 
   closeAll(): void {
