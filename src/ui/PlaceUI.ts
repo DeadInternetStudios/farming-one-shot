@@ -7,7 +7,7 @@ import type { Slots } from '../game/inventory';
 import { deliver } from '../game/requests';
 import { session } from '../game/session';
 import type { ThingState } from '../game/state';
-import { slotPitch, tapH } from '../display';
+import { getLayout, slotPitch, tapH } from '../display';
 import { footer, popup } from './chrome';
 import { COL, iconFor } from './kit';
 import { ListPane, listPage } from './MenuUI';
@@ -15,6 +15,7 @@ import type { Entry } from './MenuUI';
 import { Screen, isBack, isConfirm, isDown, isLeft, isRight, isUp } from './Screens';
 import type { Host } from './Screens';
 import { Bag } from './widgets';
+import { chestHint } from './words';
 
 export interface PickConfig {
   title: string;
@@ -247,7 +248,7 @@ export class ChestScreen extends Screen {
     const s = (this.focus === 'chest' ? this.items : session.state.player.slots)[g.sel];
     const where = this.focus === 'chest' ? 'Chest' : 'Bag';
     if (this.moved) this.line?.setText(this.moved).setTint(COL.ink);
-    else if (s) this.line?.setText(`${itemDef(s.id).name} x${s.n}. ${this.focus === 'chest' ? 'Tap to take it.' : 'Tap to store it.'}`).setTint(COL.ink);
+    else if (s) this.line?.setText(`${itemDef(s.id).name} x${s.n}. ${chestHint(getLayout().touch, this.focus)}`).setTint(COL.ink);
     else this.line?.setText(`${where}: an empty slot.`).setTint(COL.dim);
   }
 

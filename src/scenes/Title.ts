@@ -15,6 +15,8 @@ import type { Button } from '../ui/kit';
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 const DUSK = 0xdcd2f0;
+/** Words that protect the farm: a soft coral that reads on the dark chip they sit on. */
+const WARN = 0xffa08a;
 const HILL_W = 320;
 const N = 1, NE = 2, E = 4, SE = 8, S = 16, SW = 32, W = 64, NW = 128;
 const OFFS: readonly (readonly [number, number, number])[] = [[0, -1, N], [1, -1, NE], [1, 0, E], [1, 1, SE], [0, 1, S], [-1, 1, SW], [-1, 0, W], [-1, -1, NW]];
@@ -398,16 +400,22 @@ export class TitleScene extends Phaser.Scene {
     let below = top + this.choices.length * (bh + gap) + 1;
     // the column can sit off-centre on a short screen, and its text must stay on the side of the screen it is on
     const wrap = Math.max(60, Math.min(220, Math.floor(l.uiW) - 16, 2 * (Math.min(x, l.uiW - x) - 6)));
-    const line = (text: string, tint: number): void => {
-      const t = label(this, x, below, text, { tint, origin: [0.5, 0], outline: true, wrap, align: 'center' }).setDepth(D.ui + 2);
+    const line = (text: string, tint: number, warn = false): void => {
+      const t = label(this, x, below + (warn ? 3 : 0), text, { tint, origin: [0.5, 0], outline: true, wrap, align: 'center' }).setDepth(D.ui + 2);
+      if (warn) {
+        // a warning that protects the farm sits on the same dark chip as the clock, not straight on the sky
+        const w = Math.min(l.uiW - 4, Math.ceil(t.width) + 14);
+        nine(this, 'dark', Math.round(x - w / 2), below, w, Math.ceil(t.height) + 6).setDepth(D.ui + 1);
+        below += 6;
+      }
       below += Math.ceil(t.height) + 3;
     };
     if (saved) line(describeFarm(saved), PAL.cream[0]);
     const earlier = undo && saved ? rollbackFarm() : null;
     if (earlier) line(`Undo restore brings back ${describeFarm(earlier)}`, PAL.cream[0]);
-    if (loaded.kind === 'broken') line(`Your saved farm could not be opened. ${loaded.why}`, COL.berry);
+    if (loaded.kind === 'broken') line(`Your saved farm could not be opened. ${loaded.why}`, WARN, true);
     // where there is nowhere to keep a farm, say so before anyone puts an hour into one
-    if (!canStore()) line('This browser will not keep your farm. You can play, but it is lost when the page closes.', COL.berry);
+    if (!canStore()) line('This browser will not keep your farm. You can play, but it is lost when the page closes.', WARN, true);
     this.notice = label(this, x, below, '', { tint: PAL.cream[0], origin: [0.5, 0], outline: true, wrap, align: 'center' }).setDepth(D.ui + 2);
     if (!l.touch) {
       const keys = label(this, x, below + 12, saved ? 'Up and Down to choose, Enter to start' : this.choices.length > 1 ? 'Up and Down to choose, Enter to pick' : 'Press Enter to start', { tint: PAL.cream[0], origin: [0.5, 0], outline: true, wrap, align: 'center' }).setAlpha(0.75).setDepth(D.ui + 2);

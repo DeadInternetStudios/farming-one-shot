@@ -27,15 +27,24 @@ export function available(state: GameState, slot: BundleSlot): { id: string; n: 
   return null;
 }
 
-/** How many things the bag could hand to a bundle right now: what "give what fits" would give. */
-export function giveable(state: GameState, b: BundleDef): number {
+/** What the bag could hand to a bundle right now, kind by kind: what "give what fits" would give. */
+export function giving(state: GameState, b: BundleDef): { id: string; n: number }[] {
   const prog = progressOf(state, b);
-  return b.slots.reduce((sum, slot, i) => {
+  const out: { id: string; n: number }[] = [];
+  b.slots.forEach((slot, i) => {
     const need = slot.n - (prog[i] ?? 0);
     const have = available(state, slot);
-    return need > 0 && have ? sum + Math.min(need, have.n) : sum;
-  }, 0);
+    if (need <= 0 || !have) return;
+    const n = Math.min(need, have.n);
+    const same = out.find((o) => o.id === have.id);
+    if (same) same.n += n;
+    else out.push({ id: have.id, n });
+  });
+  return out;
 }
+
+/** How many things the bag could hand to a bundle right now. */
+export const giveable = (state: GameState, b: BundleDef): number => giving(state, b).reduce((sum, g) => sum + g.n, 0);
 
 export interface DonateResult {
   gave: number;

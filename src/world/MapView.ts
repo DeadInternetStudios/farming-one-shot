@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BLOB_INDEX, TILESET, TILE_ID } from '../gen/art';
+import { BLOB_INDEX, PAL, TILESET, TILE_ID } from '../gen/art';
 import type { LocationState } from '../game/state';
 import type { Season } from '../game/types';
 import { parseKey, tileKey } from '../game/types';
@@ -27,6 +27,7 @@ export class MapView {
   readonly water: Phaser.GameObjects.TileSprite | null = null;
   /** Dark timber beyond the walls of a room, so a small room on a tall screen sits on something. */
   private readonly timber: Phaser.GameObjects.TileSprite | null = null;
+  private shade: Phaser.GameObjects.Graphics | null = null;
   private tileset: Phaser.Tilemaps.Tileset;
   private waterFrame = 0;
   private waterTimer: Phaser.Time.TimerEvent | null = null;
@@ -50,6 +51,18 @@ export class MapView {
     if (def.kind === 'interior') {
       const pad = 640;
       this.timber = scene.add.tileSprite(-pad, -pad, def.w * 16 + pad * 2, def.h * 16 + pad * 2, 'atlas', 'bg/timber').setOrigin(0, 0).setDepth(DEPTH.water - 10);
+      // the room is the lit part: the timber beyond it falls away into shadow, so a tall screen shows a lit room in the dark and not a strip of room on a floor of planks
+      const shade = scene.add.graphics().setDepth(DEPTH.water - 9);
+      const step = 8;
+      for (let i = 0; i < 8; i++) {
+        shade.lineStyle(step, PAL.ink[0], Math.min(0.78, 0.1 + i * 0.1));
+        const d = i * step + step / 2;
+        shade.strokeRect(-d, -d, def.w * 16 + d * 2, def.h * 16 + d * 2);
+      }
+      const far = 8 * step;
+      shade.lineStyle(pad, PAL.ink[0], 0.78);
+      shade.strokeRect(-far - pad / 2, -far - pad / 2, def.w * 16 + (far + pad / 2) * 2, def.h * 16 + (far + pad / 2) * 2);
+      this.shade = shade;
     }
 
     this.tilemap = scene.make.tilemap({ tileWidth: 16, tileHeight: 16, width: def.w, height: def.h });
@@ -81,6 +94,7 @@ export class MapView {
     this.waterTimer?.remove();
     this.water?.destroy();
     this.timber?.destroy();
+    this.shade?.destroy();
     this.tilemap.destroy();
   }
 

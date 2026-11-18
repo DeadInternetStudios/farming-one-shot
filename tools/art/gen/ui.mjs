@@ -246,6 +246,27 @@ export function actionButton() {
   return i;
 }
 
+// A neighbour you have not met: a head and shoulders in shadow.
+export function silhouette() {
+  const i = new Img(12, 12);
+  i.disc(6, 4, 3.4, R.ink[2]);
+  i.ellipse(6, 12, 5.6, 5, R.ink[2]);
+  return i.outline(() => R.ink[0]);
+}
+
+// The touch menu button: a dark disc with a cream rim and the bag on it, smaller than the action button so the two never read as one.
+export function menuButton() {
+  const i = new Img(28, 28);
+  i.disc(14, 14, 13.5, R.ink[0]);
+  i.disc(14, 14, 12.5, R.cream[3]);
+  i.disc(14, 14, 11.5, R.cream[1]);
+  i.disc(14, 14, 10.5, R.ink[0]);
+  i.disc(14, 14, 9.5, R.ink[2]);
+  i.disc(14, 15, 8.5, R.ink[1]);
+  i.blit(tabIcon('bag'), 8, 8);
+  return i;
+}
+
 // A little pointing hand for the action button when nothing is in your hand.
 export function hand() {
   const i = Img.ascii([

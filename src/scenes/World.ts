@@ -14,6 +14,8 @@ import { finaleDue, finaleReport, finishFinale } from '../game/finale';
 import { nextGoal } from '../game/goals';
 import { freezeSaves, hasRollback, saveGame, settleRestore } from '../game/save';
 import { PressQueue } from '../game/pressqueue';
+import { learn } from '../game/teach';
+import { roomZoom } from '../systems/roomZoom';
 import { holdFarm } from '../game/tablock';
 import { session } from '../game/session';
 import { shakeOn } from '../game/settings';
@@ -130,6 +132,7 @@ export class WorldScene extends Phaser.Scene {
     subscribe(this, 'use-slot', (i: number) => this.controls.selectSlot(i));
     subscribe(this, 'virtual-move', (x: number, y: number) => { this.controls.virtualMove = { x, y }; });
     subscribe(this, 'virtual-action', () => this.controls.pressAction());
+    subscribe(this, 'virtual-menu', () => this.controls.pressMenu());
     subscribe(this, 'confirm-sleep', () => this.beginSleep(false));
     subscribe(this, 'npc-fx', (id: string, kind: 'heart' | 'sad') => {
       const at = this.npcs.position(id);
@@ -180,11 +183,15 @@ export class WorldScene extends Phaser.Scene {
     this.rig.snapTo(this.player?.x ?? 0, (this.player?.y ?? 0) - 8);
   }
 
-  /** Rooms are small, so they are drawn as large as will fit; the open air uses the usual zoom. */
+  /**
+   * Rooms are small, so they are drawn as large as will fit; the open air uses the usual zoom.
+   * A room is never drawn so large that more than two of its tiles each way fall off the screen, so a tall phone shows the room, not half of it.
+   */
   private zoomFor(): number {
     const l = getLayout();
     if (this.def.kind !== 'interior') return l.worldZoom;
-    return Math.max(l.worldZoom, Math.floor(Math.min(l.devW / (this.def.w * 16), l.devH / (this.def.h * 16))));
+    const { w, h } = this.def;
+    return roomZoom(l.devW, l.devH, w, h, l.worldZoom);
   }
 
   /** Build the ground and everything standing on it for one map, replacing the one before. */
@@ -293,6 +300,7 @@ export class WorldScene extends Phaser.Scene {
       else if (!this.finaleOn && finaleDue(st, this.def.id)) this.beginFinale();
 
       const mv = this.controls.move;
+      if (Math.hypot(mv.x, mv.y) > 0.25) learn(st, 'walk');
       this.angler.update(dt, Math.hypot(mv.x, mv.y) > 0.25);
       this.player.update(dt, mv.x, mv.y, this.controls.sprint, this.solid);
       this.syncPlayer();
@@ -318,7 +326,10 @@ export class WorldScene extends Phaser.Scene {
       }
       if (this.controls.action()) this.act();
       if (this.controls.eat()) this.eatSelected();
-      if (this.controls.menu()) session.events.emit('interact', { kind: 'menu' });
+      if (this.controls.menu()) {
+        learn(st, 'menu');
+        session.events.emit('interact', { kind: 'menu' });
+      }
       if (POSTCARD_ON && this.controls.postcard() && !this.finaleOn) session.events.emit('postcard');
     } else {
       this.controls.flush();
@@ -426,6 +437,7 @@ export class WorldScene extends Phaser.Scene {
   // ------------------------------------------------------------- acting
 
   private act(at?: { x: number; y: number }): void {
+    learn(session.state, 'use');
     if (this.player.swinging) {
       // a press during a swing is kept for the end of it, so the most repeated action in the game never goes missing; a few are kept, in order
       this.queuedActs.push(at, this.time.now);

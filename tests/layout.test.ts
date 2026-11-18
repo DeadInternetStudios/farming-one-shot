@@ -52,3 +52,32 @@ describe('touch targets', () => {
     }
   });
 });
+
+describe('the larger interface', () => {
+  it('is one step bigger where there is room for it', () => {
+    for (const [w, h, dpr, touch] of [[1280, 720, 1, false], [1920, 1080, 1, false], [1440, 900, 2, false], [820, 1180, 2, true]] as const) {
+      const normal = computeLayout(w, h, dpr, touch);
+      const big = computeLayout(w, h, dpr, touch, true);
+      expect(big.uiZoom).toBeGreaterThan(normal.uiZoom);
+      expect(Math.min(big.uiW, big.uiH)).toBeGreaterThanOrEqual(180);
+    }
+  });
+
+  it('never squeezes a small phone below what a pop-up needs: there it changes nothing', () => {
+    for (const [, w, h, dpr, touch] of SCREENS) {
+      const big = computeLayout(w, h, dpr, touch, true);
+      expect(big.uiW).toBeGreaterThanOrEqual(180);
+      expect(big.uiH).toBeGreaterThanOrEqual(180);
+    }
+    const phone = computeLayout(390, 844, 3, true);
+    expect(computeLayout(390, 844, 3, true, true).uiZoom).toBe(phone.uiZoom);
+  });
+
+  it('keeps buttons as tall as a fingertip on touch', () => {
+    for (const [, w, h, dpr, touch] of SCREENS) {
+      if (!touch) continue;
+      const l = computeLayout(w, h, dpr, touch, true);
+      expect(tapH(l) * (l.uiZoom / l.dpr)).toBeGreaterThanOrEqual(44);
+    }
+  });
+});

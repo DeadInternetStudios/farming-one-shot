@@ -8,6 +8,7 @@ import { PostcardScreen } from '../features/postcard/PostcardScreen';
 import { takePostcard } from '../features/postcard/capture';
 import { POSTCARD_ON } from '../features/postcard/layout';
 import type { Layout } from '../display';
+import { PAL } from '../gen/art';
 import { subscribe } from '../systems/bus';
 import { dayCard } from '../ui/DayCard';
 import { Hud } from '../ui/Hud';
@@ -24,6 +25,8 @@ export class UIScene extends Phaser.Scene {
   private touch: Touch | null = null;
   private stack!: ScreenStack;
   private shooting = false;
+  /** Over the always-on interface and under every pop-up: with a screen open, the clock, hotbar and touch buttons step back too. */
+  private shade!: Phaser.GameObjects.Rectangle;
 
   constructor() {
     super('UI');
@@ -33,6 +36,7 @@ export class UIScene extends Phaser.Scene {
     const l = getLayout();
     fitUiCamera(this.cameras.main, l);
     this.hud = new Hud(this, l);
+    this.shade = this.add.rectangle(0, 0, l.uiW, l.uiH, PAL.ink[0], 0.5).setOrigin(0, 0).setDepth(11).setVisible(false);
     this.modals = new Modals(this, l);
     this.stack = new ScreenStack(this, l);
     if (l.touch) this.touch = new Touch(this, l);
@@ -61,6 +65,7 @@ export class UIScene extends Phaser.Scene {
   private onLayout(l: Layout): void {
     fitUiCamera(this.cameras.main, l);
     this.hud.rebuild(l);
+    this.shade.setSize(l.uiW, l.uiH);
     this.modals.setLayout(l);
     this.stack.setLayout(l);
     this.rebuildTouch(l);
@@ -88,6 +93,7 @@ export class UIScene extends Phaser.Scene {
 
   override update(): void {
     this.hud.update(this.stack.isOpen);
+    this.shade.setVisible(this.stack.isOpen);
     this.stack.update();
   }
 }

@@ -29,8 +29,8 @@ export default async ({ lh, page, press, wait, shot, state, log }) => {
 
   // the list, top to bottom
   const rows = touch
-    ? ['Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Controls side', 'Take a postcard', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title']
-    : ['Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Take a postcard', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title'];
+    ? ['Controls', 'Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Larger interface', 'Controls side', 'Take a postcard', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title']
+    : ['Controls', 'Music', 'Sounds', 'Day length', 'Screen shake', 'Calm motion', 'Larger interface', 'Take a postcard', 'Back up your farm', 'Restore a backup', 'Save game', 'Back to title'];
   const go = async (name) => {
     const to = rows.indexOf(name);
     for (let i = 0; i < (to - cur + rows.length) % rows.length; i++) await press('ArrowDown', 60);

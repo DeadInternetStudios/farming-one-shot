@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <meta name="theme-color" content="#1a1423" />
     <link rel="manifest" href="manifest.webmanifest" />
@@ -26,12 +26,20 @@
       #boot.done { opacity: 0; }
       #boot.stuck .lamp { animation: none; opacity: 0.35; }
       #boot .why { max-width: 320px; padding: 0 20px; text-align: center; font-weight: 400; letter-spacing: 0; line-height: 1.5; opacity: 0.9; }
+      .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
       @keyframes glow { 0%, 100% { transform: scale(0.85); opacity: 0.7; } 50% { transform: scale(1.1); opacity: 1; } }
       @media (prefers-reduced-motion: reduce) { #boot .lamp { animation: none; } }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div class="sr">
+      <h1>Lantern Hollow</h1>
+      <p>A cozy pixel-art farming game. Grow crops, fish, make friends in the valley and light every lantern. It is drawn on a canvas, so the goal and what happens are spoken in the live region below.</p>
+      <h2>Controls</h2>
+      <ul id="how"></ul>
+      <div id="live" role="status" aria-live="polite"></div>
+    </div>
     <div id="boot"><div class="lamp"></div><div>LANTERN HOLLOW</div></div>
     <noscript>Lantern Hollow needs JavaScript to run.</noscript>
     <script type="module" src="/src/main.ts"></script>

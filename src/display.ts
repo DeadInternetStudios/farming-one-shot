@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { settings } from './game/settings';
 
 /**
  * The canvas is measured in device pixels (CSS size x pixel ratio) and shown at 1/ratio, so one
@@ -26,14 +27,15 @@ const UI_SHORT = 180;
 /** The finest the interface goes: this many CSS pixels per interface pixel, so a letter stays readable. */
 const MIN_CSS_PER_UI = 4 / 3;
 
-export function computeLayout(cssW: number, cssH: number, dpr: number, touch: boolean): Layout {
+export function computeLayout(cssW: number, cssH: number, dpr: number, touch: boolean, big = false): Layout {
   const devW = Math.max(1, Math.round(cssW * dpr));
   const devH = Math.max(1, Math.round(cssH * dpr));
   const cssShort = Math.min(cssW, cssH);
   const devShort = Math.min(devW, devH);
   const tilesShort = cssShort < 520 ? 11 : cssShort < 800 ? 13 : 15;
   const worldZoom = Math.max(1, Math.round(devShort / tilesShort / 16));
-  const cssPerUi = cssShort >= 800 ? 3 : 2;
+  // the larger interface is one step bigger, on screens with room for it: the UI_SHORT floor below still holds, so a small phone stays as it is
+  const cssPerUi = (cssShort >= 800 ? 3 : 2) + (big ? 1 : 0);
   // a small screen gets a finer interface instead of a cramped one: never fewer than UI_SHORT interface pixels on its short side
   // (a phone held sideways is 160 tall at the usual scale, which cannot hold a tab strip, a grid and a message line)
   const finest = Math.max(2, Math.round(MIN_CSS_PER_UI * dpr));
@@ -59,8 +61,13 @@ export const isTouchDevice = (): boolean =>
 export function measure(parent: HTMLElement): Layout {
   const r = parent.getBoundingClientRect();
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  return computeLayout(Math.max(1, r.width), Math.max(1, r.height), dpr, isTouchDevice());
+  return computeLayout(Math.max(1, r.width), Math.max(1, r.height), dpr, isTouchDevice(), settings.big);
 }
+
+let reapply: (() => void) | null = null;
+
+/** Measure again and tell every screen: for a change the window did not announce, like the larger interface being switched on. */
+export const relayout = (): void => reapply?.();
 
 /** Keeps the canvas matched to its parent. Emits `layout` on the game's event emitter. */
 export function installLayout(game: Phaser.Game, parent: HTMLElement): void {
@@ -76,6 +83,7 @@ export function installLayout(game: Phaser.Game, parent: HTMLElement): void {
     }
     game.events.emit('layout', next);
   };
+  reapply = apply;
   new ResizeObserver(apply).observe(parent);
   window.addEventListener('orientationchange', () => window.setTimeout(apply, 200));
   window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.('change', apply);

@@ -286,7 +286,7 @@ for (const c of crops) {
   add('ui/icon-cat', U.catIcon());
   add('ui/icon-coop', U.coopIcon());
   for (const w of ['sun', 'moon', 'cloud', 'rain', 'storm', 'snow']) add(`ui/weather-${w}`, U.weatherIcon(w));
-  add('ui/stick-base', U.stickBase()); add('ui/stick-knob', U.stickKnob()); add('ui/action-btn', U.actionButton()); add('ui/hand', U.hand());
+  add('ui/stick-base', U.stickBase()); add('ui/stick-knob', U.stickKnob()); add('ui/action-btn', U.actionButton()); add('ui/menu-btn', U.menuButton()); add('ui/silhouette', U.silhouette()); add('ui/hand', U.hand());
 }
 
 // fx

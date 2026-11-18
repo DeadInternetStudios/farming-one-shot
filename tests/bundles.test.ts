@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BUNDLE_BY_ID, BUNDLES } from '../src/data/bundles';
-import { donate, giveable } from '../src/game/bundles';
+import { donate, giveable, giving } from '../src/game/bundles';
 import { addItem } from '../src/game/inventory';
 import { newGame } from '../src/game/state';
 
@@ -43,5 +43,19 @@ describe('what the shrine will take', () => {
     addItem(st.player.slots, 'radish', 2);
     addItem(st.player.slots, 'potato', 1);
     expect(giveable(st, spring)).toBe(1);
+  });
+});
+
+describe('what the shrine will take, by name', () => {
+  it('lists each kind the bag would hand over, so the button and the card can say them before the press', () => {
+    const st = newGame(3, 'Rowan');
+    expect(giving(st, spring)).toEqual([]);
+    for (const slot of spring.slots.slice(0, 2)) addItem(st.player.slots, slot.any[0] as string, slot.n);
+    const list = giving(st, spring);
+    expect(list.length).toBe(2);
+    const listed = list.reduce((n, g) => n + g.n, 0);
+    expect(listed).toBe(giveable(st, spring));
+    // and the list is what a press then gives
+    expect(giveAll(st)).toBe(listed);
   });
 });

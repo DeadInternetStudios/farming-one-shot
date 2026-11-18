@@ -7,6 +7,8 @@ export interface Settings {
   calm: boolean;
   /** Touch controls the other way round: the stick on the right, the action button on the left. */
   lefty: boolean;
+  /** One step larger text and buttons, on screens with room for it. */
+  big: boolean;
 }
 
 const KEY = 'lantern-hollow:settings';
@@ -14,7 +16,7 @@ const KEY = 'lantern-hollow:settings';
 const deviceWantsCalm = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function defaults(): Settings {
-  return { music: 0.6, sfx: 0.8, shake: true, calm: deviceWantsCalm(), lefty: false };
+  return { music: 0.6, sfx: 0.8, shake: true, calm: deviceWantsCalm(), lefty: false, big: false };
 }
 
 function read(): Settings {

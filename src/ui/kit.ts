@@ -14,8 +14,8 @@ export const COL = {
   leaf: PAL.leaf[4],
   berry: PAL.red[3],
   water: PAL.water[3],
-  /** A label on a button that cannot be used right now: parchment-brown, quieter than the text around it. */
-  off: 0x8b7a62,
+  /** A label on a button that cannot be used right now: a softer brown than the ink, still well clear of the pale plate it sits on. */
+  off: 0x65543d,
 } as const;
 
 /** The dark the opening passes through: a lit lantern's, not the night's, so the title opens into the house's light. */

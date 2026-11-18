@@ -8,6 +8,7 @@ import { session } from '../game/session';
 import { PAL } from '../gen/art';
 import type { Layout } from '../display';
 import { settings } from '../game/settings';
+import { keyLine } from '../game/teach';
 import { COL, iconFor, label, nine } from './kit';
 import { MS, easeOut } from './motion';
 import { money } from './money';
@@ -46,8 +47,11 @@ export class Hud {
   private objs: Phaser.GameObjects.GameObject[] = [];
   private season!: Phaser.GameObjects.Image;
   private weather!: Phaser.GameObjects.Image;
+  private clockBg!: Phaser.GameObjects.NineSlice;
   private dayText!: Phaser.GameObjects.BitmapText;
   private timeText!: Phaser.GameObjects.BitmapText;
+  /** A short landscape screen (a phone on its side) keeps the top thin: the clock is one line and the goal sits beside it. */
+  private short = false;
   private goldText!: Phaser.GameObjects.BitmapText;
   private goldShown = -1;
   private goldTarget = 0;
@@ -62,6 +66,9 @@ export class Hud {
   private hintBg!: Phaser.GameObjects.NineSlice;
   private hintText!: Phaser.GameObjects.BitmapText;
   private hintShown = '';
+  private keysBg!: Phaser.GameObjects.NineSlice;
+  private keysText!: Phaser.GameObjects.BitmapText;
+  private keysShown = '';
   private placeBg!: Phaser.GameObjects.NineSlice;
   private placeText!: Phaser.GameObjects.BitmapText;
   private placeUntil = 0;
@@ -114,16 +121,18 @@ export class Hud {
     const l = this.l;
 
     // clock, top left
-    this.add(nine(s, 'dark', 3, 3, 88, 31));
-    this.season = this.add(s.add.image(9, 9, 'atlas', 'ui/season-spring').setOrigin(0, 0));
-    this.dayText = this.add(label(s, 23, 10, ''));
-    this.weather = this.add(s.add.image(91 - 7, 9, 'atlas', 'ui/weather-sun').setOrigin(1, 0));
+    this.short = l.uiH < 200;
+    this.clockBg = this.add(nine(s, 'dark', 3, 3, 88, this.short ? 15 : 31));
+    this.season = this.add(s.add.image(9, this.short ? 5 : 9, 'atlas', 'ui/season-spring').setOrigin(0, 0));
+    this.dayText = this.add(label(s, 23, this.short ? 7 : 10, ''));
+    this.weather = this.add(s.add.image(91 - 7, this.short ? 5 : 9, 'atlas', 'ui/weather-sun').setOrigin(1, 0));
     this.timeText = this.add(label(s, 9, 22, '', { tint: COL.gold }));
     this.goalBg = this.add(nine(s, 'dark', 3, 37, 40, 15).setVisible(false));
     this.goalIcon = this.add(s.add.image(9, 41, 'atlas', 'ui/arrow-right').setOrigin(0, 0).setVisible(false));
-    this.goalText = this.add(label(s, 19, 41, '', { tint: COL.cream, wrap: Math.min(200, l.uiW - 36) }).setVisible(false));
+    this.goalText = this.add(label(s, 19, 41, '', { tint: COL.cream, wrap: this.goalWrap() }).setVisible(false));
     this.goalShown = '';
     this.goalCheck = 0;
+    this.layoutClock();
 
     // gold and energy, top right
     const gw = 58;
@@ -163,6 +172,9 @@ export class Hud {
     this.hintBg = this.add(nine(s, 'dark', 0, 0, 40, 15).setVisible(false));
     this.hintText = this.add(label(s, 0, 0, '', { origin: [0.5, 0], tint: COL.gold }).setVisible(false));
     this.hintShown = '';
+    this.keysBg = this.add(nine(s, 'dark', 0, 0, 40, 15).setVisible(false));
+    this.keysText = this.add(label(s, 0, 0, '', { origin: [0.5, 0], tint: COL.cream, wrap: l.uiW - 20, align: 'center' }).setVisible(false));
+    this.keysShown = '\0';
     this.placeBg = this.add(nine(s, 'dark', 0, 0, 40, 17).setVisible(false));
     this.placeText = this.add(label(s, 0, 0, '', { origin: [0.5, 0] }).setVisible(false));
     this.sig = '';
@@ -255,9 +267,66 @@ export class Hud {
     this.hintText.setPosition(x + Math.floor(w / 2), y + 4).setVisible(true);
   }
 
+  /** How wide a line of the goal may be: the whole width under the clock, or what is left beside it on a short screen. */
+  private goalWrap(): number {
+    return this.short ? Math.max(60, this.l.uiW - this.clockRight() - 4 - 64 - 24) : Math.min(200, this.l.uiW - 36);
+  }
+
+  private clockRight(): number {
+    return this.short ? this.clockBg.x + this.clockBg.width : 91;
+  }
+
+  /** One line on a short screen: the day, then the time, then the weather, with the pill sized to what they say. */
+  private layoutClock(): void {
+    if (!this.short) {
+      this.placeGoal();
+      return;
+    }
+    this.timeText.setPosition(this.dayText.x + Math.ceil(this.dayText.width) + 8, this.dayText.y);
+    const right = this.timeText.x + Math.ceil(this.timeText.width) + 4;
+    this.weather.setPosition(right + 11, 5);
+    this.clockBg.setSize(right + 11 - 3 + 6, 15);
+    this.goalText.setMaxWidth(this.goalWrap());
+    this.placeGoal();
+  }
+
+  /** The goal chip: under the clock, or beside it on a short screen. */
+  private placeGoal(): void {
+    if (this.goalShown === '') {
+      this.goalRect.setTo(0, 0, 0, 0);
+      return;
+    }
+    const at = this.short ? { x: this.clockRight() + 4, y: 3 } : { x: 3, y: 37 };
+    const text = this.goalText;
+    const w = Math.ceil(text.width) + 24;
+    const h = Math.ceil(text.height) + 8;
+    this.goalBg.setPosition(at.x, at.y).setSize(w, h);
+    this.goalIcon.setPosition(at.x + 6, at.y + 4);
+    text.setPosition(at.x + 16, at.y + 4);
+    this.goalRect.setTo(at.x, at.y, w, h);
+  }
+
+  /** The keys to press, for a player with a keyboard, above the hotbar. It shrinks as each is learned and is gone once they all are. */
+  private updateKeys(covered: boolean): void {
+    const line = this.l.touch || covered ? '' : keyLine(session.state);
+    if (line === this.keysShown) return;
+    this.keysShown = line;
+    const on = line !== '';
+    this.keysBg.setVisible(on);
+    this.keysText.setVisible(on);
+    if (!on) return;
+    this.keysText.setText(line);
+    const w = Math.ceil(this.keysText.width) + 14;
+    const h = Math.ceil(this.keysText.height) + 8;
+    const cx = Math.floor(this.l.uiW / 2);
+    const y = this.hotbarTop - 40 - h;
+    this.keysBg.setSize(w, h).setPosition(cx - Math.floor(w / 2), y);
+    this.keysText.setPosition(cx, y + 4);
+  }
+
   /** Where the centred pop-ups start: under the goal line, however many lines it came out as. */
   private topY(): number {
-    return Math.max(38, this.goalRect.bottom + 3);
+    return Math.max(this.short ? 22 : 38, this.goalRect.bottom + 3);
   }
 
   /** The one line that says what to do next, under the clock. It steps aside for a pop-up, which would otherwise show it through its own fade. */
@@ -273,6 +342,7 @@ export class Hud {
     const text = nextGoal(session.state)?.text ?? '';
     if (text === this.goalShown) return;
     this.goalShown = text;
+    session.events.emit('goal', text);
     const on = text !== '';
     this.goalBg.setVisible(on && !covered);
     this.goalIcon.setVisible(on && !covered);
@@ -282,10 +352,7 @@ export class Hud {
       return;
     }
     this.goalText.setText(text);
-    const w = Math.ceil(this.goalText.width) + 24;
-    const h = Math.ceil(this.goalText.height) + 8;
-    this.goalBg.setSize(w, h);
-    this.goalRect.setTo(3, 37, w, h);
+    this.placeGoal();
   }
 
   /** The name of the place you just arrived at, shown for a moment near the top. */
@@ -311,6 +378,7 @@ export class Hud {
     const now = this.scene.time.now;
 
     this.updateGoal(now, covered);
+    this.updateKeys(covered);
     const season = seasonOf(st.day);
     const clockSig = `${st.day}|${Math.floor(st.minute / 10)}|${st.weather}`;
     if (clockSig !== this.clockSig) {
@@ -322,6 +390,7 @@ export class Hud {
       this.weather.setFrame(dark ? 'ui/weather-moon' : `ui/weather-${st.weather}`);
       this.dayText.setText(`${names[season]} ${dayOfSeason(st.day)}`);
       this.timeText.setText(`${WEEKDAYS[weekdayOf(st.day)]}  ${formatTime(st.minute)}`);
+      this.layoutClock();
     }
 
     this.goldTarget = p.gold;

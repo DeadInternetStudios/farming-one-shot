@@ -2,12 +2,15 @@
 // screen on its side and back with the pop-up still open. Run it once for each screen size you care about:
 //   node tools/test/probe.mjs tools/test/scenarios/layout.mjs --size 360x640 --dpr 2 --touch --out /tmp/layout
 // ONLY=menu-bag,shop-buy limits it to some states. TURN=0 skips the turning. SHOTS=1 photographs every look, not only the bad ones.
+// SETTINGS='{"big":true}' looks at the same screens with those settings switched on.
 // It exits with 1 when anything is wrong.
 import { check, settle } from '../audit.mjs';
 
 export default async ({ page, wait, press, lh, log, shot }) => {
   const url = page.url().replace('&new=1', '').replace('&skip=1', '');
   await page.addInitScript({ path: `tools/test/fixtures/${process.env.FIXTURE ?? 'midgame'}.js` });
+  // SETTINGS='{"big":true}' looks at the same screens with those settings switched on
+  if (process.env.SETTINGS) await page.addInitScript((s) => localStorage.setItem('lantern-hollow:settings', s), process.env.SETTINGS);
   await page.goto(url, { waitUntil: 'load' });
   await wait(2600);
   await lh('setMinute', 600);

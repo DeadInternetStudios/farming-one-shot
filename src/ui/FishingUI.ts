@@ -7,7 +7,7 @@ import { mulberry32 } from '../game/rng';
 import { session } from '../game/session';
 import { HOOKS, hookFlags } from '../hooks';
 import { watchKey } from '../systems/keys';
-import { COL } from './kit';
+import { COL, label, wrapText } from './kit';
 import { Screen, isBack } from './Screens';
 import type { Host } from './Screens';
 
@@ -47,10 +47,29 @@ export class FishingScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.18);
+    // until the first fish is landed, the panel says in words what the two bars are; on a short screen it says less, and then nothing, before it would not fit
+    const hint = l.touch ? 'Hold anywhere' : 'Hold E / Space';
+    const first = session.state.stats.caught === 0;
+    const says = first ? [`Keep the fish in the green. The gold bar fills while it is. ${hint}.`, `Keep the fish in the green. ${hint}.`] : [];
+    const room = l.uiH - 8 - PANEL_H;
+    let coach = '';
+    let extra = 0;
+    for (const words of says) {
+      const text = wrapText(this.scene, words, PANEL_W - 12);
+      const probe = label(this.scene, 0, 0, text).setVisible(false);
+      const more = Math.max(0, Math.ceil(probe.height) - 8);
+      probe.destroy();
+      if (more <= room) {
+        coach = text;
+        extra = more;
+        break;
+      }
+    }
+    const height = PANEL_H + extra;
     const x = l.uiW - PANEL_W - 10;
-    const y = Math.round((l.uiH - PANEL_H) / 2);
+    const y = Math.round((l.uiH - height) / 2);
     this.trackTop = y + 24;
-    bag.panel(x, y, PANEL_W, PANEL_H, 'dark');
+    bag.panel(x, y, PANEL_W, height, 'dark');
     bag.text(x + PANEL_W / 2, y + 8, 'On the line!', { origin: [0.5, 0] });
     const tx = x + 14;
     bag.add(this.scene.add.nineslice(tx, this.trackTop, 'atlas', 'ui/fish-track', TRACK_W, TRACK_H, 4, 4, 4, 4).setOrigin(0, 0), 1);
@@ -61,8 +80,7 @@ export class FishingScreen extends Screen {
     this.meterX = x + PANEL_W - 14 - 16;
     bag.add(this.scene.add.nineslice(this.meterX, this.trackTop, 'atlas', 'ui/fish-track', 14, TRACK_H, 4, 4, 4, 4).setOrigin(0, 0), 1);
     this.fill = bag.add(this.scene.add.nineslice(this.meterX, this.trackTop + TRACK_H, 'atlas', 'ui/fish-meter', 14, 8, 4, 4, 4, 4).setOrigin(0, 1), 2);
-    const hint = l.touch ? 'Hold anywhere' : 'Hold E / Space';
-    bag.text(x + PANEL_W / 2, y + PANEL_H - 15, hint, { origin: [0.5, 0], tint: COL.cream });
+    bag.text(x + PANEL_W / 2, y + height - 15 - extra, coach || hint, { origin: [0.5, 0], tint: COL.cream, align: 'center' });
     this.banner = bag.text(x + PANEL_W / 2, y + PANEL_H / 2 - 4, '', { origin: [0.5, 0.5], outline: true, tint: COL.gold });
     this.banner.setDepth(bag.depth + 9);
     if (HOOKS && hookFlags().has('debug')) (window as unknown as { __fight: unknown }).__fight = this.fight;

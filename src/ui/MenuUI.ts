@@ -6,14 +6,16 @@ import { NPCS } from '../data/npcs';
 import type { NpcDef } from '../data/npcs';
 import { RECIPES } from '../data/recipes';
 import type { Recipe } from '../data/recipes';
-import { getLayout, slotPitch, tapH } from '../display';
+import { getLayout, relayout, slotPitch, tapH } from '../display';
 import type { Layout } from '../display';
 import { BACKUP_ON, backupToFile, canUndoRestore, restoreFromFile, undoLastRestore } from '../features/backup/backup';
 import { POSTCARD_ON } from '../features/postcard/layout';
 import { PWA_ON, canInstall, install, isInstalled } from '../features/pwa/offline';
 import { PACE_REAL_MINUTES } from '../game/clock';
 import type { PaceId } from '../game/clock';
-import { available, donate, giveable, isComplete, progressOf, slotDone } from '../game/bundles';
+import { controlsLines } from './controlsText';
+import { carryHint, swapHint } from './words';
+import { available, donate, giving, isComplete, progressOf, slotDone } from '../game/bundles';
 import { have, make, plan } from '../game/crafting';
 import { weatherFor } from '../game/day';
 import { nextGoal } from '../game/goals';
@@ -177,12 +179,18 @@ function teacherOf(recipe: string): { npc: NpcDef; hearts: number } | null {
 function lockedRecipe(st: GameState, r: Recipe): Entry {
   const made = itemDef(r.makes);
   const teacher = teacherOf(r.id);
-  const who = teacher && friendOf(st, teacher.npc.id).met ? teacher.npc.name : 'A neighbour';
+  const known = teacher !== null && friendOf(st, teacher.npc.id).met;
+  // a neighbour not met yet stays a surprise by name, but not by whereabouts: their job says where to look
+  const teaches = !teacher
+    ? 'Someone in the valley knows this one.'
+    : known
+      ? `${teacher.npc.name} shares this one once you are good friends: ${teacher.hearts} hearts.`
+      : `A neighbour shares this one once you are good friends: ${teacher.hearts} hearts. Look for the one who is: ${teacher.npc.role}.`;
   return {
     row: { text: made.name, icon: iconFor(st, r.makes), dim: true, right: 'Locked' },
     title: r.name,
     icon: iconFor(st, r.makes),
-    lines: [r.blurb, teacher ? `${who} shares this one once you are good friends: ${teacher.hearts} hearts.` : 'Someone in the valley knows this one.'],
+    lines: [r.blurb, teaches],
   };
 }
 
@@ -218,13 +226,23 @@ export function recipeEntries(kind: Recipe['kind']): Entry[] {
   }).concat(locked);
 }
 
+/** The shrine's button: the one thing it will take by name, or how many kinds when there are several (the card lists them). */
+function giveLabel(going: { id: string; n: number }[]): string {
+  if (going.length === 0) return 'Give what fits';
+  const [first] = going;
+  if (going.length === 1 && first) return `Give ${itemDef(first.id).name} x${first.n}`;
+  return `Give ${going.length} kinds`;
+}
+
 export function bundleEntries(canGive: boolean): Entry[] {
   const st = session.state;
   return BUNDLES.map((b: BundleDef): Entry => {
     const prog = progressOf(st, b);
     const done = isComplete(st, b);
     const got = b.slots.filter((_, i) => slotDone(st, b, i)).length;
-    const fits = canGive && !done ? giveable(st, b) : 0;
+    const going = canGive && !done ? giving(st, b) : [];
+    const fits = going.reduce((sum, g) => sum + g.n, 0);
+    const goes = going.map((g) => `${itemDef(g.id).name} x${g.n}`).join(', ');
     return {
       row: { text: b.name, right: done ? 'Lit' : `${got}/${b.slots.length}`, icon: done ? 'item/lantern' : undefined, tint: done ? COL.leaf : undefined },
       title: b.name,
@@ -234,11 +252,12 @@ export function bundleEntries(canGive: boolean): Entry[] {
           t: s.label || itemDef(s.any[0] as string).name,
           need: { icon: iconFor(st, s.any[0] as string), have: Math.min(prog[i] ?? 0, s.n), n: s.n, ready: canGive ? Math.min(s.n - (prog[i] ?? 0), available(st, s)?.n ?? 0) : 0 },
         })),
+        ...(goes ? [{ t: `Giving: ${goes}.`, tint: COL.leaf }] : []),
         `Reward: ${b.reward.gold}g${b.reward.item ? ` and ${b.reward.item.n} ${itemDef(b.reward.item.id).name}` : ''}.`,
       ],
       actions: canGive && !done ? [{
         // the button says what it will hand over, so a full bag and an empty one never look alike
-        label: fits > 0 ? `Give ${fits} ${fits === 1 ? 'item' : 'items'}` : 'Give what fits', kind: 'leaf', off: fits === 0, run: () => {
+        label: giveLabel(going), kind: 'leaf', off: fits === 0, run: () => {
           let any = false;
           let finished: BundleDef['reward'] | null = null;
           b.slots.forEach((_, i) => {
@@ -278,8 +297,8 @@ export function friendEntries(): Entry[] {
   // everyone in the valley has a place on the list from the start: the ones not met yet are a name still to learn and a job to go and find
   for (const n of NPCS.filter((x) => !friendOf(st, x.id).met)) {
     out.push({
-      row: { text: '???', dim: true, right: 'New' },
-      title: 'Someone new',
+      row: { text: n.role, icon: 'ui/silhouette', dim: true },
+      title: 'Not met yet',
       lines: [`${n.role}.`, 'Walk through the village in the daytime and say hello to meet them.'],
     });
   }
@@ -288,7 +307,7 @@ export function friendEntries(): Entry[] {
 
 /** Settings that make the game easier on the eyes and hands. */
 function accessEntries(): Entry[] {
-  const toggle = (key: 'calm' | 'lefty'): void => { settings[key] = !settings[key]; saveSettings(); session.events.emit('settings'); };
+  const toggle = (key: 'calm' | 'lefty' | 'big'): void => { settings[key] = !settings[key]; saveSettings(); session.events.emit('settings'); if (key === 'big') relayout(); };
   const out: Entry[] = [
     {
       row: { text: 'Calm motion', right: settings.calm ? 'On' : 'Off' },
@@ -298,6 +317,13 @@ function accessEntries(): Entry[] {
       actions: [{ label: 'Toggle', kind: 'leaf', run: () => { toggle('calm'); return null; } }],
     },
   ];
+  out.push({
+    row: { text: 'Larger interface', right: settings.big ? 'On' : 'Off' },
+    title: 'Larger interface',
+    lines: ['Bigger text and buttons, one step up, on screens with room for them.', 'A small phone already shows the biggest size that fits, so nothing changes there.'],
+    adjust: () => toggle('big'),
+    actions: [{ label: 'Toggle', kind: 'leaf', run: () => { toggle('big'); return null; } }],
+  });
   if (getLayout().touch) {
     out.push({
       row: { text: 'Controls side', right: settings.lefty ? 'Left hand' : 'Right hand' },
@@ -366,6 +392,10 @@ const PACE_NAMES: Record<PaceId, string> = { relaxed: 'Relaxed', standard: 'Stan
 /** Set once Leave has warned that the browser will not keep the farm, so the next press goes through. */
 let leaveWarned = false;
 
+function controlsEntry(): Entry {
+  return { row: { text: 'Controls' }, title: 'Controls', lines: controlsLines(getLayout().touch, POSTCARD_ON) };
+}
+
 export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry[] {
   const st = session.state;
   const pct = (v: number): string => `${Math.round(v * 10)}/10`;
@@ -380,6 +410,7 @@ export function optionEntries(toTitle: () => void, closeMenu: () => void): Entry
     ],
   });
   return [
+    controlsEntry(),
     slider('Music', 'music', 'How loud the music is.'),
     slider('Sounds', 'sfx', 'How loud the little sounds are.'),
     {
@@ -450,8 +481,6 @@ function bagCard(s: { id: string; n: number } | null): CardSpec {
   return { title: d.name, lines: [crop ? `${d.blurb} ${plantAdvice(crop.id, session.state.day)}` : d.blurb], actions: d.energy ? [{ label: 'Eat', kind: 'leaf' }] : [] };
 }
 
-const SWAP_HINT = 'Tap a stack, then another slot to swap them.';
-
 class BagView {
   private sel = 0;
   private carry = -1;
@@ -519,7 +548,7 @@ class BagView {
     if (advice) this.drawToday(bag, a, todayTop, next, weather);
     this.info = new Bag(scene, bag.depth);
     this.paint();
-    say(SWAP_HINT);
+    say(swapHint(getLayout().touch));
   }
 
   /** What to do next and what the weather does tomorrow: the two things worth a glance before closing the bag. */
@@ -549,7 +578,7 @@ class BagView {
   private act(): void {
     const slots = session.state.player.slots;
     if (this.carry < 0) {
-      if (slots[this.sel]) { this.carry = this.sel; this.say('Now tap where it goes.'); }
+      if (slots[this.sel]) { this.carry = this.sel; this.say(carryHint(getLayout().touch)); }
     } else {
       const a = this.carry;
       const b = this.sel;
@@ -560,7 +589,7 @@ class BagView {
         session.events.emit('sfx', 'tick');
       }
       this.carry = -1;
-      this.say(SWAP_HINT);
+      this.say(swapHint(getLayout().touch));
     }
     this.paint();
   }

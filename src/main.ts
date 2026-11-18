@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { installA11y } from './a11y';
 import { installLayout, measure } from './display';
 import { startOffline } from './features/pwa/offline';
 import { BootScene } from './scenes/Boot';
@@ -51,6 +52,7 @@ function start(): void {
     scene: [BootScene, TitleScene, WorldScene, UIScene],
   });
   installLayout(game, parent);
+  installA11y(game);
   startOffline();
 }
 
