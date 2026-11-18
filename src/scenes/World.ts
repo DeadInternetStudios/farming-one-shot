@@ -48,6 +48,8 @@ import { SHRINE } from '../gen/art';
 import { WARM_DARK } from '../ui/kit';
 
 const REACH = 2.1;
+/** How many presses made during a swing are kept for after it. */
+const MAX_QUEUED = 3;
 /** How often the farm is saved on its own, in milliseconds. */
 const AUTOSAVE_MS = 15000;
 
@@ -81,8 +83,8 @@ export class WorldScene extends Phaser.Scene {
   private travelling = false;
   private finaleOn = false;
   private wasPaused = false;
-  /** A press that came while the farmer was mid-swing, done as soon as the swing ends instead of being thrown away. */
-  private queuedAct: { at?: { x: number; y: number }; until: number } | null = null;
+  /** Presses that came while the farmer was mid-swing, done in order as the swings end instead of being thrown away. */
+  private queuedActs: { at?: { x: number; y: number }; until: number }[] = [];
   /** The last save did not go through, and the player has been told. */
   private saveWarned = false;
   private letGoOfFarm: (() => void) | null = null;
@@ -309,10 +311,10 @@ export class WorldScene extends Phaser.Scene {
       if (slot !== null) this.selectSlot(slot);
       const cyc = this.controls.cycle();
       if (cyc !== 0) this.selectSlot((st.player.selected + cyc + 10 * 100) % 10);
-      const waiting = this.queuedAct;
-      if (waiting && !this.player.swinging) {
-        this.queuedAct = null;
-        if (this.time.now <= waiting.until) this.act(waiting.at);
+      if (!this.player.swinging) {
+        let next = this.queuedActs.shift();
+        while (next && this.time.now > next.until) next = this.queuedActs.shift();
+        if (next) this.act(next.at);
       }
       if (this.controls.action()) this.act();
       if (this.controls.eat()) this.eatSelected();
@@ -320,7 +322,7 @@ export class WorldScene extends Phaser.Scene {
       if (POSTCARD_ON && this.controls.postcard() && !this.finaleOn) session.events.emit('postcard');
     } else {
       this.controls.flush();
-      this.queuedAct = null;
+      this.queuedActs = [];
       this.player.update(dt, 0, 0, false, this.solid);
     }
 
@@ -425,8 +427,8 @@ export class WorldScene extends Phaser.Scene {
 
   private act(at?: { x: number; y: number }): void {
     if (this.player.swinging) {
-      // a press during a swing is kept for the end of it, so the most repeated action in the game never goes missing
-      this.queuedAct = { at, until: this.time.now + 700 };
+      // a press during a swing is kept for the end of it, so the most repeated action in the game never goes missing; a few are kept, in order
+      if (this.queuedActs.length < MAX_QUEUED) this.queuedActs.push({ at, until: this.time.now + 1500 });
       return;
     }
     const st = session.state;

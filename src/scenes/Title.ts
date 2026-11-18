@@ -43,6 +43,11 @@ export class TitleScene extends Phaser.Scene {
   private picked = 0;
   private busy = false;
   private overlay: Phaser.GameObjects.GameObject[] = [];
+  /** The two answers of the open question, and which one the keys are on. It starts on the safe one. */
+  private answers: [() => void, () => void] = [() => undefined, () => undefined];
+  private answerAt: 0 | 1 = 1;
+  private ring: Phaser.GameObjects.Rectangle | null = null;
+  private ringSpots: [number, number] = [0, 0];
   private notice: Phaser.GameObjects.BitmapText | null = null;
   private ground = 0;
   private menuTop = 0;
@@ -392,7 +397,8 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: this.pointer, x: this.pointer.x - 2, duration: 450, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     this.select(0, false);
     let below = top + this.choices.length * (bh + gap) + 1;
-    const wrap = Math.min(220, Math.floor(l.uiW) - 16);
+    // the column can sit off-centre on a short screen, and its text must stay on the side of the screen it is on
+    const wrap = Math.max(60, Math.min(220, Math.floor(l.uiW) - 16, 2 * (Math.min(x, l.uiW - x) - 6)));
     const line = (text: string, tint: number): void => {
       const t = label(this, x, below, text, { tint, origin: [0.5, 0], outline: true, wrap, align: 'center' }).setDepth(D.ui + 2);
       below += Math.ceil(t.height) + 3;
@@ -403,7 +409,9 @@ export class TitleScene extends Phaser.Scene {
     if (!canStore()) line('This browser will not keep your farm. You can play, but it is lost when the page closes.', COL.berry);
     this.notice = label(this, x, below, '', { tint: PAL.cream[0], origin: [0.5, 0], outline: true, wrap, align: 'center' }).setDepth(D.ui + 2);
     if (!l.touch) {
-      label(this, x, below + 12, saved ? 'Up and Down to choose, Enter to start' : this.choices.length > 1 ? 'Up and Down to choose, Enter to pick' : 'Press Enter to start', { tint: PAL.cream[0], origin: [0.5, 0], outline: true }).setAlpha(0.75).setDepth(D.ui + 2);
+      const keys = label(this, x, below + 12, saved ? 'Up and Down to choose, Enter to start' : this.choices.length > 1 ? 'Up and Down to choose, Enter to pick' : 'Press Enter to start', { tint: PAL.cream[0], origin: [0.5, 0], outline: true, wrap, align: 'center' }).setAlpha(0.75).setDepth(D.ui + 2);
+      // on a short screen with a long notice the hint is the first thing to go: the arrow already shows what the keys do
+      if (keys.y + keys.height > l.uiH - 3) keys.destroy();
     }
     this.menuTop = top;
     this.menuStep = bh + gap;
@@ -435,6 +443,8 @@ export class TitleScene extends Phaser.Scene {
     if (this.busy) return;
     if (this.overlay.length > 0) {
       if (ev.code === 'Escape') this.closeConfirm();
+      else if (/^(Arrow(Left|Right|Up|Down)|Tab|Key[ADWS])$/.test(ev.code)) this.focusAnswer(this.answerAt === 0 ? 1 : 0);
+      else if (ev.code === 'Enter' || ev.code === 'Space' || ev.code === 'KeyE') this.answers[this.answerAt]();
       return;
     }
     const n = this.choices.length;
@@ -444,7 +454,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private confirmNew(damaged = false): void {
-    const says = damaged ? 'The farm that will not open stays in this browser, and Keep a copy still saves it.' : 'This replaces your saved farm.';
+    const says = damaged ? 'Starting over replaces the farm that will not open. Keep a copy first if you want to hold on to it.' : 'This replaces your saved farm.';
     this.ask('Start a new farm?', says, 'Start over', damaged ? 'Not now' : 'Keep it', () => this.start(true));
   }
 
@@ -470,17 +480,33 @@ export class TitleScene extends Phaser.Scene {
     parts.push(label(this, x + w / 2, y + 12, title, { tint: COL.ink, origin: [0.5, 0] }).setDepth(D.ui + 12));
     parts.push(label(this, x + w / 2, y + 26, says, { tint: COL.dim, origin: [0.5, 0], wrap: w - 20, align: 'center' }).setDepth(D.ui + 12));
     const half = Math.floor((w - 28) / 2);
-    const go = button(this, x + 10, y + h - bh - 9, half, bh, yes, 'berry', () => { this.closeConfirm(); onYes(); });
-    const stay = button(this, x + w - 10 - half, y + h - bh - 9, half, bh, no, 'leaf', () => this.closeConfirm());
+    const by = y + h - bh - 9;
+    const yesAt = x + 10;
+    const noAt = x + w - 10 - half;
+    const go = button(this, yesAt, by, half, bh, yes, 'berry', () => { this.closeConfirm(); onYes(); });
+    const stay = button(this, noAt, by, half, bh, no, 'leaf', () => this.closeConfirm());
     for (const b of [go, stay]) for (const p of b.parts) (p as Phaser.GameObjects.GameObject & { setDepth: (d: number) => unknown }).setDepth(D.ui + 13);
     parts.push(...go.parts, ...stay.parts);
+    // the keys need to see where they are: a dark frame sits on the answer Enter would give
+    this.ringSpots = [yesAt, noAt];
+    this.ring = this.add.rectangle(noAt - 2, by - 2, half + 4, bh + 4).setOrigin(0, 0).setFillStyle(0, 0).setStrokeStyle(1, PAL.ink[0]).setDepth(D.ui + 14);
+    parts.push(this.ring);
+    this.answers = [() => { this.closeConfirm(); onYes(); }, () => this.closeConfirm()];
+    this.answerAt = 1;
     this.overlay = parts;
     audio.sfx('open');
+  }
+
+  private focusAnswer(i: 0 | 1): void {
+    this.answerAt = i;
+    this.ring?.setX(this.ringSpots[i] - 2);
+    audio.sfx('tick');
   }
 
   private closeConfirm(): void {
     for (const p of this.overlay) p.destroy();
     this.overlay = [];
+    this.ring = null;
     audio.sfx('close');
   }
 
