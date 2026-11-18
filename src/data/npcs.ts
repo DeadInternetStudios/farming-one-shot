@@ -142,7 +142,7 @@ export const NPCS: readonly NpcDef[] = [
   {
     id: 'tam', name: 'Old Tam', role: 'Keeps the lake',
     birthday: { season: 'winter', day: 9 },
-    loves: ['koi', 'eel', 'dish-stew'], likes: ['trout', 'carp', 'perch', 'dish-tea'], dislikes: ['mushroom', 'fiber'],
+    loves: ['fish-koi', 'fish-eel', 'dish-stew'], likes: ['fish-trout', 'fish-carp', 'fish-perch', 'dish-tea'], dislikes: ['mushroom', 'fiber'],
     stops: [
       { from: 6 * H, map: 'lake', x: 12, y: 13, dir: 'right' },
       { from: 6 * H, map: null, x: 0, y: 0, weather: ['storm'] },
