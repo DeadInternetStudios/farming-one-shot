@@ -13,7 +13,9 @@ npm ci
 npm run dev
 ```
 
-Open the address Vite prints. Keyboard: arrows or WASD to move, E or Space to act, Tab or Escape for the menu, number keys to pick a tool. On a phone the controls are on screen.
+Open the address Vite prints.
+
+Play it online: https://deadinternetstudios.github.io/farming-one-shot/ Keyboard: arrows or WASD to move, E or Space to act, Tab or Escape for the menu, number keys to pick a tool. On a phone the controls are on screen.
 
 ## Commands
 
