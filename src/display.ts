@@ -21,6 +21,11 @@ export interface Layout {
   touch: boolean;
 }
 
+/** The fewest interface pixels the short side of the screen may have, where the pixel ratio allows it. */
+const UI_SHORT = 180;
+/** The finest the interface goes: this many CSS pixels per interface pixel, so a letter stays readable. */
+const MIN_CSS_PER_UI = 4 / 3;
+
 export function computeLayout(cssW: number, cssH: number, dpr: number, touch: boolean): Layout {
   const devW = Math.max(1, Math.round(cssW * dpr));
   const devH = Math.max(1, Math.round(cssH * dpr));
@@ -29,7 +34,10 @@ export function computeLayout(cssW: number, cssH: number, dpr: number, touch: bo
   const tilesShort = cssShort < 520 ? 11 : cssShort < 800 ? 13 : 15;
   const worldZoom = Math.max(1, Math.round(devShort / tilesShort / 16));
   const cssPerUi = cssShort >= 800 ? 3 : 2;
-  const uiZoom = Math.max(1, Math.round(cssPerUi * dpr));
+  // a small screen gets a finer interface instead of a cramped one: never fewer than UI_SHORT interface pixels on its short side
+  // (a phone held sideways is 160 tall at the usual scale, which cannot hold a tab strip, a grid and a message line)
+  const finest = Math.max(2, Math.round(MIN_CSS_PER_UI * dpr));
+  const uiZoom = Math.max(1, Math.max(finest, Math.min(Math.round(cssPerUi * dpr), Math.floor(devShort / UI_SHORT))));
   return { dpr, cssW, cssH, devW, devH, worldZoom, uiZoom, uiW: Math.floor(devW / uiZoom), uiH: Math.floor(devH / uiZoom), touch };
 }
 

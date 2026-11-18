@@ -205,19 +205,25 @@ export class ChestScreen extends Screen {
   build(): void {
     const { l, bag } = this;
     this.dim(0.5);
-    const pitch = slotPitch(l);
     const bagSlots = session.state.player.slots.length;
     // a touch screen's title bar is taller, to hold a close button big enough for a finger
     const lift = l.touch ? tapH(l) - 14 : 0;
-    const tall = (c: number): number => 28 + lift + Math.ceil(CHEST_SLOTS / c) * pitch + 16 + Math.ceil(bagSlots / c) * pitch + 26;
+    const tallAt = (c: number, pitch: number): number => 28 + lift + Math.ceil(CHEST_SLOTS / c) * pitch + 16 + Math.ceil(bagSlots / c) * pitch + 26;
+    const mostAt = (pitch: number): number => Math.max(6, Math.floor((l.uiW - 36) / pitch));
+    // two grids in one pop-up are a lot for a short screen: if fingertip-sized slots will not fit even in the most columns the width allows, the slots shrink to the pointer size
+    let pitch = slotPitch(l);
+    if (tallAt(mostAt(pitch), pitch) > l.uiH - 8) pitch = Math.min(pitch, slotPitch({ ...l, touch: false }));
+    const tall = (c: number): number => tallAt(c, pitch);
     // as many columns as the screen's width allows, but no more than it takes to fit its height
-    const most = Math.max(6, Math.floor((l.uiW - 36) / pitch));
+    const most = mostAt(pitch);
     let cols = Math.min(10, most);
     while (cols < most && tall(cols) > l.uiH - 8) cols++;
     const h = tall(cols);
     const p = popup(bag, l, { title: 'Chest', maxW: cols * pitch + 20, wideH: h, tallH: h, close: () => this.close() });
     const { x, y } = p;
     this.bare = bag.text(p.closeX - 8, p.titleY, 'Nothing stored', { origin: [1, 0], tint: COL.dim });
+    // on a narrow pop-up the title leaves less room, so the note says it in one word
+    if (this.bare.x - this.bare.width < p.title.x + p.title.width + 8) this.bare.setText('Empty');
     const body = this.own(new Bag(this.scene, bag.depth));
     const chestRows = Math.ceil(CHEST_SLOTS / cols);
     this.chest = new SlotGrid(body, x + 10, y + 26 + lift, cols, pitch, () => this.items, (i) => { this.focus = 'chest'; this.move('chest', i); });

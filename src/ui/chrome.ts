@@ -383,7 +383,22 @@ export function drawCard(b: Bag, box: Area, c: CardSpec, btnH: number, style: Ca
   if (c.extra && ty + 12 <= limit) ty = c.extra(b, x + 2, ty + 1, w - 4);
   if (acts.length === 0) return ty - y;
   const by = Math.min(ty + 3, y + h - btnH);
-  const bw = Math.floor((w - 4 - (acts.length - 1) * 4) / acts.length);
-  acts.forEach((a, i) => b.btn(x + 2 + i * (bw + 4), by, bw, a.label, a.kind, () => act(i), btnH, undefined, a.off));
+  const total = w - 4 - (acts.length - 1) * 4;
+  const even = Math.floor(total / acts.length);
+  // buttons share the card equally, unless a label needs more than its share: then each gets what its label needs and the rest is split
+  const want = acts.map((a) => {
+    const probe = label(b.scene, 0, 0, a.label).setVisible(false);
+    const need = Math.ceil(probe.width) + 12;
+    probe.destroy();
+    return need;
+  });
+  const spare = total - want.reduce((s, v) => s + v, 0);
+  const widths = want.every((v) => v <= even) || spare < 0 ? acts.map(() => even) : want.map((v) => v + Math.floor(spare / acts.length));
+  let bx = x + 2;
+  acts.forEach((a, i) => {
+    const bw = widths[i] as number;
+    b.btn(bx, by, bw, a.label, a.kind, () => act(i), btnH, undefined, a.off);
+    bx += bw + 4;
+  });
   return by + btnH - y;
 }

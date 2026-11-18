@@ -450,7 +450,12 @@ class BagView {
     this.ox = a.x + (beside ? 2 : Math.floor((a.w - this.cols * pitch) / 2) + 1);
     this.oy = a.y + 2;
     const gridH = Math.ceil(slots.length / this.cols) * pitch;
-    let todayTop = a.y + a.h - todayH;
+    // a page too short for the grid and both lines about today gives up the weather first, then the advice, rather than draw them over the grid
+    const spare = a.h - 2 - gridH - 5;
+    const weather = !beside || todayH <= spare;
+    const advice = weather || next.length * LINE <= spare;
+    const shownH = weather ? todayH : advice ? next.length * LINE : 0;
+    let todayTop = a.y + a.h - shownH;
     if (beside) {
       this.box = { x: this.ox + this.cols * pitch + 8, y: a.y, w: a.x + a.w - (this.ox + this.cols * pitch + 8), h: todayTop - 5 - a.y };
     } else {
@@ -471,21 +476,22 @@ class BagView {
       this.cells.push({ bg, icon, count });
     }
     this.cursor = bag.img(0, 0, 'ui/slot-sel', [0, 0], 3);
-    this.drawToday(bag, a, todayTop, next);
+    if (advice) this.drawToday(bag, a, todayTop, next, weather);
     this.info = new Bag(scene, bag.depth);
     this.paint();
     say(SWAP_HINT);
   }
 
   /** What to do next and what the weather does tomorrow: the two things worth a glance before closing the bag. */
-  private drawToday(bag: Bag, a: Area, top: number, next: string[]): void {
+  private drawToday(bag: Bag, a: Area, top: number, next: string[], weather: boolean): void {
     const st = session.state;
     const x = a.x + 2;
-    const rain = weatherFor(st.seed, st.day + 1);
-    const outlook = `Tomorrow is ${WEATHER_NAMES[rain].toLowerCase()}${rain === 'rain' || rain === 'storm' ? '. No need to water.' : '.'}`;
     bag.rect(a.x + 2, top - 5, a.w - 4, 1, PAL.wood[1], 0.35, 2);
     bag.img(x + 4, top + 5, 'ui/arrow-right').setTint(COL.berry);
     bag.text(x + 15, top, next.join('\n'), { tint: COL.ink });
+    if (!weather) return;
+    const rain = weatherFor(st.seed, st.day + 1);
+    const outlook = `Tomorrow is ${WEATHER_NAMES[rain].toLowerCase()}${rain === 'rain' || rain === 'storm' ? '. No need to water.' : '.'}`;
     const wy = top + next.length * LINE + 5;
     bag.img(x + 5, wy + 5, `ui/weather-${rain}`);
     bag.text(x + 15, wy, outlook, { tint: COL.dim });

@@ -99,7 +99,8 @@ export class Dialogue extends Screen {
     const rowH = Math.max(16, tapH(this.l));
     const ph = ch.length * rowH + 10;
     const px = x + w - cw - 6;
-    const py = this.high ? y + this.box.h + 3 : y - ph - 3;
+    // under the box on a short screen, but never off the bottom of it: the choices may then overlap the box's empty corner
+    const py = this.high ? Math.min(y + this.box.h + 3, this.l.uiH - ph - 3) : y - ph - 3;
     const cbag = this.own(new Bag(this.scene, this.bag.depth + 10));
     cbag.panel(px, py, cw, ph, 'parchment', 0);
     this.list = this.own(new ListView(cbag, px + 6, py + 5, cw - 12, ch.length * rowH, rowH, (i) => this.choose(i), () => undefined, true));

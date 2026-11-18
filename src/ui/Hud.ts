@@ -255,9 +255,9 @@ export class Hud {
     this.hintText.setPosition(x + Math.floor(w / 2), y + 4).setVisible(true);
   }
 
-  /** Where the centred pop-ups start. Narrow screens keep them below the goal line. */
+  /** Where the centred pop-ups start: under the goal line, however many lines it came out as. */
   private topY(): number {
-    return this.l.uiW < 330 ? 54 : 38;
+    return Math.max(38, this.goalRect.bottom + 3);
   }
 
   /** The one line that says what to do next, under the clock. It steps aside for a pop-up, which would otherwise show it through its own fade. */
@@ -363,8 +363,9 @@ export class Hud {
         this.placeBg.setVisible(false);
         this.placeText.setVisible(false);
       } else {
-        this.placeBg.setAlpha(a);
-        this.placeText.setAlpha(a);
+        // the goal line can change under it (a new place, a new goal), so it keeps its place under the line
+        this.placeBg.setAlpha(a).setY(this.topY() + 2);
+        this.placeText.setAlpha(a).setY(this.topY() + 7);
       }
     }
 
