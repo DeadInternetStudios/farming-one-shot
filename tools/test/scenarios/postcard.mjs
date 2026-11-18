@@ -12,11 +12,20 @@ const png = (file) => {
 };
 
 export default async ({ lh, page, press, wait, shot, state, log }) => {
-  const expect = (cond, what) => log(`[probe] ${cond ? 'ok  ' : 'FAIL'} ${what}`);
+  const failed = [];
+  const expect = (cond, what) => {
+    log(`[probe] ${cond ? 'ok  ' : 'FAIL'} ${what}`);
+    if (!cond) failed.push(what);
+  };
   mkdirSync(OUT, { recursive: true });
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
-  // Music, Sounds, Day length, Screen shake, Calm motion, [Controls side on a phone], then the postcard row
-  const ROW = touch ? 6 : 5;
+  // how many presses down the Options list the postcard row is: asked of the game by its label, so a row added above it cannot throw this off
+  const rowOf = async (label) => {
+    const rows = await lh('options');
+    const at = rows.indexOf(label);
+    if (at < 0) throw new Error(`there is no "${label}" row in Options: ${JSON.stringify(rows)}`);
+    return at;
+  };
   const cardOpen = () => page.evaluate(() => window.__lh.game().textures.exists('postcard-card'));
   const waitFor = async (fn, what, ms = 8000) => {
     for (let t = 0; t < ms; t += 100) {
@@ -82,7 +91,7 @@ export default async ({ lh, page, press, wait, shot, state, log }) => {
     await wait(250);
     await press('z', 300);
     await wait(250);
-    for (let i = 0; i < ROW; i++) await press('ArrowDown', 80);
+    for (let i = await rowOf('Take a postcard'); i > 0; i--) await press('ArrowDown', 80);
     await wait(250);
     await shot('postcard-1-options');
     await press('Enter', 300);
@@ -140,7 +149,7 @@ export default async ({ lh, page, press, wait, shot, state, log }) => {
   await wait(250);
   await press('z', 300);
   await wait(250);
-  for (let i = 0; i < ROW; i++) await press('ArrowDown', 80);
+  for (let i = await rowOf('Take a postcard'); i > 0; i--) await press('ArrowDown', 80);
   await wait(250);
   await press('Enter', 300);
   expect(await waitFor(cardOpen, 'the second card'), 'the Options page takes a postcard too');
@@ -164,4 +173,5 @@ export default async ({ lh, page, press, wait, shot, state, log }) => {
   expect(!(await cardOpen()), 'P does nothing while the menu is open');
   await press('Escape', 300);
   log('[probe] touch device:', touch);
+  if (failed.length > 0) throw new Error(`${failed.length} checks failed: ${failed.join('; ')}`);
 };

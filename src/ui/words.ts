@@ -10,3 +10,13 @@ export const chestHint = (touch: boolean, from: 'chest' | 'bag'): string => {
   const verb = from === 'chest' ? 'take it' : 'store it';
   return touch ? `Tap to ${verb}.` : `Click or press Enter to ${verb}.`;
 };
+
+/** What the hand can do with an item that is not a tool, seed or machine: only what is true of it, in words for the device. */
+export const heldHint = (item: { name: string; energy?: number; sell: number }, touch: boolean): string => {
+  const eat = item.energy ? (touch ? 'Open your bag to eat it' : 'Press F to eat it') : '';
+  const ship = item.sell > 0 ? 'ship it from the bin' : '';
+  if (eat && ship) return `${item.name}. ${eat}, or ${ship}.`;
+  if (eat) return `${item.name}. ${eat}.`;
+  if (ship) return `${item.name}. You can ${ship}.`;
+  return `${item.name}.`;
+};

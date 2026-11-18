@@ -9,6 +9,7 @@ import { PAL } from '../gen/art';
 import type { Layout } from '../display';
 import { settings } from '../game/settings';
 import { keyLine } from '../game/teach';
+import { HUD_STRIP } from './chrome';
 import { COL, iconFor, label, nine } from './kit';
 import { MS, easeOut } from './motion';
 import { money } from './money';
@@ -140,7 +141,7 @@ export class Hud {
     this.add(nine(s, 'dark', gx, 3, gw, 16));
     this.add(s.add.image(gx + 6, 6, 'atlas', 'ui/coin').setOrigin(0, 0));
     this.goldText = this.add(label(s, gx + gw - 7, 7, '0', { tint: COL.gold, origin: [1, 0] }));
-    this.add(nine(s, 'dark', gx, 21, gw, 13));
+    this.add(nine(s, 'dark', gx, 21, gw, HUD_STRIP - 21));
     this.add(s.add.image(gx + 4, 21 + 1, 'atlas', 'ui/bolt').setOrigin(0, 0));
     this.energyW = gw - 22;
     this.add(s.add.rectangle(gx + 17, 21 + 5, this.energyW, 4, PAL.ink[0]).setOrigin(0, 0));

@@ -20,6 +20,9 @@ export interface Area {
 
 /** The bitmap font's line height. */
 export const LINE = 11;
+
+/** How far down from the top the clock, gold and energy pills reach, so a box that must not bury them starts below it. */
+export const HUD_STRIP = 34;
 const PAD = 10;
 const GAP = 3;
 

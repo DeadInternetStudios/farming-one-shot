@@ -115,6 +115,16 @@ export class ListPane {
     this.info.destroy();
   }
 
+  /** The row the player is on. */
+  get place(): number {
+    return this.list.sel;
+  }
+
+  restore(place: number): void {
+    this.list.select(place);
+    this.paint();
+  }
+
   refresh(reset = false): void {
     if (this.closed) return;
     this.entries = this.get();
@@ -568,6 +578,15 @@ class BagView {
 
   destroy(): void {
     this.info.destroy();
+  }
+
+  get place(): number {
+    return this.sel;
+  }
+
+  restore(place: number): void {
+    this.sel = Math.max(0, Math.min(session.state.player.slots.length - 1, place));
+    this.paint();
   }
 
   private tap(i: number): void {

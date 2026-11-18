@@ -6,6 +6,9 @@ import { teaching } from '../game/teach';
 import { COL, iconFor, label, nine } from './kit';
 
 const RADIUS = 22;
+/** A finger dragged this far from where it landed, well past the ring, asks to hurry; it has to come back inside the lower mark to walk again. */
+const HURRY_ON = RADIUS * 1.7;
+const HURRY_OFF = RADIUS * 1.3;
 
 /** A floating stick on the left half of the screen, plus an action button at the bottom right. Left-handed play swaps the sides. */
 export class Touch {
@@ -20,6 +23,7 @@ export class Touch {
   private tweens: Phaser.Tweens.Tween[] = [];
   private shown = '';
   private pointerId = -1;
+  private hurry = false;
   private origin = new Phaser.Math.Vector2();
   private onMove: (p: Phaser.Input.Pointer) => void;
   private onUp: (p: Phaser.Input.Pointer) => void;
@@ -50,12 +54,14 @@ export class Touch {
       this.knob.setPosition(this.origin.x + dx * k, this.origin.y + dy * k);
       const m = Math.min(1, d / RADIUS);
       session.events.emit('virtual-move', d < 4 ? 0 : (dx / d) * m, d < 4 ? 0 : (dy / d) * m);
+      this.setHurry(this.hurry ? d > HURRY_OFF : d > HURRY_ON);
     };
     this.onUp = (p) => {
       if (p.id !== this.pointerId) return;
       this.pointerId = -1;
       this.base.setVisible(false);
       this.knob.setVisible(false);
+      this.setHurry(false);
       session.events.emit('virtual-move', 0, 0);
     };
     scene.input.on('pointermove', this.onMove);
@@ -138,6 +144,14 @@ export class Touch {
     this.icon.setFrame(frame);
   }
 
+  /** The knob swells while the player is hurrying, so the second gear can be seen as well as felt. */
+  private setHurry(on: boolean): void {
+    if (on === this.hurry) return;
+    this.hurry = on;
+    this.knob.setScale(on ? 1.25 : 1);
+    session.events.emit('virtual-sprint', on);
+  }
+
   destroy(): void {
     this.scene.events.off('update', this.sync, this);
     for (const t of this.tweens) t.remove();
@@ -147,6 +161,8 @@ export class Touch {
     this.scene.input.off('pointerupoutside', this.onUp);
     for (const o of this.objs) o.destroy();
     this.objs = [];
+    this.hurry = false;
+    session.events.emit('virtual-sprint', false);
     session.events.emit('virtual-move', 0, 0);
   }
 }

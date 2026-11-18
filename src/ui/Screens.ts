@@ -13,6 +13,14 @@ export interface Host {
   close(s: Screen): void;
 }
 
+/** Something on a screen that knows where the player was in it, so a rebuild after a resize can put them back. */
+export interface Placed {
+  readonly place: number;
+  restore(place: number): void;
+}
+
+const isPlaced = <T extends { destroy(): void }>(e: T): e is T & Placed => typeof (e as Partial<Placed>).restore === 'function';
+
 /** One pop-up interface: a shop, a conversation, the bag. Builds itself, takes keys, cleans up after itself. */
 export abstract class Screen {
   protected bag: Bag;
@@ -72,9 +80,15 @@ export abstract class Screen {
 
   /** Builds the screen again, after a resize or a tab switch. `fade` brings the page in softly; the frame around it stays put. */
   relayout(fade = false): void {
+    // a turn of the phone, a resize or a setting that changes the layout rebuilds the page but not the player's place in it; a tab switch starts fresh
+    const places = fade ? [] : this.extra.filter(isPlaced).map((e) => e.place);
     this.teardown();
     this.pageStart = -1;
     this.build();
+    this.extra.filter(isPlaced).forEach((e, i) => {
+      const was = places[i];
+      if (was !== undefined) e.restore(was);
+    });
     if (fade && this.pageStart >= 0) this.motion = reveal(this.scene, this.scene.children.list.slice(this.pageStart), { ms: MS.quick });
   }
 }

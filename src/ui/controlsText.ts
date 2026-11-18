@@ -2,11 +2,12 @@
 export function controlsLines(touch: boolean, postcard: boolean): string[] {
   return touch
     ? [
-        'Drag on the left of the screen to walk.',
+        'Drag on the left of the screen to walk. Drag past the ring to hurry.',
         'The big button uses what is in your hand: dig, water, plant, talk, open a door.',
         'The bag button opens your bag, crafting, friends and these options.',
         'Tap a slot at the bottom to pick a tool or item.',
         'Tap a tile next to you to use your tool there.',
+        'To eat, open your bag, tap the food and tap Eat.',
       ]
     : [
         'Arrow keys or WASD walk. Hold Shift to hurry.',

@@ -34,7 +34,17 @@ export default async ({ lh, press, wait, shot, state, page }) => {
     const want = s.fish - s.zone - vel * 0.22 > 0;
     if (want && !held) { await page.keyboard.down('e'); held = true; }
     else if (!want && held) { await page.keyboard.up('e'); held = false; }
-    if (i === 40 && shots === 0) { await shot('f3-fight'); shots++; }
+    if (i === 40 && shots === 0) {
+      await shot('f3-fight');
+      shots++;
+      // the numbers above steer the fight, but a player steers by the picture: the fish has to be on screen, and not faded to nothing
+      const seen = await page.evaluate(() => {
+        const ui = window.__lh.game().scene.getScene('UI');
+        return ui.children.list.filter((o) => o.visible && o.frame && String(o.frame.name).startsWith('item/fish-')).map((o) => o.alpha);
+      });
+      console.log('[probe] fish images on screen, alpha', JSON.stringify(seen));
+      if (!seen.some((a) => a === 1)) throw new Error(`the fish cannot be seen in the fight (alphas ${JSON.stringify(seen)})`);
+    }
     await wait(45);
   }
   if (held) await page.keyboard.up('e');

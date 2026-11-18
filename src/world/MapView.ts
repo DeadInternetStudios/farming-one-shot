@@ -54,13 +54,16 @@ export class MapView {
       // the room is the lit part: the timber beyond it falls away into shadow, so a tall screen shows a lit room in the dark and not a strip of room on a floor of planks
       const shade = scene.add.graphics().setDepth(DEPTH.water - 9);
       const step = 8;
-      for (let i = 0; i < 8; i++) {
-        shade.lineStyle(step, PAL.ink[0], Math.min(0.78, 0.1 + i * 0.1));
+      const rings = 10;
+      // five tiles of falloff, ending nearly black: what lies past the room reads as the dark of the house around it, not as more floor
+      const dark = (i: number): number => 0.12 + 0.86 * (i / (rings - 1)) ** 0.9;
+      for (let i = 0; i < rings; i++) {
+        shade.lineStyle(step, PAL.ink[0], dark(i));
         const d = i * step + step / 2;
         shade.strokeRect(-d, -d, def.w * 16 + d * 2, def.h * 16 + d * 2);
       }
-      const far = 8 * step;
-      shade.lineStyle(pad, PAL.ink[0], 0.78);
+      const far = rings * step;
+      shade.lineStyle(pad, PAL.ink[0], dark(rings - 1));
       shade.strokeRect(-far - pad / 2, -far - pad / 2, def.w * 16 + (far + pad / 2) * 2, def.h * 16 + (far + pad / 2) * 2);
       this.shade = shade;
     }

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { session } from '../game/session';
 import { tapH } from '../display';
-import { LINE } from './chrome';
+import { HUD_STRIP, LINE } from './chrome';
 import { COL, label, wrapText } from './kit';
 import { Screen, isBack, isConfirm, isDown, isUp } from './Screens';
 import { Bag, ListView } from './widgets';
@@ -43,9 +43,9 @@ export class Dialogue extends Screen {
     const lines = Math.max(1, ...this.o.pages.map((p) => wrapText(this.scene, p, room).split('\n').length));
     const h = Math.max(70, 12 + lines * LINE + 12);
     const x = Math.floor((l.uiW - w) / 2);
-    // on a short screen (a phone held sideways) the box goes up, because the people talking stand in the middle
+    // on a short screen (a phone held sideways) the box goes up, because the people talking stand in the middle; it starts under the clock and gold, whose pills it would otherwise bury
     this.high = l.uiH < 230;
-    const y = this.high ? 14 : l.uiH - h - 32;
+    const y = this.high ? HUD_STRIP + 8 : l.uiH - h - 32;
     bag.panel(x, y, w, h);
     let x0 = x + 14;
     if (this.o.portrait) {

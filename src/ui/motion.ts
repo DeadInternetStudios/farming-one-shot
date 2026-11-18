@@ -21,6 +21,8 @@ interface Moving {
   /** Where it should end up. */
   alpha: number;
   y: number;
+  /** Still fading in, and still rising: each is given up on its own, the moment something else takes that over. */
+  fade: boolean;
   lift: boolean;
   /** What this motion last set, so a change made by anything else is noticed and left alone. */
   seenAlpha: number;
@@ -30,7 +32,8 @@ interface Moving {
 /**
  * Fades the objects in from nothing, rising `rise` pixels as they settle. Each ends as clear and as high as it was
  * when this was called, and objects as wide as `skipWide` (a dimmer over the whole screen) fade without moving.
- * An object that something else changes while this runs is let go, so a list repainted mid-fade keeps its new look.
+ * What something else changes while this runs is left alone, one thing at a time: a list repainted mid-fade keeps its new look,
+ * and a picture that something moves every frame (the fish on its line) still fades in, it just does not rise.
  * Nothing moves when calm motion is on.
  */
 export function reveal(scene: Phaser.Scene, objs: readonly Phaser.GameObjects.GameObject[], o: { ms?: number; rise?: number; skipWide?: number } = {}): Motion {
@@ -38,15 +41,22 @@ export function reveal(scene: Phaser.Scene, objs: readonly Phaser.GameObjects.Ga
   const rise = o.rise ?? 0;
   const parts: (Moving | null)[] = (objs as readonly Part[])
     .filter((p) => typeof p.alpha === 'number' && typeof p.y === 'number')
-    .map((p) => ({ p, alpha: p.alpha as number, y: p.y as number, lift: rise !== 0 && (p.displayWidth ?? 0) < (o.skipWide ?? Infinity), seenAlpha: p.alpha as number, seenY: p.y as number }));
+    .map((p) => ({ p, alpha: p.alpha as number, y: p.y as number, fade: true, lift: rise !== 0 && (p.displayWidth ?? 0) < (o.skipWide ?? Infinity), seenAlpha: p.alpha as number, seenY: p.y as number }));
   const set = (k: number): void => {
     parts.forEach((q, i) => {
       if (!q) return;
-      if (!q.p.active || q.p.alpha !== q.seenAlpha || q.p.y !== q.seenY) { parts[i] = null; return; }
-      q.p.setAlpha?.(q.alpha * k);
-      if (q.lift) q.p.y = q.y + (1 - k) * rise;
-      q.seenAlpha = q.p.alpha as number;
-      q.seenY = q.p.y as number;
+      if (!q.p.active) { parts[i] = null; return; }
+      if (q.fade && q.p.alpha !== q.seenAlpha) q.fade = false;
+      if (q.lift && q.p.y !== q.seenY) q.lift = false;
+      if (!q.fade && !q.lift) { parts[i] = null; return; }
+      if (q.fade) {
+        q.p.setAlpha?.(q.alpha * k);
+        q.seenAlpha = q.p.alpha as number;
+      }
+      if (q.lift) {
+        q.p.y = q.y + (1 - k) * rise;
+        q.seenY = q.p.y as number;
+      }
     });
   };
   set(0);

@@ -25,6 +25,8 @@ import { addItem } from '../game/inventory';
 import type { Dir, ToolId, Weather } from '../game/types';
 import { tileKey } from '../game/types';
 import { getLayout } from '../display';
+import { optionEntries } from '../ui/MenuUI';
+import { heldHint } from '../ui/words';
 import { HOOKS, hookFlags } from '../hooks';
 import { POSTCARD_ON } from '../features/postcard/layout';
 import { Angler } from '../entities/Angler';
@@ -131,6 +133,7 @@ export class WorldScene extends Phaser.Scene {
 
     subscribe(this, 'use-slot', (i: number) => this.controls.selectSlot(i));
     subscribe(this, 'virtual-move', (x: number, y: number) => { this.controls.virtualMove = { x, y }; });
+    subscribe(this, 'virtual-sprint', (on: boolean) => this.controls.setVirtualSprint(on));
     subscribe(this, 'virtual-action', () => this.controls.pressAction());
     subscribe(this, 'virtual-menu', () => this.controls.pressMenu());
     subscribe(this, 'confirm-sleep', () => this.beginSleep(false));
@@ -484,7 +487,7 @@ export class WorldScene extends Phaser.Scene {
     } else if (def.kind === 'machine') {
       this.resolve(placeMachine(ctx, held.id, st.player.selected, t.x, t.y), null);
     } else {
-      this.say(`${def.name}. Press F to eat it, or ship it from the bin.`);
+      this.say(heldHint(def, getLayout().touch));
     }
   }
 
@@ -787,6 +790,7 @@ export class WorldScene extends Phaser.Scene {
     subscribe(this, 'toast', (m: string) => toasts.push(m));
     const api = {
       toasts: () => toasts.splice(0),
+      options: () => optionEntries(() => undefined, () => undefined).map((e) => e.row.text),
       repaint: () => this.view.repaintAll(),
       refreshTile: (x: number, y: number) => this.view.refresh([tileKey(x, y)]),
       tile: (x: number, y: number) => ({

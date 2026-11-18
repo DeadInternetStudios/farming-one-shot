@@ -83,6 +83,22 @@ describe('interface motion', () => {
     expect(other.alpha).toBe(1);
   });
 
+  it('still fades in a picture that something moves every frame, so the fish on its line is not left clear', () => {
+    const f = fakeScene();
+    const fish = part(1, 50);
+    reveal(f.scene, asObjects(fish), { rise: 5 });
+    expect(fish.alpha).toBe(0);
+    for (const k of [0.1, 0.3, 0.6]) {
+      fish.y = 70 + k * 10;
+      f.at(k);
+      expect(fish.y).toBe(70 + k * 10);
+    }
+    expect(fish.alpha).toBeGreaterThan(0.5);
+    f.at(1);
+    f.done();
+    expect(fish.alpha).toBe(1);
+  });
+
   it('leaves everything in place when calm motion is on', () => {
     settings.calm = true;
     const f = fakeScene();
