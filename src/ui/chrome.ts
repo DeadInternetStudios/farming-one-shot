@@ -154,9 +154,9 @@ export interface TabSpec<T extends string> {
   icon?: string;
 }
 
-/** How a row of tabs is laid out: names beside the icons, names under them, or icons alone. */
+/** How a row of tabs is laid out: names beside the icons, names under them, the name on the chosen tab only, or icons alone. */
 export interface TabPlan {
-  mode: 'beside' | 'under' | 'icons';
+  mode: 'beside' | 'under' | 'active' | 'icons';
   widths: number[];
   h: number;
   /** The names are on the tabs, so the page title does not have to say which page this is. */
@@ -165,9 +165,10 @@ export interface TabPlan {
 
 /**
  * Chooses how to fit the tabs in `inner` pixels, from roomiest to tightest: icon and name side by side,
- * the name under a smaller icon, or icons alone. Tabs never overlap, and every one is at least a fingertip tall on touch.
+ * the name under a smaller icon, the name on the chosen tab alone while the rest shrink to icons that are still a fingertip wide,
+ * or icons alone. Tabs never overlap, and every one is at least a fingertip tall on touch.
  */
-export function planTabs<T extends string>(scene: Phaser.Scene, l: Layout, inner: number, specs: readonly TabSpec<T>[]): TabPlan {
+export function planTabs<T extends string>(scene: Phaser.Scene, l: Layout, inner: number, specs: readonly TabSpec<T>[], active?: T): TabPlan {
   const base = l.touch ? tapH(l) : 16;
   const probe = label(scene, 0, 0, '').setVisible(false);
   const names = specs.map((s) => {
@@ -192,12 +193,21 @@ export function planTabs<T extends string>(scene: Phaser.Scene, l: Layout, inner
   const under = names.map((w) => Math.max(w, 14) + 4);
   const underTotal = under.reduce((a, v) => a + v, 0) + 2 * (n - 1);
   if (underTotal <= inner) return { mode: 'under', widths: spread(under, 2), h: Math.max(base, 27), labelled: true };
+  // the chosen tab wears its name; the others keep a fingertip each. Whether this fits is judged by the longest name, so the mode does not change as you switch tabs.
+  const finger = l.touch ? base : 18;
+  const wear = names.map((w) => w + 15 + 8);
+  const gaps2 = 2 * (n - 1);
+  if (Math.max(...wear) + (n - 1) * finger + gaps2 <= inner) {
+    const on = Math.max(0, specs.findIndex((t) => t.id === active));
+    const each = Math.floor((inner - gaps2 - (wear[on] as number)) / (n - 1));
+    return { mode: 'active', widths: specs.map((_, i) => (i === on ? (wear[on] as number) : each)), h: base, labelled: true };
+  }
   return { mode: 'icons', widths: specs.map(() => Math.floor((inner - GAP * (n - 1)) / n)), h: base, labelled: false };
 }
 
 /** Draws the tabs the plan describes, starting at `y`. */
 export function tabStrip<T extends string>(bag: Bag, p: Pop, y: number, plan: TabPlan, specs: readonly TabSpec<T>[], active: T, pick: (id: T) => void): { bottom: number } {
-  const gap = plan.mode === 'under' ? 2 : GAP;
+  const gap = plan.mode === 'under' || plan.mode === 'active' ? 2 : GAP;
   const used = plan.widths.reduce((a, v) => a + v, 0) + gap * (specs.length - 1);
   let tx = p.x + PAD + Math.floor((p.w - 2 * PAD - used) / 2);
   specs.forEach((s, i) => {
@@ -208,7 +218,8 @@ export function tabStrip<T extends string>(bag: Bag, p: Pop, y: number, plan: Ta
       if (s.icon) bag.img(tx + w / 2, y + 9, s.icon, [0.5, 0.5], 5);
       bag.add(label(bag.scene, tx + w / 2, y + plan.h - 11, s.label, { outline: true, origin: [0.5, 0] }), 5);
     } else {
-      bag.btn(tx, y, w, plan.mode === 'beside' ? s.label : '', kind, () => pick(s.id), plan.h, s.icon);
+      const named = plan.mode === 'beside' || (plan.mode === 'active' && s.id === active);
+      bag.btn(tx, y, w, named ? s.label : '', kind, () => pick(s.id), plan.h, s.icon);
     }
     tx += w + gap;
   });

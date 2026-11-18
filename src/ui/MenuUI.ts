@@ -544,7 +544,7 @@ export class MenuScreen extends Screen {
     const { l, bag } = this;
     this.dim(0.5);
     const f = frameOf(l, MENU_FRAME);
-    const tabs = planTabs(this.scene, l, f.inner, TABS);
+    const tabs = planTabs(this.scene, l, f.inner, TABS, this.tab);
     const row = tapH(l);
     const style = cardStyle(l, f.wide);
     // each page is as tall as its content; the frame hangs from the top the tallest page would give it, so the tabs never move
